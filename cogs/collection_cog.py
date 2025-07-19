@@ -5,6 +5,14 @@ import json
 import random
 import datetime
 
+RARITY_COLORS = {
+    "Commun": discord.Color.light_grey(),
+    "Peu Commun": discord.Color.green(),
+    "Rare": discord.Color.blue(),
+    "Épique": discord.Color.purple(),
+    "Légendaire": discord.Color.gold()
+}
+
 # --- CONFIGURATION ---
 # Remplacez 0 par l'ID du canal où les annonces de cartes rares seront postées.
 # Pour obtenir l'ID : Clic droit sur le canal -> "Copier l'ID du salon" (Mode développeur doit être activé dans Discord)
@@ -117,65 +125,7 @@ class CollectionCog(commands.Cog):
         else:
             await ctx.send(f"❌ {ctx.author.mention}, tu n'as pas assez de points. Il te manque **{PACK_COST - points} points**.", ephemeral=True)
 
-    @commands.command(name='ouvrir')
-    async def open_command(self, ctx):
-        """Ouvre un pack et révèle les cartes obtenues."""
-        user_id = ctx.author.id
-        _, packs, _, _ = database.get_user_data(user_id)
-
-        if packs <= 0:
-            await ctx.send(f"Tu n'as pas de pack à ouvrir. Fais `!pack` pour en acheter un.", ephemeral=True)
-            return
-
-        database.remove_pack(user_id, 1)
-
-        # Logique de tirage des cartes
-        cartes_obtenues = []
-        # Carte 1: 100% Commun
-        cartes_obtenues.append(random.choice(self.cards_by_rarity["Commun"]))
-        # Carte 2: 65% Commun / 35% Peu Commun
-        cartes_obtenues.append(random.choices(
-            population=[*self.cards_by_rarity["Commun"], *self.cards_by_rarity["Peu Commun"]],
-            weights=[65]*len(self.cards_by_rarity["Commun"]) + [35]*len(self.cards_by_rarity["Peu Commun"]),
-            k=1
-        )[0])
-        # Carte 3: 60% Rare / 30% Épique / 10% Légendaire
-        cartes_obtenues.append(random.choices(
-            population=[*self.cards_by_rarity["Rare"], *self.cards_by_rarity["Épique"], *self.cards_by_rarity["Légendaire"]],
-            weights=[60]*len(self.cards_by_rarity["Rare"]) + [30]*len(self.cards_by_rarity["Épique"]) + [10]*len(self.cards_by_rarity["Légendaire"]),
-            k=1
-        )[0])
-
-        # Création de l'embed pour afficher les résultats
-        embed = discord.Embed(title=f"🎁 Contenu de ton pack, {ctx.author.name} !", color=discord.Color.gold())
-
-        annonce_publique = None
-
-        for carte in cartes_obtenues:
-            database.add_card_to_collection(user_id, carte['id'])
-            embed.add_field(name=f"**{carte['nom']}** ({carte['rarete']})", value=f"*{carte['club']}*", inline=False)
-
-            # Si une carte Épique ou Légendaire est tirée, on prépare une annonce
-            if carte['rarete'] in ["Épique", "Légendaire"]:
-                annonce_embed = discord.Embed(
-                    title=f"✨ Tirage Exceptionnel ! ✨",
-                    description=f"**{ctx.author.mention}** vient d'obtenir **{carte['nom']} ({carte['rarete']})** dans un pack !",
-                    color=discord.Color.orange() if carte['rarete'] == "Épique" else discord.Color.purple()
-                )
-                annonce_embed.set_thumbnail(url=carte['image_url'])
-                annonce_publique = annonce_embed
-
-        # On prend la miniature de la carte la plus rare pour l'embed principal
-        carte_plus_rare = max(cartes_obtenues, key=lambda c: list(self.cards_by_rarity.keys()).index(c['rarete']))
-        embed.set_thumbnail(url=carte_plus_rare['image_url'])
-
-        await ctx.send(embed=embed, ephemeral=True)
-
-        # Envoi de l'annonce publique si une carte rare a été trouvée et si le canal est configuré
-        if annonce_publique and ANNONCE_CHANNEL_ID != 441234583372038153:
-            channel = self.bot.get_channel(ANNONCE_CHANNEL_ID)
-            if channel:
-                await channel.send(embed=annonce_publique)
+    
 
     @commands.command(name='collection')
     async def collection_command(self, ctx):
