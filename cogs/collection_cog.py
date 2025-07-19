@@ -13,6 +13,14 @@ RARITY_COLORS = {
     "Légendaire": discord.Color.gold()
 }
 
+ANSI_COLORS = {
+    "Commun": "[2;37m",       # Gris
+    "Peu Commun": "[0;32m",    # Vert
+    "Rare": "[0;34m",          # Bleu
+    "Épique": "[0;35m",        # Magenta/Violet
+    "Légendaire": "[0;33m"     # Jaune/Or
+}
+
 # --- CONFIGURATION ---
 # Remplacez 0 par l'ID du canal où les annonces de cartes rares seront postées.
 # Pour obtenir l'ID : Clic droit sur le canal -> "Copier l'ID du salon" (Mode développeur doit être activé dans Discord)
@@ -192,39 +200,145 @@ class CollectionCog(commands.Cog):
         # Message de conclusion
         await ctx.send(f"Tes nouvelles cartes ont été ajoutées à ta collection ! Fais `!collection` pour les voir.", ephemeral=True)
 
+    
+    def format_card_name(card):
+        """Met en forme le nom d'une carte avec la couleur ANSI appropriée."""
+        color = ANSI_COLORS.get(card['rarete'], "[0;37m") # Défaut blanc
+        return f"{color}{card['nom']}[0m" # "[0m" réinitialise la couleur
+    
+    class CollectionView(discord.ui.View):
+        def __init__(self, author_id, user_collection_data):
+            super().__init__(timeout=180)  # La vue se désactivera après 3 minutes d'inactivité
+            self.author_id = author_id
+            self.collection = user_collection_data
+            
+            # Regroupe les cartes par club
+            self.cards_by_club = {}
+            for card in self.collection:
+                club = card['club']
+                if club not in self.cards_by_club:
+                    self.cards_by_club[club] = []
+                self.cards_by_club[club].append(card)
+    
+            # État actuel de la vue
+            self.current_club = None
+            self.current_page = 0
+            self.items_per_page = 1 # On affiche une carte par page pour bien voir l'image
+    
+            # Ajoute le menu déroulant et les boutons
+            self.add_item(self.create_club_select())
+            self.add_item(self.prev_button)
+            self.add_item(self.next_button)
+            self.update_buttons()
+    
+        def create_club_select(self):
+            """Crée le menu déroulant avec les clubs possédés."""
+            options = [
+                discord.SelectOption(label=club, description=f"{len(cards)} carte(s)")
+                for club, cards in sorted(self.cards_by_club.items())
+            ]
+            if not options:
+                 return discord.ui.Select(placeholder="Ta collection est vide !", disabled=True)
+    
+            return discord.ui.Select(
+                placeholder="Choisis un club pour voir les cartes...",
+                options=options,
+                custom_id="club_select"
+            )
+    
+        async def generate_embed(self):
+            """Génère l'embed en fonction de l'état actuel (club et page)."""
+            if self.current_club is None:
+                # Embed initial / d'accueil
+                embed = discord.Embed(
+                    title="🗂️ Ta Collection",
+                    description="Utilise le menu déroulant ci-dessous pour sélectionner un club et voir tes cartes.",
+                    color=discord.Color.dark_green()
+                )
+                total_cards = len(self.collection)
+                total_unique_cards = len(set(c['id'] for c in self.collection)) # Compte les uniques
+                embed.set_footer(text=f"Tu possèdes {total_cards} cartes au total ({total_unique_cards} uniques).")
+                return embed
+            
+            # Embed affichant une carte d'un club spécifique
+            cards_in_club = self.cards_by_club[self.current_club]
+            card = cards_in_club[self.current_page]
+            
+            color = RARITY_COLORS.get(card['rarete'], discord.Color.default())
+            embed = discord.Embed(
+                title=f"**{card['nom']}**",
+                description=f"**Club :** {card['club']}\n**Rareté :** {card['rarete']}",
+                color=color
+            )
+            embed.set_image(url=card['image_url'])
+            embed.set_footer(text=f"Carte {self.current_page + 1} / {len(cards_in_club)}")
+            return embed
+    
+        def update_buttons(self):
+            """Active ou désactive les boutons de navigation."""
+            if self.current_club is None:
+                self.prev_button.disabled = True
+                self.next_button.disabled = True
+            else:
+                cards_in_club = self.cards_by_club[self.current_club]
+                self.prev_button.disabled = self.current_page == 0
+                self.next_button.disabled = self.current_page >= len(cards_in_club) - 1
+    
+        @discord.ui.select(custom_id="club_select")
+        async def select_callback(self, interaction: discord.Interaction, select: discord.ui.Select):
+            if interaction.user.id != self.author_id:
+                await interaction.response.send_message("Tu ne peux pas interagir avec la collection de quelqu'un d'autre.", ephemeral=True)
+                return
+    
+            self.current_club = select.values[0]
+            self.current_page = 0 # Revenir à la première page
+            self.update_buttons()
+            embed = await self.generate_embed()
+            await interaction.response.edit_message(embed=embed, view=self)
+            
+        prev_button = discord.ui.Button(label="◀ Précédent", style=discord.ButtonStyle.blurple, custom_id="prev")
+        next_button = discord.ui.Button(label="Suivant ▶", style=discord.ButtonStyle.blurple, custom_id="next")
+        
+        @discord.ui.button(custom_id="prev")
+        async def prev_button_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
+            if interaction.user.id != self.author_id:
+                return
+            self.current_page -= 1
+            self.update_buttons()
+            embed = await self.generate_embed()
+            await interaction.response.edit_message(embed=embed, view=self)
+            
+        @discord.ui.button(custom_id="next")
+        async def next_button_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
+            if interaction.user.id != self.author_id:
+                return
+            self.current_page += 1
+            self.update_buttons()
+            embed = await self.generate_embed()
+            await interaction.response.edit_message(embed=embed, view=self)
+    
+    
     @commands.command(name='collection')
     async def collection_command(self, ctx):
-        """Affiche la collection de l'utilisateur, groupée par club."""
+        """Affiche la collection de manière interactive."""
         user_id = ctx.author.id
-        card_ids = database.get_user_collection(user_id)
-
-        if not card_ids:
+        
+        # 1. Obtenir les IDs uniques des cartes
+        all_card_ids = database.get_user_collection(user_id)
+        unique_card_ids = list(set(all_card_ids)) # <-- GESTION DES DOUBLONS ICI
+        
+        # 2. Transformer les IDs en objets carte complets
+        user_collection_data = [self.card_map[card_id] for card_id in unique_card_ids if card_id in self.card_map]
+        
+        if not user_collection_data:
             await ctx.send("Ta collection est vide pour le moment. Ouvre des packs pour la commencer !", ephemeral=True)
             return
+            
+        # 3. Créer et envoyer la vue interactive
+        view = CollectionView(user_id, user_collection_data)
+        initial_embed = await view.generate_embed()
+        await ctx.send(embed=initial_embed, view=view, ephemeral=True)
 
-        collection = {}
-        for card_id in card_ids:
-            card = self.card_map.get(card_id)
-            if card:
-                club = card['club']
-                if club not in collection:
-                    collection[club] = []
-                collection[club].append(f"**{card['nom']}** ({card['rarete']})")
-
-        embed = discord.Embed(title=f"🗂️ Collection de {ctx.author.name}", color=discord.Color.dark_green())
-
-        if not collection:
-            embed.description = "Ta collection est vide."
-        else:
-            # Trie les clubs par ordre alphabétique
-            for club in sorted(collection.keys()):
-                # S'assure que la valeur du champ ne dépasse pas la limite de Discord (1024 caractères)
-                joueurs_str = "\n".join(collection[club])
-                if len(joueurs_str) > 1024:
-                    joueurs_str = joueurs_str[:1020] + "\n..."
-                embed.add_field(name=f"**{club}**", value=joueurs_str, inline=False)
-
-        await ctx.send(embed=embed, ephemeral=True)
 
     @commands.command(name='addpoints')
     @commands.has_permissions(manage_guild=True) # <-- LA SÉCURITÉ EST ICI !
