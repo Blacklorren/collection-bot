@@ -1,0 +1,72 @@
+[
+  {
+    "id": 1,
+    "nom": "Nikola Karabatic",
+    "club": "Paris Saint-Germain",
+    "rarete": "Légendaire",
+    "image_url": "https://i.imgur.com/exemple.png"
+  },
+  {
+    "id": 2,
+    "nom": "Ludovic Fabregas",
+    "club": "Veszprém KC",
+    "rarete": "Légendaire",
+    "image_url": "https://i.imgur.com/exemple.png"
+  },
+  {
+    "id": 10,
+    "nom": "Dika Mem",
+    "club": "FC Barcelone",
+    "rarete": "Épique",
+    "image_url": "https://i.imgur.com/exemple.png"
+  },
+  {
+    "id": 11,
+    "nom": "Elohim Prandi",
+    "club": "Paris Saint-Germain",
+    "rarete": "Épique",
+    "image_url": "https://i.imgur.com/exemple.png"
+  },
+  {
+    "id": 50,
+    "nom": "Kentin Mahé",
+    "club": "Veszprém KC",
+    "rarete": "Rare",
+    "image_url": "https://i.imgur.com/exemple.png"
+  },
+  {
+    "id": 51,
+    "nom": "Nedim Remili",
+    "club": "Veszprém KC",
+    "rarete": "Rare",
+    "image_url": "https://i.imgur.com/exemple.png"
+  },
+  {
+    "id": 100,
+    "nom": "Vincent Gérard",
+    "club": "Istres Provence Handball",
+    "rarete": "Peu Commun",
+    "image_url": "https://i.imgur.com/exemple.png"
+  },
+  {
+    "id": 101,
+    "nom": "Valentin Porte",
+    "club": "Montpellier Handball",
+    "rarete": "Peu Commun",
+    "image_url": "https://i.imgur.com/exemple.png"
+  },
+  {
+    "id": 200,
+    "nom": "Karl Konan",
+    "club": "Montpellier Handball",
+    "rarete": "Commun",
+    "image_url": "https://i.imgur.com/exemple.png"
+  },
+  {
+    "id": 201,
+    "nom": "Dylan Nahi",
+    "club": "Industria Kielce",
+    "rarete": "Commun",
+    "image_url": "https://i.imgur.com/exemple.png"
+  }
+]
