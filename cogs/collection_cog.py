@@ -317,7 +317,7 @@ class CollectionCog(commands.Cog):
             await ctx.send("Ta collection est vide pour le moment. Ouvre des packs pour la commencer !", ephemeral=True)
             return
             
-        view = CollectionView(user_id, user_collection_data)
+        view = self.CollectionView(user_id, user_collection_data)
         initial_embed = await view.generate_embed()
         await ctx.send(embed=initial_embed, view=view, ephemeral=True)
 
