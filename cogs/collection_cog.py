@@ -201,66 +201,62 @@ class CollectionCog(commands.Cog):
         await ctx.send(f"Tes nouvelles cartes ont été ajoutées à ta collection ! Fais `!collection` pour les voir.", ephemeral=True)
 
     
-    def format_card_name(card):
-        """Met en forme le nom d'une carte avec la couleur ANSI appropriée."""
-        color = ANSI_COLORS.get(card['rarete'], "[0;37m") # Défaut blanc
-        return f"{color}{card['nom']}[0m" # "[0m" réinitialise la couleur
-    
+
     class CollectionView(discord.ui.View):
+        # On définit les variables d'état ici
+        current_club: str = None
+        current_page: int = 0
+    
         def __init__(self, author_id, user_collection_data):
-            super().__init__(timeout=180)  # La vue se désactivera après 3 minutes d'inactivité
+            super().__init__(timeout=180) # La vue se désactive après 3 minutes
             self.author_id = author_id
-            self.collection = user_collection_data
             
-            # Regroupe les cartes par club
+            # On regroupe les cartes de l'utilisateur par club
             self.cards_by_club = {}
-            for card in self.collection:
+            for card in user_collection_data:
                 club = card['club']
                 if club not in self.cards_by_club:
                     self.cards_by_club[club] = []
                 self.cards_by_club[club].append(card)
+            
+            # On peuple dynamiquement le menu déroulant avec les clubs possédés
+            self.club_select.options = self.create_select_options()
+            if not self.club_select.options:
+                self.club_select.placeholder = "Ta collection est vide !"
+                self.club_select.disabled = True
+                
+            # On met à jour l'état initial des boutons
+            self.update_buttons_state()
     
-            # État actuel de la vue
-            self.current_club = None
-            self.current_page = 0
-            self.items_per_page = 1 # On affiche une carte par page pour bien voir l'image
-    
-            # Ajoute le menu déroulant et les boutons
-            self.add_item(self.create_club_select())
-            self.add_item(self.prev_button)
-            self.add_item(self.next_button)
-            self.update_buttons()
-    
-        def create_club_select(self):
-            """Crée le menu déroulant avec les clubs possédés."""
-            options = [
+        def create_select_options(self):
+            """Crée la liste des options pour le menu déroulant."""
+            return [
                 discord.SelectOption(label=club, description=f"{len(cards)} carte(s)")
                 for club, cards in sorted(self.cards_by_club.items())
             ]
-            if not options:
-                 return discord.ui.Select(placeholder="Ta collection est vide !", disabled=True)
     
-            return discord.ui.Select(
-                placeholder="Choisis un club pour voir les cartes...",
-                options=options,
-                custom_id="club_select"
-            )
+        def update_buttons_state(self):
+            """Active ou désactive les boutons de navigation."""
+            if self.current_club is None:
+                self.prev_button.disabled = True
+                self.next_button.disabled = True
+            else:
+                cards_in_club = self.cards_by_club[self.current_club]
+                self.prev_button.disabled = self.current_page == 0
+                self.next_button.disabled = self.current_page >= len(cards_in_club) - 1
     
         async def generate_embed(self):
             """Génère l'embed en fonction de l'état actuel (club et page)."""
             if self.current_club is None:
-                # Embed initial / d'accueil
                 embed = discord.Embed(
                     title="🗂️ Ta Collection",
                     description="Utilise le menu déroulant ci-dessous pour sélectionner un club et voir tes cartes.",
                     color=discord.Color.dark_green()
                 )
-                total_cards = len(self.collection)
-                total_unique_cards = len(set(c['id'] for c in self.collection)) # Compte les uniques
-                embed.set_footer(text=f"Tu possèdes {total_cards} cartes au total ({total_unique_cards} uniques).")
+                total_unique_cards = len(self.cards_by_club.keys())
+                embed.set_footer(text=f"Tu possèdes des cartes de {total_unique_cards} club(s) différent(s).")
                 return embed
             
-            # Embed affichant une carte d'un club spécifique
             cards_in_club = self.cards_by_club[self.current_club]
             card = cards_in_club[self.current_page]
             
@@ -274,46 +270,35 @@ class CollectionCog(commands.Cog):
             embed.set_footer(text=f"Carte {self.current_page + 1} / {len(cards_in_club)}")
             return embed
     
-        def update_buttons(self):
-            """Active ou désactive les boutons de navigation."""
-            if self.current_club is None:
-                self.prev_button.disabled = True
-                self.next_button.disabled = True
-            else:
-                cards_in_club = self.cards_by_club[self.current_club]
-                self.prev_button.disabled = self.current_page == 0
-                self.next_button.disabled = self.current_page >= len(cards_in_club) - 1
+        # --- Définition des composants interactifs avec les décorateurs ---
     
-        @discord.ui.select(custom_id="club_select")
-        async def select_callback(self, interaction: discord.Interaction, select: discord.ui.Select):
+        @discord.ui.select(placeholder="Choisis un club pour voir les cartes...", row=0)
+        async def club_select(self, interaction: discord.Interaction, select: discord.ui.Select):
             if interaction.user.id != self.author_id:
                 await interaction.response.send_message("Tu ne peux pas interagir avec la collection de quelqu'un d'autre.", ephemeral=True)
                 return
     
             self.current_club = select.values[0]
-            self.current_page = 0 # Revenir à la première page
-            self.update_buttons()
+            self.current_page = 0
+            self.update_buttons_state()
             embed = await self.generate_embed()
             await interaction.response.edit_message(embed=embed, view=self)
-            
-        prev_button = discord.ui.Button(label="◀ Précédent", style=discord.ButtonStyle.blurple, custom_id="prev")
-        next_button = discord.ui.Button(label="Suivant ▶", style=discord.ButtonStyle.blurple, custom_id="next")
-        
-        @discord.ui.button(custom_id="prev")
-        async def prev_button_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
+    
+        @discord.ui.button(label="◀ Précédent", style=discord.ButtonStyle.blurple, row=1)
+        async def prev_button(self, interaction: discord.Interaction, button: discord.ui.Button):
             if interaction.user.id != self.author_id:
                 return
             self.current_page -= 1
-            self.update_buttons()
+            self.update_buttons_state()
             embed = await self.generate_embed()
             await interaction.response.edit_message(embed=embed, view=self)
-            
-        @discord.ui.button(custom_id="next")
-        async def next_button_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
+    
+        @discord.ui.button(label="Suivant ▶", style=discord.ButtonStyle.blurple, row=1)
+        async def next_button(self, interaction: discord.Interaction, button: discord.ui.Button):
             if interaction.user.id != self.author_id:
                 return
             self.current_page += 1
-            self.update_buttons()
+            self.update_buttons_state()
             embed = await self.generate_embed()
             await interaction.response.edit_message(embed=embed, view=self)
     
@@ -323,21 +308,19 @@ class CollectionCog(commands.Cog):
         """Affiche la collection de manière interactive."""
         user_id = ctx.author.id
         
-        # 1. Obtenir les IDs uniques des cartes
         all_card_ids = database.get_user_collection(user_id)
-        unique_card_ids = list(set(all_card_ids)) # <-- GESTION DES DOUBLONS ICI
+        unique_card_ids = list(set(all_card_ids)) # Gestion des doublons
         
-        # 2. Transformer les IDs en objets carte complets
         user_collection_data = [self.card_map[card_id] for card_id in unique_card_ids if card_id in self.card_map]
         
         if not user_collection_data:
             await ctx.send("Ta collection est vide pour le moment. Ouvre des packs pour la commencer !", ephemeral=True)
             return
             
-        # 3. Créer et envoyer la vue interactive
         view = CollectionView(user_id, user_collection_data)
         initial_embed = await view.generate_embed()
         await ctx.send(embed=initial_embed, view=view, ephemeral=True)
+
 
 
     @commands.command(name='addpoints')
