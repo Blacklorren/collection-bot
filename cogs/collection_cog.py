@@ -161,29 +161,29 @@ class CollectionCog(commands.Cog):
 
         await ctx.send(embed=embed, ephemeral=True)
 
-@commands.command(name='addpoints')
-@commands.has_permissions(manage_guild=True) # <-- LA SÉCURITÉ EST ICI !
-async def add_points_command(self, ctx, member: discord.Member, amount: int):
-    """
-    Commande réservée aux admins pour donner des points à un membre.
-    Utilisation : !addpoints @NomUtilisateur 500
-    """
-    if amount <= 0:
-        await ctx.send("❌ Vous devez donner un nombre de points positif.", ephemeral=True)
-        return
-
-    # On ajoute les points dans la base de données
-    database.update_points(member.id, amount)
-
-    # On confirme l'action à l'administrateur
-    await ctx.send(f"✅ J'ai ajouté avec succès **{amount} points** à {member.mention}.", ephemeral=True)
-
-    # (Optionnel) On envoie un message privé à l'utilisateur qui a reçu les points
-    try:
-        await member.send(f"🎉 Un administrateur vient de vous créditer de **{amount} points** !")
-    except discord.errors.Forbidden:
-        # Si l'utilisateur a bloqué les MPs, on prévient l'admin
-        await ctx.send(f"*(Note : Impossible de notifier {member.mention} par message privé.)*", ephemeral=True)
+    @commands.command(name='addpoints')
+    @commands.has_permissions(manage_guild=True) # <-- LA SÉCURITÉ EST ICI !
+    async def add_points_command(self, ctx, member: discord.Member, amount: int):
+        """
+        Commande réservée aux admins pour donner des points à un membre.
+        Utilisation : !addpoints @NomUtilisateur 500
+        """
+        if amount <= 0:
+            await ctx.send("❌ Vous devez donner un nombre de points positif.", ephemeral=True)
+            return
+    
+        # On ajoute les points dans la base de données
+        database.update_points(member.id, amount)
+    
+        # On confirme l'action à l'administrateur
+        await ctx.send(f"✅ J'ai ajouté avec succès **{amount} points** à {member.mention}.", ephemeral=True)
+    
+        # (Optionnel) On envoie un message privé à l'utilisateur qui a reçu les points
+        try:
+            await member.send(f"🎉 Un administrateur vient de vous créditer de **{amount} points** !")
+        except discord.errors.Forbidden:
+            # Si l'utilisateur a bloqué les MPs, on prévient l'admin
+            await ctx.send(f"*(Note : Impossible de notifier {member.mention} par message privé.)*", ephemeral=True)
 
 async def setup(bot):
     """Fonction requise par discord.py pour charger le Cog."""
