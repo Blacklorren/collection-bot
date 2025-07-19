@@ -26,9 +26,10 @@ ANSI_COLORS = {
 # Pour obtenir l'ID : Clic droit sur le canal -> "Copier l'ID du salon" (Mode développeur doit être activé dans Discord)
 ANNONCE_CHANNEL_ID = 0 
 PACK_COST = 150  # Coût en points pour acheter un pack
-DAILY_REWARD = 100 # Points donnés par la commande !daily
-POINTS_PER_MESSAGE = 5 # Points donnés par message (avec cooldown)
-MESSAGE_COOLDOWN = 60 # Temps en secondes avant de pouvoir regagner des points par message
+DAILY_BONUS = 100 # Points pour le premier message de la journée
+POINTS_PER_MESSAGE = 10 # Points par message
+MAX_DAILY_MESSAGE_POINTS = 200 # Limite de points gagnés par message par jour
+MESSAGE_COOLDOWN = 10 # Temps en secondes entre chaque gain de points
 
 # Fonction pour charger les données des cartes depuis le fichier JSON
 def load_cards_data():
@@ -65,23 +66,40 @@ class CollectionCog(commands.Cog):
             print(f"Impossible d'envoyer un MP à {member.name}.")
 
     @commands.Cog.listener()
-    async def on_message(self, message):
-        """Donne des points quand un utilisateur envoie un message (avec cooldown)."""
-        if message.author.bot or message.content.startswith('!') or not message.guild:
-            return
+async def on_message(self, message):
+    """Gère le gain de points pour les messages et le bonus journalier."""
+    if message.author.bot or message.content.startswith('!') or not message.guild:
+        return
 
-        user_id = message.author.id
-        _, _, _, last_message_time_str = database.get_user_data(user_id)
+    user_id = message.author.id
+    user_data = database.get_user_data(user_id)
+    
+    now = datetime.datetime.now()
+    today_str = datetime.date.today().isoformat()
 
-        now = datetime.datetime.now()
+    # 1. Vérifier si c'est un nouveau jour pour l'utilisateur
+    if user_data['last_activity_date'] != today_str:
+        # C'est le premier message de la journée !
+        database.reset_daily_and_add_first_bonus(user_id, DAILY_BONUS, POINTS_PER_MESSAGE)
+        try:
+            # On le notifie de son bonus
+            await message.author.send(f"🎉 C'est ton premier message de la journée ! Tu as reçu un bonus de **{DAILY_BONUS} points** ainsi que **{POINTS_PER_MESSAGE} points** pour ton message.")
+        except discord.errors.Forbidden:
+            pass # L'utilisateur a bloqué les MPs, on continue silencieusement
+        return # L'action est terminée pour ce message
 
-        if last_message_time_str:
-            last_message_time = datetime.datetime.fromisoformat(last_message_time_str)
-            if (now - last_message_time).total_seconds() < MESSAGE_COOLDOWN:
-                return # Cooldown n'est pas terminé
+    # 2. Si c'est le même jour, on vérifie le cooldown
+    if user_data['last_message_time']:
+        last_message_time = datetime.datetime.fromisoformat(user_data['last_message_time'])
+        if (now - last_message_time).total_seconds() < MESSAGE_COOLDOWN:
+            return # Cooldown n'est pas terminé, on ne fait rien
 
-        database.update_points(user_id, POINTS_PER_MESSAGE)
-        database.update_last_message_time(user_id)
+    # 3. On vérifie si la limite de points par message est atteinte
+    if user_data['daily_message_points'] >= MAX_DAILY_MESSAGE_POINTS:
+        return # Limite atteinte, on ne donne plus de points pour les messages aujourd'hui
+
+    # 4. Si toutes les conditions sont remplies, on donne les points
+    database.update_on_message_activity(user_id, POINTS_PER_MESSAGE)
 
     # === COMMANDES ===
     @commands.command(name='aide')
@@ -94,7 +112,6 @@ class CollectionCog(commands.Cog):
         )
         embed.add_field(name="`!collection`", value="Affiche toutes les cartes que tu possèdes, triées par club.", inline=False)
         embed.add_field(name="`!points`", value="Consulte ton solde de points actuel.", inline=False)
-        embed.add_field(name="`!daily`", value=f"Récupère ta récompense journalière de **{DAILY_REWARD} points**.", inline=False)
         embed.add_field(name="`!pack`", value=f"Achète un pack de cartes pour **{PACK_COST} points**.", inline=False)
         embed.add_field(name="`!ouvrir`", value="Ouvre un pack pour recevoir de nouvelles cartes.", inline=False)
         await ctx.send(embed=embed)
@@ -105,21 +122,7 @@ class CollectionCog(commands.Cog):
         """Affiche le solde de points de l'utilisateur."""
         points, packs, _, _ = database.get_user_data(ctx.author.id)
         await ctx.send(f"💰 {ctx.author.mention}, tu as actuellement **{points} points** et **{packs} pack(s)** à ouvrir.", ephemeral=True)
-
-    @commands.command(name='daily')
-    async def daily_command(self, ctx):
-        """Permet de récupérer une récompense journalière."""
-        user_id = ctx.author.id
-        _, _, last_daily_str, _ = database.get_user_data(user_id)
-        today_str = datetime.date.today().isoformat()
-
-        if last_daily_str == today_str:
-            await ctx.send(f"⏳ {ctx.author.mention}, tu as déjà récupéré ta récompense aujourd'hui. Reviens demain !", ephemeral=True)
-        else:
-            database.update_points(user_id, DAILY_REWARD)
-            database.set_daily_claimed(user_id)
-            await ctx.send(f"🎉 {ctx.author.mention}, tu as reçu tes **{DAILY_REWARD} points** quotidiens !", ephemeral=True)
-
+    
     @commands.command(name='pack')
     async def pack_command(self, ctx):
         """Achète un pack de cartes."""
