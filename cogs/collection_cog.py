@@ -66,40 +66,40 @@ class CollectionCog(commands.Cog):
             print(f"Impossible d'envoyer un MP à {member.name}.")
 
     @commands.Cog.listener()
-async def on_message(self, message):
-    """Gère le gain de points pour les messages et le bonus journalier."""
-    if message.author.bot or message.content.startswith('!') or not message.guild:
-        return
-
-    user_id = message.author.id
-    user_data = database.get_user_data(user_id)
+    async def on_message(self, message):
+        """Gère le gain de points pour les messages et le bonus journalier."""
+        if message.author.bot or message.content.startswith('!') or not message.guild:
+            return
     
-    now = datetime.datetime.now()
-    today_str = datetime.date.today().isoformat()
-
-    # 1. Vérifier si c'est un nouveau jour pour l'utilisateur
-    if user_data['last_activity_date'] != today_str:
-        # C'est le premier message de la journée !
-        database.reset_daily_and_add_first_bonus(user_id, DAILY_BONUS, POINTS_PER_MESSAGE)
-        try:
-            # On le notifie de son bonus
-            await message.author.send(f"🎉 C'est ton premier message de la journée ! Tu as reçu un bonus de **{DAILY_BONUS} points** ainsi que **{POINTS_PER_MESSAGE} points** pour ton message.")
-        except discord.errors.Forbidden:
-            pass # L'utilisateur a bloqué les MPs, on continue silencieusement
-        return # L'action est terminée pour ce message
-
-    # 2. Si c'est le même jour, on vérifie le cooldown
-    if user_data['last_message_time']:
-        last_message_time = datetime.datetime.fromisoformat(user_data['last_message_time'])
-        if (now - last_message_time).total_seconds() < MESSAGE_COOLDOWN:
-            return # Cooldown n'est pas terminé, on ne fait rien
-
-    # 3. On vérifie si la limite de points par message est atteinte
-    if user_data['daily_message_points'] >= MAX_DAILY_MESSAGE_POINTS:
-        return # Limite atteinte, on ne donne plus de points pour les messages aujourd'hui
-
-    # 4. Si toutes les conditions sont remplies, on donne les points
-    database.update_on_message_activity(user_id, POINTS_PER_MESSAGE)
+        user_id = message.author.id
+        user_data = database.get_user_data(user_id)
+        
+        now = datetime.datetime.now()
+        today_str = datetime.date.today().isoformat()
+    
+        # 1. Vérifier si c'est un nouveau jour pour l'utilisateur
+        if user_data['last_activity_date'] != today_str:
+            # C'est le premier message de la journée !
+            database.reset_daily_and_add_first_bonus(user_id, DAILY_BONUS, POINTS_PER_MESSAGE)
+            try:
+                # On le notifie de son bonus
+                await message.author.send(f"🎉 C'est ton premier message de la journée ! Tu as reçu un bonus de **{DAILY_BONUS} points** ainsi que **{POINTS_PER_MESSAGE} points** pour ton message.")
+            except discord.errors.Forbidden:
+                pass # L'utilisateur a bloqué les MPs, on continue silencieusement
+            return # L'action est terminée pour ce message
+    
+        # 2. Si c'est le même jour, on vérifie le cooldown
+        if user_data['last_message_time']:
+            last_message_time = datetime.datetime.fromisoformat(user_data['last_message_time'])
+            if (now - last_message_time).total_seconds() < MESSAGE_COOLDOWN:
+                return # Cooldown n'est pas terminé, on ne fait rien
+    
+        # 3. On vérifie si la limite de points par message est atteinte
+        if user_data['daily_message_points'] >= MAX_DAILY_MESSAGE_POINTS:
+            return # Limite atteinte, on ne donne plus de points pour les messages aujourd'hui
+    
+        # 4. Si toutes les conditions sont remplies, on donne les points
+        database.update_on_message_activity(user_id, POINTS_PER_MESSAGE)
 
     # === COMMANDES ===
     @commands.command(name='aide')
