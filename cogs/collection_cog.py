@@ -126,6 +126,71 @@ class CollectionCog(commands.Cog):
             await ctx.send(f"❌ {ctx.author.mention}, tu n'as pas assez de points. Il te manque **{PACK_COST - points} points**.", ephemeral=True)
 
     
+    @commands.command(name='ouvrir')
+    async def open_command(self, ctx):
+        """Ouvre un pack et révèle les cartes obtenues une par une."""
+        user_id = ctx.author.id
+        _, packs, _, _ = database.get_user_data(user_id)
+    
+        if packs <= 0:
+            await ctx.send(f"Tu n'as pas de pack à ouvrir. Fais `!pack` pour en acheter un.", ephemeral=True)
+            return
+        
+        # On informe l'utilisateur que l'ouverture commence
+        await ctx.send(f"🎉 C'est parti ! J'ouvre ton pack, {ctx.author.mention}...", ephemeral=True)
+        
+        database.remove_pack(user_id, 1)
+        
+        # Logique de tirage des cartes (inchangée)
+        cartes_obtenues = []
+        # Carte 1: 100% Commun
+        cartes_obtenues.append(random.choice(self.cards_by_rarity["Commun"]))
+        # Carte 2: 65% Commun / 35% Peu Commun
+        cartes_obtenues.append(random.choices(
+            population=[*self.cards_by_rarity["Commun"], *self.cards_by_rarity["Peu Commun"]],
+            weights=[65]*len(self.cards_by_rarity["Commun"]) + [35]*len(self.cards_by_rarity["Peu Commun"]),
+            k=1
+        )[0])
+        # Carte 3: 60% Rare / 30% Épique / 10% Légendaire
+        cartes_obtenues.append(random.choices(
+            population=[*self.cards_by_rarity["Rare"], *self.cards_by_rarity["Épique"], *self.cards_by_rarity["Légendaire"]],
+            weights=[60]*len(self.cards_by_rarity["Rare"]) + [30]*len(self.cards_by_rarity["Épique"]) + [10]*len(self.cards_by_rarity["Légendaire"]),
+            k=1
+        )[0])
+        
+        # Boucle pour envoyer une carte par message
+        for carte in cartes_obtenues:
+            # 1. On ajoute la carte à la collection dans la base de données
+            database.add_card_to_collection(user_id, carte['id'])
+            
+            # 2. On crée un embed personnalisé pour cette carte
+            couleur = RARITY_COLORS.get(carte['rarete'], discord.Color.default())
+            embed_carte = discord.Embed(
+                title=f"**{carte['nom']}**",
+                description=f"**Rareté : {carte['rarete']}**\n*Club : {carte['club']}*",
+                color=couleur
+            )
+            embed_carte.set_image(url=carte['image_url']) # Affiche la grande image du joueur
+            
+            # 3. On envoie le message discret avec l'embed de la carte
+            await ctx.send(embed=embed_carte, ephemeral=True)
+            
+            # 4. Si la carte est Épique ou Légendaire, on prépare et envoie l'annonce publique
+            if carte['rarete'] in ["Épique", "Légendaire"] and ANNONCE_CHANNEL_ID != 0:
+                annonce_embed = discord.Embed(
+                    title=f"✨ Tirage Exceptionnel ! ✨",
+                    description=f"**{ctx.author.mention}** vient d'obtenir **{carte['nom']} ({carte['rarete']})** dans un pack !",
+                    color=RARITY_COLORS.get(carte['rarete'])
+                )
+                annonce_embed.set_image(url=carte['image_url'])
+                annonce_embed.set_footer(text="Félicitations !")
+                
+                channel = self.bot.get_channel(ANNONCE_CHANNEL_ID)
+                if channel:
+                    await channel.send(embed=annonce_embed)
+                    
+        # Message de conclusion
+        await ctx.send(f"Tes nouvelles cartes ont été ajoutées à ta collection ! Fais `!collection` pour les voir.", ephemeral=True)
 
     @commands.command(name='collection')
     async def collection_command(self, ctx):
