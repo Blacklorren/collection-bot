@@ -1,7 +1,7 @@
 import sqlite3
 import datetime
 
-DB_NAME = 'collection.db'
+DB_NAME = '/data/collection.db'
 
 def initialize_database():
     """Crée les tables de la base de données si elles n'existent pas."""
