@@ -260,29 +260,45 @@ class CollectionCog(commands.Cog):
                 self.next_button.disabled = self.current_page >= len(cards_in_club) - 1
     
         async def generate_embed(self):
-            """Génère l'embed en fonction de l'état actuel (club et page)."""
-            if self.current_club is None:
-                # --- CET EMBED A ÉTÉ AMÉLIORÉ ---
-                embed = discord.Embed(
-                    title="🗂️ Ta Collection",
-                    description="Utilise le menu déroulant pour explorer ta collection par club.",
-                    color=discord.Color.dark_green()
-                )
-                
-                # Calcul de la progression
-                unique_user_cards = len(self.collection)
-                percentage = (unique_user_cards / self.total_available_cards) * 100 if self.total_available_cards > 0 else 0
-                
-                # Création d'une "barre de progression" simple
-                progress_bar = "█" * int(percentage / 10) + "░" * (10 - int(percentage / 10))
-                
-                embed.add_field(
-                    name="Progression Générale",
-                    value=f"**{unique_user_cards} / {self.total_available_cards}** cartes uniques\n"
-                          f"`{progress_bar}` {percentage:.2f}%",
-                    inline=False
-                )
-                return embed
+    """Génère l'embed en fonction de l'état actuel (club et page)."""
+    if self.current_club is None:
+        # --- L'EMBED D'ACCUEIL A ÉTÉ AMÉLIORÉ VISUELLEMENT ---
+        embed = discord.Embed(
+            title="🗂️ Ta Collection",
+            description="Utilise le menu déroulant pour explorer ta collection par club.",
+            color=discord.Color.dark_green()
+        )
+        
+        # Calcul de la progression
+        unique_user_cards = len(self.collection)
+        percentage = (unique_user_cards / self.total_available_cards) * 100 if self.total_available_cards > 0 else 0
+        
+        # Création de la barre de progression avec des emojis
+        filled_blocks = int(percentage / 10)
+        empty_blocks = 10 - filled_blocks
+        progress_bar = "🟩" * filled_blocks + "⬛" * empty_blocks
+        
+        embed.add_field(
+            name="Progression Générale",
+            value=f"**{unique_user_cards} / {self.total_available_cards}** cartes uniques\n"
+                  f"{progress_bar} **{percentage:.2f}%**", # Pourcentage en gras
+            inline=False
+        )
+        return embed
+    
+    # L'embed pour une carte spécifique reste le même
+    cards_in_club = self.cards_by_club[self.current_club]
+    card = cards_in_club[self.current_page]
+    
+    color = RARITY_COLORS.get(card['rarete'], discord.Color.default())
+    embed = discord.Embed(
+        title=f"**{card['nom']}**",
+        description=f"**Club :** {card['club']}\n**Rareté :** {card['rarete']}",
+        color=color
+    )
+    embed.set_image(url=card['image_url'])
+    embed.set_footer(text=f"Carte {self.current_page + 1} / {len(cards_in_club)}")
+    return embed
             
             # L'embed pour une carte spécifique reste le même
             cards_in_club = self.cards_by_club[self.current_club]
