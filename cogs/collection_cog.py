@@ -131,6 +131,7 @@ class CollectionCog(commands.Cog):
         embed.add_field(name="`!ouvrir`", value="Ouvre un pack pour recevoir de nouvelles cartes.", inline=False)
         embed.add_field(name="`!recycler`", value="Échange toutes tes cartes en double contre des fragments.", inline=False)
         embed.add_field(name="`!creer \"Nom du Joueur\"`", value="Dépense tes fragments pour créer une carte manquante (Rare ou supérieure).", inline=False)
+        embed.add_field(name="`!fragments`", value="Affiche ton solde de fragments et les coûts de recyclage/création.", inline=False)
         await ctx.send(embed=embed)
 
 
@@ -431,22 +432,26 @@ class CollectionCog(commands.Cog):
         await ctx.send(embed=embed, ephemeral=True)
     
     
+    # --- REMPLACEZ L'ANCIENNE create_card_command PAR CELLE-CI ---
+
     @commands.command(name='creer')
     async def create_card_command(self, ctx, *, card_name: str):
-        """Crée une carte manquante en utilisant un Joker acheté avec des Fragments."""
+        """Crée une carte manquante en utilisant une recherche de nom flexible."""
         user_id = ctx.author.id
         
-        # 1. Trouver la carte demandée
-        target_card = None
-        for card in self.all_cards:
-            if card_name.lower() == card['nom'].lower():
-                target_card = card
-                break
+        # 1. Trouver les correspondances possibles (insensible à la casse et partiel)
+        search_term = card_name.lower()
+        matches = [card for card in self.all_cards if search_term in card['nom'].lower()]
         
-        if not target_card:
-            await ctx.send(f"Désolé, je ne trouve aucune carte nommée \"{card_name}\". Vérifie l'orthographe.", ephemeral=True)
+        if not matches:
+            await ctx.send(f"Désolé, je ne trouve aucune carte contenant \"{card_name}\".", ephemeral=True)
             return
-            
+        if len(matches) > 1:
+            await ctx.send(f"Ta recherche \"{card_name}\" correspond à plusieurs joueurs. Sois plus précis !", ephemeral=True)
+            return
+        
+        target_card = matches[0]
+        
         # 2. Vérifier si l'utilisateur possède déjà la carte
         user_card_ids = database.get_user_collection(user_id)
         if target_card['id'] in user_card_ids:
@@ -454,9 +459,9 @@ class CollectionCog(commands.Cog):
             return
             
         # 3. Vérifier le coût et le solde de fragments
-        rarity_key = target_card['rarete'].lower()
-        if rarity_key not in ["rare", "epique", "legendaire"]:
-             await ctx.send(f"Tu ne peux pas créer de carte de rareté '{target_card['rarete']}'.", ephemeral=True)
+        rarity_key = target_card['rarete'].lower().replace("é", "e") # Gère "Épique" et "Légendaire"
+        if rarity_key not in JOKER_COSTS:
+             await ctx.send(f"Tu ne peux pas créer de carte de rareté '{target_card['rarete']}'. Seules les cartes Rares, Épiques ou Légendaires peuvent être créées.", ephemeral=True)
              return
              
         cost = JOKER_COSTS[rarity_key]
@@ -477,6 +482,45 @@ class CollectionCog(commands.Cog):
             color=RARITY_COLORS.get(target_card['rarete'], discord.Color.default())
         )
         embed.set_thumbnail(url=target_card['image_url'])
+        await ctx.send(embed=embed, ephemeral=True)
+
+    @commands.command(name='fragments')
+    async def fragments_command(self, ctx):
+        """Affiche le solde de fragments, les taux de recyclage et les coûts de création."""
+        user_id = ctx.author.id
+        user_data = database.get_user_data(user_id)
+        
+        embed = discord.Embed(
+            title="♻️ Gestion des Fragments ♻️",
+            description=f"Tu possèdes actuellement **{user_data['fragments']} fragments**.",
+            color=discord.Color.from_rgb(180, 180, 180) # Une couleur grise/métal
+        )
+        
+        # Taux de recyclage
+        recycling_rates = ""
+        for rarity, value in FRAGMENT_VALUES.items():
+            recycling_rates += f"Doublon **{rarity}** : **{value}** fragments\n"
+        
+        embed.add_field(
+            name="Taux de Recyclage (`!recycler`)",
+            value=recycling_rates,
+            inline=False
+        )
+        
+        # Coûts de création
+        creation_costs = ""
+        for rarity, cost in JOKER_COSTS.items():
+            # Met la première lettre en majuscule pour un affichage propre
+            creation_costs += f"Créer une carte **{rarity.capitalize()}** : **{cost}** fragments\n"
+            
+        embed.add_field(
+            name="Coût de Création (`!creer`)",
+            value=creation_costs,
+            inline=False
+        )
+        
+        embed.set_footer(text="Utilise !recycler pour gagner des fragments et !creer \"Nom Joueur\" pour les dépenser.")
+        
         await ctx.send(embed=embed, ephemeral=True)
 
 async def setup(bot):
