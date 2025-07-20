@@ -31,6 +31,21 @@ POINTS_PER_MESSAGE = 10 # Points par message
 MAX_DAILY_MESSAGE_POINTS = 200 # Limite de points gagnés par message par jour
 MESSAGE_COOLDOWN = 10 # Temps en secondes entre chaque gain de points
 
+# Configuration du système de recyclage et de Jokers
+FRAGMENT_VALUES = {
+    "Commun": 2,
+    "Peu Commun": 5,
+    "Rare": 10,
+    "Épique": 30,
+    "Légendaire": 100
+}
+
+JOKER_COSTS = {
+    "rare": 250,
+    "epique": 800,
+    "legendaire": 3000
+}
+
 # Fonction pour charger les données des cartes depuis le fichier JSON
 def load_cards_data():
     with open('cards.json', 'r', encoding='utf-8') as f:
@@ -114,20 +129,21 @@ class CollectionCog(commands.Cog):
         embed.add_field(name="`!points`", value="Consulte ton solde de points actuel.", inline=False)
         embed.add_field(name="`!pack`", value=f"Achète un pack de cartes pour **{PACK_COST} points**.", inline=False)
         embed.add_field(name="`!ouvrir`", value="Ouvre un pack pour recevoir de nouvelles cartes.", inline=False)
+        embed.add_field(name="`!recycler`", value="Échange toutes tes cartes en double contre des fragments.", inline=False)
+        embed.add_field(name="`!creer \"Nom du Joueur\"`", value="Dépense tes fragments pour créer une carte manquante (Rare ou supérieure).", inline=False)
         await ctx.send(embed=embed)
 
 
+    
     @commands.command(name='points')
     async def points_command(self, ctx):
-        """Affiche le solde de points de l'utilisateur."""
-        # On récupère toutes les données de l'utilisateur dans un seul objet
+        """Affiche les soldes de l'utilisateur."""
         user_data = database.get_user_data(ctx.author.id)
-    
-        # On accède aux valeurs dont on a besoin par leur nom
         points = user_data['points']
         packs = user_data['packs']
-    
-        await ctx.send(f"💰 {ctx.author.mention}, tu as actuellement **{points} points** et **{packs} pack(s)** à ouvrir.", ephemeral=True)
+        fragments = user_data['fragments']
+        
+        await ctx.send(f"💰 Tu as **{points} points** et **{packs} pack(s)**.\n♻️ Tu possèdes également **{fragments} fragments**.", ephemeral=True)
     
     @commands.command(name='pack')
     async def pack_command(self, ctx):
@@ -371,6 +387,97 @@ class CollectionCog(commands.Cog):
         except discord.errors.Forbidden:
             # Si l'utilisateur a bloqué les MPs, on prévient l'admin
             await ctx.send(f"*(Note : Impossible de notifier {member.mention} par message privé.)*", ephemeral=True)
+   
+    @commands.command(name='recycler')
+    async def recycle_command(self, ctx):
+        """Recycle les cartes en double pour obtenir des Fragments."""
+        user_id = ctx.author.id
+        all_card_ids = database.get_user_collection(user_id)
+        
+        if not all_card_ids:
+            await ctx.send("Tu n'as aucune carte à recycler.", ephemeral=True)
+            return
+            
+        seen_ids = set()
+        duplicates = []
+        for card_id in all_card_ids:
+            if card_id in seen_ids:
+                duplicates.append(card_id)
+            else:
+                seen_ids.add(card_id)
+        
+        if not duplicates:
+            await ctx.send("Tu n'as aucune carte en double à recycler.", ephemeral=True)
+            return
+            
+        fragments_gained = 0
+        for card_id in duplicates:
+            card = self.card_map.get(card_id)
+            if card:
+                fragments_gained += FRAGMENT_VALUES.get(card['rarete'], 0)
+        
+        # Mettre à jour la base de données
+        database.update_fragments(user_id, fragments_gained)
+        database.reset_and_set_collection(user_id, list(seen_ids))
+        
+        user_data = database.get_user_data(user_id)
+        
+        embed = discord.Embed(
+            title="♻️ Recyclage Terminé ♻️",
+            description=f"Tu as recyclé **{len(duplicates)}** carte(s) en double et obtenu **{fragments_gained} fragments**.",
+            color=discord.Color.orange()
+        )
+        embed.add_field(name="Nouveau Solde", value=f"Tu possèdes maintenant **{user_data['fragments']} fragments**.")
+        await ctx.send(embed=embed, ephemeral=True)
+    
+    
+    @commands.command(name='creer')
+    async def create_card_command(self, ctx, *, card_name: str):
+        """Crée une carte manquante en utilisant un Joker acheté avec des Fragments."""
+        user_id = ctx.author.id
+        
+        # 1. Trouver la carte demandée
+        target_card = None
+        for card in self.all_cards:
+            if card_name.lower() == card['nom'].lower():
+                target_card = card
+                break
+        
+        if not target_card:
+            await ctx.send(f"Désolé, je ne trouve aucune carte nommée \"{card_name}\". Vérifie l'orthographe.", ephemeral=True)
+            return
+            
+        # 2. Vérifier si l'utilisateur possède déjà la carte
+        user_card_ids = database.get_user_collection(user_id)
+        if target_card['id'] in user_card_ids:
+            await ctx.send(f"Tu possèdes déjà la carte **{target_card['nom']}**.", ephemeral=True)
+            return
+            
+        # 3. Vérifier le coût et le solde de fragments
+        rarity_key = target_card['rarete'].lower()
+        if rarity_key not in ["rare", "epique", "legendaire"]:
+             await ctx.send(f"Tu ne peux pas créer de carte de rareté '{target_card['rarete']}'.", ephemeral=True)
+             return
+             
+        cost = JOKER_COSTS[rarity_key]
+        user_data = database.get_user_data(user_id)
+        user_fragments = user_data['fragments']
+        
+        if user_fragments < cost:
+            await ctx.send(f"Il te faut **{cost} fragments** pour créer cette carte, mais tu n'en as que **{user_fragments}**.", ephemeral=True)
+            return
+            
+        # 4. Exécuter la transaction
+        database.update_fragments(user_id, -cost)
+        database.add_card_to_collection(user_id, target_card['id'])
+        
+        embed = discord.Embed(
+            title="🃏 Création de Carte Réussie ! 🃏",
+            description=f"Tu as dépensé **{cost} fragments** pour créer la carte **{target_card['nom']} ({target_card['rarete']})** !",
+            color=RARITY_COLORS.get(target_card['rarete'], discord.Color.default())
+        )
+        embed.set_thumbnail(url=target_card['image_url'])
+        await ctx.send(embed=embed, ephemeral=True)
 
 async def setup(bot):
     """Fonction requise par discord.py pour charger le Cog."""
