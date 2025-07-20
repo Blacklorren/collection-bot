@@ -523,6 +523,37 @@ class CollectionCog(commands.Cog):
         
         await ctx.send(embed=embed, ephemeral=True)
 
+     @commands.command(name='top')
+    async def top_command(self, ctx):
+        """Affiche le classement des meilleurs collectionneurs."""
+        leaderboard_data = database.get_leaderboard_data()
+        
+        embed = discord.Embed(
+            title="🏆 Top 10 des Collectionneurs 🏆",
+            description="Classement basé sur le nombre de cartes uniques possédées.",
+            color=discord.Color.gold()
+        )
+        
+        if not leaderboard_data:
+            embed.description = "Le classement est encore vide. Collectionnez des cartes pour apparaître ici !"
+        else:
+            description_text = ""
+            for rank, (user_id, unique_cards) in enumerate(leaderboard_data, 1):
+                member = ctx.guild.get_member(user_id)
+                member_name = member.display_name if member else f"Utilisateur Inconnu ({user_id})"
+                
+                emoji = ""
+                if rank == 1: emoji = "🥇 "
+                elif rank == 2: emoji = "🥈 "
+                elif rank == 3: emoji = "🥉 "
+                else: emoji = f"**#{rank}** "
+                
+                description_text += f"{emoji} **{member_name}** - {unique_cards} / {len(self.all_cards)} cartes\n"
+            
+            embed.description = description_text
+            
+        await ctx.send(embed=embed)
+
 async def setup(bot):
     """Fonction requise par discord.py pour charger le Cog."""
     await bot.add_cog(CollectionCog(bot))
