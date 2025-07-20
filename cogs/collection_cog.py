@@ -524,7 +524,7 @@ class CollectionCog(commands.Cog):
         
         await ctx.send(embed=embed, ephemeral=True)
 
-     @commands.command(name='top')
+    @commands.command(name='top')
     async def top_command(self, ctx):
         """Affiche le classement des meilleurs collectionneurs."""
         leaderboard_data = database.get_leaderboard_data()
