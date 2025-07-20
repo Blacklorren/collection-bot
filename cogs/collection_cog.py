@@ -212,20 +212,21 @@ class CollectionCog(commands.Cog):
                     
         await ctx.send(f"Tes nouvelles cartes ont été ajoutées à ta collection ! Fais `!collection` pour les voir.", ephemeral=True)
 
-    
-
+        
     class CollectionView(discord.ui.View):
         # On définit les variables d'état ici
         current_club: str = None
         current_page: int = 0
     
-        def __init__(self, author_id, user_collection_data):
+        def __init__(self, author_id, user_collection_data, total_available_cards):
             super().__init__(timeout=180) # La vue se désactive après 3 minutes
             self.author_id = author_id
+            self.collection = user_collection_data
+            self.total_available_cards = total_available_cards # <-- NOUVEAU: on stocke le total des cartes du jeu
             
             # On regroupe les cartes de l'utilisateur par club
             self.cards_by_club = {}
-            for card in user_collection_data:
+            for card in self.collection:
                 club = card['club']
                 if club not in self.cards_by_club:
                     self.cards_by_club[club] = []
@@ -242,8 +243,9 @@ class CollectionCog(commands.Cog):
     
         def create_select_options(self):
             """Crée la liste des options pour le menu déroulant."""
+            # La description indique maintenant le nombre de cartes uniques possédées pour ce club
             return [
-                discord.SelectOption(label=club, description=f"{len(cards)} carte(s)")
+                discord.SelectOption(label=club, description=f"{len(cards)} carte(s) possédée(s)")
                 for club, cards in sorted(self.cards_by_club.items())
             ]
     
@@ -260,15 +262,29 @@ class CollectionCog(commands.Cog):
         async def generate_embed(self):
             """Génère l'embed en fonction de l'état actuel (club et page)."""
             if self.current_club is None:
+                # --- CET EMBED A ÉTÉ AMÉLIORÉ ---
                 embed = discord.Embed(
                     title="🗂️ Ta Collection",
-                    description="Utilise le menu déroulant ci-dessous pour sélectionner un club et voir tes cartes.",
+                    description="Utilise le menu déroulant pour explorer ta collection par club.",
                     color=discord.Color.dark_green()
                 )
-                total_unique_cards = len(self.cards_by_club.keys())
-                embed.set_footer(text=f"Tu possèdes des cartes de {total_unique_cards} club(s) différent(s).")
+                
+                # Calcul de la progression
+                unique_user_cards = len(self.collection)
+                percentage = (unique_user_cards / self.total_available_cards) * 100 if self.total_available_cards > 0 else 0
+                
+                # Création d'une "barre de progression" simple
+                progress_bar = "█" * int(percentage / 10) + "░" * (10 - int(percentage / 10))
+                
+                embed.add_field(
+                    name="Progression Générale",
+                    value=f"**{unique_user_cards} / {self.total_available_cards}** cartes uniques\n"
+                          f"`{progress_bar}` {percentage:.2f}%",
+                    inline=False
+                )
                 return embed
             
+            # L'embed pour une carte spécifique reste le même
             cards_in_club = self.cards_by_club[self.current_club]
             card = cards_in_club[self.current_page]
             
@@ -281,8 +297,6 @@ class CollectionCog(commands.Cog):
             embed.set_image(url=card['image_url'])
             embed.set_footer(text=f"Carte {self.current_page + 1} / {len(cards_in_club)}")
             return embed
-    
-        # --- Définition des composants interactifs avec les décorateurs ---
     
         @discord.ui.select(placeholder="Choisis un club pour voir les cartes...", row=0)
         async def club_select(self, interaction: discord.Interaction, select: discord.ui.Select):
@@ -298,8 +312,7 @@ class CollectionCog(commands.Cog):
     
         @discord.ui.button(label="◀ Précédent", style=discord.ButtonStyle.blurple, row=1)
         async def prev_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-            if interaction.user.id != self.author_id:
-                return
+            if interaction.user.id != self.author_id: return
             self.current_page -= 1
             self.update_buttons_state()
             embed = await self.generate_embed()
@@ -307,8 +320,7 @@ class CollectionCog(commands.Cog):
     
         @discord.ui.button(label="Suivant ▶", style=discord.ButtonStyle.blurple, row=1)
         async def next_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-            if interaction.user.id != self.author_id:
-                return
+            if interaction.user.id != self.author_id: return
             self.current_page += 1
             self.update_buttons_state()
             embed = await self.generate_embed()
@@ -321,20 +333,21 @@ class CollectionCog(commands.Cog):
         user_id = ctx.author.id
         
         all_card_ids = database.get_user_collection(user_id)
-        unique_card_ids = list(set(all_card_ids)) # Gestion des doublons
+        unique_card_ids = list(set(all_card_ids))
         
         user_collection_data = [self.card_map[card_id] for card_id in unique_card_ids if card_id in self.card_map]
         
         if not user_collection_data:
             await ctx.send("Ta collection est vide pour le moment. Ouvre des packs pour la commencer !", ephemeral=True)
             return
-            
-        view = self.CollectionView(user_id, user_collection_data)
+        
+        # --- MODIFICATION ICI ---
+        # On passe maintenant le nombre total de cartes à la vue
+        view = self.CollectionView(user_id, user_collection_data, total_available_cards=len(self.all_cards))
         initial_embed = await view.generate_embed()
         await ctx.send(embed=initial_embed, view=view, ephemeral=True)
-
-
-
+    
+   
     @commands.command(name='addpoints')
     @commands.has_permissions(manage_guild=True) # <-- LA SÉCURITÉ EST ICI !
     async def add_points_command(self, ctx, member: discord.Member, amount: int):
