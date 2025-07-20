@@ -47,7 +47,7 @@ JOKER_COSTS = {
 }
 
 # List of user IDs to exclude from the !top command leaderboard
-LEADERBOARD_EXCLUDED_IDS = 133711821214449665
+LEADERBOARD_EXCLUDED_IDS = [133711821214449665]
 
 # Fonction pour charger les données des cartes depuis le fichier JSON
 def load_cards_data():
@@ -526,8 +526,6 @@ class CollectionCog(commands.Cog):
         embed.set_footer(text="Utilise !recycler pour gagner des fragments et !creer \"Nom Joueur\" pour les dépenser.")
         
         await ctx.send(embed=embed, ephemeral=True)
-
-    # --- REPLACE THE OLD top_command WITH THIS ONE ---
 
     @commands.command(name='top')
     async def top_command(self, ctx):
