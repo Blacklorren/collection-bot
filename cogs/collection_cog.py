@@ -120,18 +120,28 @@ class CollectionCog(commands.Cog):
     @commands.command(name='points')
     async def points_command(self, ctx):
         """Affiche le solde de points de l'utilisateur."""
-        points, packs, _, _ = database.get_user_data(ctx.author.id)
+        # On récupère toutes les données de l'utilisateur dans un seul objet
+        user_data = database.get_user_data(ctx.author.id)
+    
+        # On accède aux valeurs dont on a besoin par leur nom
+        points = user_data['points']
+        packs = user_data['packs']
+    
         await ctx.send(f"💰 {ctx.author.mention}, tu as actuellement **{points} points** et **{packs} pack(s)** à ouvrir.", ephemeral=True)
     
     @commands.command(name='pack')
     async def pack_command(self, ctx):
         """Achète un pack de cartes."""
         user_id = ctx.author.id
-        points, _, _, _ = database.get_user_data(user_id)
-
+        # On récupère les données de l'utilisateur
+        user_data = database.get_user_data(user_id)
+    
+        # On accède aux points par leur nom
+        points = user_data['points']
+    
         if points >= PACK_COST:
-            database.update_points(user_id, -PACK_COST)
-            database.add_pack(user_id, 1)
+        database.update_points(user_id, -PACK_COST)
+        database.add_pack(user_id, 1)
             await ctx.send(f"🛍️ {ctx.author.mention}, tu as acheté un pack pour **{PACK_COST} points** ! Fais `!ouvrir` pour l'ouvrir.", ephemeral=True)
         else:
             await ctx.send(f"❌ {ctx.author.mention}, tu n'as pas assez de points. Il te manque **{PACK_COST - points} points**.", ephemeral=True)
@@ -141,7 +151,11 @@ class CollectionCog(commands.Cog):
     async def open_command(self, ctx):
         """Ouvre un pack et révèle les cartes obtenues une par une."""
         user_id = ctx.author.id
-        _, packs, _, _ = database.get_user_data(user_id)
+        # On récupère les données de l'utilisateur
+        user_data = database.get_user_data(user_id)
+        
+        # On accède au nombre de packs par son nom
+        packs = user_data['packs']
     
         if packs <= 0:
             await ctx.send(f"Tu n'as pas de pack à ouvrir. Fais `!pack` pour en acheter un.", ephemeral=True)
@@ -171,22 +185,18 @@ class CollectionCog(commands.Cog):
         
         # Boucle pour envoyer une carte par message
         for carte in cartes_obtenues:
-            # 1. On ajoute la carte à la collection dans la base de données
             database.add_card_to_collection(user_id, carte['id'])
             
-            # 2. On crée un embed personnalisé pour cette carte
             couleur = RARITY_COLORS.get(carte['rarete'], discord.Color.default())
             embed_carte = discord.Embed(
                 title=f"**{carte['nom']}**",
                 description=f"**Rareté : {carte['rarete']}**\n*Club : {carte['club']}*",
                 color=couleur
             )
-            embed_carte.set_image(url=carte['image_url']) # Affiche la grande image du joueur
+            embed_carte.set_image(url=carte['image_url'])
             
-            # 3. On envoie le message discret avec l'embed de la carte
             await ctx.send(embed=embed_carte, ephemeral=True)
             
-            # 4. Si la carte est Épique ou Légendaire, on prépare et envoie l'annonce publique
             if carte['rarete'] in ["Épique", "Légendaire"] and ANNONCE_CHANNEL_ID != 0:
                 annonce_embed = discord.Embed(
                     title=f"✨ Tirage Exceptionnel ! ✨",
@@ -200,7 +210,6 @@ class CollectionCog(commands.Cog):
                 if channel:
                     await channel.send(embed=annonce_embed)
                     
-        # Message de conclusion
         await ctx.send(f"Tes nouvelles cartes ont été ajoutées à ta collection ! Fais `!collection` pour les voir.", ephemeral=True)
 
     
