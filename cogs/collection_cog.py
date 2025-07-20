@@ -140,11 +140,11 @@ class CollectionCog(commands.Cog):
         points = user_data['points']
     
         if points >= PACK_COST:
-        database.update_points(user_id, -PACK_COST)
-        database.add_pack(user_id, 1)
-            await ctx.send(f"🛍️ {ctx.author.mention}, tu as acheté un pack pour **{PACK_COST} points** ! Fais `!ouvrir` pour l'ouvrir.", ephemeral=True)
-        else:
-            await ctx.send(f"❌ {ctx.author.mention}, tu n'as pas assez de points. Il te manque **{PACK_COST - points} points**.", ephemeral=True)
+            database.update_points(user_id, -PACK_COST)
+            database.add_pack(user_id, 1)
+                await ctx.send(f"🛍️ {ctx.author.mention}, tu as acheté un pack pour **{PACK_COST} points** ! Fais `!ouvrir` pour l'ouvrir.", ephemeral=True)
+            else:
+                await ctx.send(f"❌ {ctx.author.mention}, tu n'as pas assez de points. Il te manque **{PACK_COST - points} points**.", ephemeral=True)
 
     
     @commands.command(name='ouvrir')
