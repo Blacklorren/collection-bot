@@ -132,6 +132,7 @@ class CollectionCog(commands.Cog):
         embed.add_field(name="`!recycler`", value="Échange toutes tes cartes en double contre des fragments.", inline=False)
         embed.add_field(name="`!creer \"Nom du Joueur\"`", value="Dépense tes fragments pour créer une carte manquante (Rare ou supérieure).", inline=False)
         embed.add_field(name="`!fragments`", value="Affiche ton solde de fragments et les coûts de recyclage/création.", inline=False)
+        embed.add_field(name="`!top`", value="Affiche le classement des meilleurs collectionneurs.", inline=False)
         await ctx.send(embed=embed)
 
 
