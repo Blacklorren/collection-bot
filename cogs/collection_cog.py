@@ -213,6 +213,8 @@ class CollectionCog(commands.Cog):
         await ctx.send(f"Tes nouvelles cartes ont été ajoutées à ta collection ! Fais `!collection` pour les voir.", ephemeral=True)
 
         
+    
+
     class CollectionView(discord.ui.View):
         # On définit les variables d'état ici
         current_club: str = None
@@ -222,7 +224,7 @@ class CollectionCog(commands.Cog):
             super().__init__(timeout=180) # La vue se désactive après 3 minutes
             self.author_id = author_id
             self.collection = user_collection_data
-            self.total_available_cards = total_available_cards # <-- NOUVEAU: on stocke le total des cartes du jeu
+            self.total_available_cards = total_available_cards
             
             # On regroupe les cartes de l'utilisateur par club
             self.cards_by_club = {}
@@ -243,7 +245,6 @@ class CollectionCog(commands.Cog):
     
         def create_select_options(self):
             """Crée la liste des options pour le menu déroulant."""
-            # La description indique maintenant le nombre de cartes uniques possédées pour ce club
             return [
                 discord.SelectOption(label=club, description=f"{len(cards)} carte(s) possédée(s)")
                 for club, cards in sorted(self.cards_by_club.items())
@@ -259,7 +260,7 @@ class CollectionCog(commands.Cog):
                 self.prev_button.disabled = self.current_page == 0
                 self.next_button.disabled = self.current_page >= len(cards_in_club) - 1
     
-         async def generate_embed(self):
+        async def generate_embed(self):
             """Génère l'embed en fonction de l'état actuel (club et page)."""
             if self.current_club is None:
                 embed = discord.Embed(
@@ -283,34 +284,7 @@ class CollectionCog(commands.Cog):
                 )
                 return embed
             
-            cards_in_club = self.cards_by_club[self.current_club]
-            card = cards_in_club[self.current_page]
-            
-            color = RARITY_COLORS.get(card['rarete'], discord.Color.default())
-            embed = discord.Embed(
-                title=f"**{card['nom']}**",
-                description=f"**Club :** {card['club']}\n**Rareté :** {card['rarete']}",
-                color=color
-            )
-            embed.set_image(url=card['image_url'])
-            embed.set_footer(text=f"Carte {self.current_page + 1} / {len(cards_in_club)}")
-            return embed
-            
-            # L'embed pour une carte spécifique reste le même
-            cards_in_club = self.cards_by_club[self.current_club]
-            card = cards_in_club[self.current_page]
-            
-            color = RARITY_COLORS.get(card['rarete'], discord.Color.default())
-            embed = discord.Embed(
-                title=f"**{card['nom']}**",
-                description=f"**Club :** {card['club']}\n**Rareté :** {card['rarete']}",
-                color=color
-            )
-            embed.set_image(url=card['image_url'])
-            embed.set_footer(text=f"Carte {self.current_page + 1} / {len(cards_in_club)}")
-            return embed
-            
-            # L'embed pour une carte spécifique reste le même
+            # Cette partie n'est exécutée que si un club est sélectionné
             cards_in_club = self.cards_by_club[self.current_club]
             card = cards_in_club[self.current_page]
             
