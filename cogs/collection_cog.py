@@ -46,6 +46,9 @@ JOKER_COSTS = {
     "legendaire": 3000
 }
 
+# List of user IDs to exclude from the !top command leaderboard
+LEADERBOARD_EXCLUDED_IDS = 133711821214449665
+
 # Fonction pour charger les données des cartes depuis le fichier JSON
 def load_cards_data():
     with open('cards.json', 'r', encoding='utf-8') as f:
@@ -524,25 +527,41 @@ class CollectionCog(commands.Cog):
         
         await ctx.send(embed=embed, ephemeral=True)
 
+    # --- REPLACE THE OLD top_command WITH THIS ONE ---
+
     @commands.command(name='top')
     async def top_command(self, ctx):
         """Affiche le classement des meilleurs collectionneurs."""
         leaderboard_data = database.get_leaderboard_data()
         
+        # --- NEW FILTERING LOGIC ---
+        # Filter out the excluded IDs from the data before displaying
+        filtered_leaderboard = [
+            (user_id, unique_cards) 
+            for user_id, unique_cards in leaderboard_data 
+            if user_id not in LEADERBOARD_EXCLUDED_IDS
+        ]
+        # We will only display the top 5 of the filtered list
+        top_5_filtered = filtered_leaderboard[:5]
+        
         embed = discord.Embed(
-            title="🏆 Top 10 des Collectionneurs 🏆",
+            title="🏆 Top 5 des Collectionneurs 🏆",
             description="Classement basé sur le nombre de cartes uniques possédées.",
             color=discord.Color.gold()
         )
         
-        if not leaderboard_data:
+        if not top_5_filtered:
             embed.description = "Le classement est encore vide. Collectionnez des cartes pour apparaître ici !"
         else:
             description_text = ""
-            for rank, (user_id, unique_cards) in enumerate(leaderboard_data, 1):
+            for rank, (user_id, unique_cards) in enumerate(top_5_filtered, 1):
                 member = ctx.guild.get_member(user_id)
-                member_name = member.display_name if member else f"Utilisateur Inconnu ({user_id})"
+                member_name = member.display_name if member else f"Utilisateur Inconnu"
                 
+                # Skip if member is not found in the server
+                if not member:
+                    continue
+    
                 emoji = ""
                 if rank == 1: emoji = "🥇 "
                 elif rank == 2: emoji = "🥈 "
