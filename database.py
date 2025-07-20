@@ -16,7 +16,8 @@ def initialize_database():
                 last_activity_date TEXT,
                 last_message_time TEXT,
                 daily_message_points INTEGER NOT NULL DEFAULT 0,
-                fragments INTEGER NOT NULL DEFAULT 0
+                fragments INTEGER NOT NULL DEFAULT 0,
+                has_received_onboarding INTEGER NOT NULL DEFAULT 0
             )
         ''')
 
@@ -26,6 +27,9 @@ def initialize_database():
         except sqlite3.OperationalError: pass
         try:
             cur.execute("ALTER TABLE users ADD COLUMN fragments INTEGER NOT NULL DEFAULT 0")
+        except sqlite3.OperationalError: pass
+        try:
+            cur.execute("ALTER TABLE users ADD COLUMN has_received_onboarding INTEGER NOT NULL DEFAULT 0")
         except sqlite3.OperationalError: pass
         try:
             cur.execute("ALTER TABLE users RENAME COLUMN last_daily TO last_activity_date")
@@ -39,17 +43,36 @@ def initialize_database():
                 FOREIGN KEY (user_id) REFERENCES users (user_id)
             )
         ''')
+        con.commit()
 
+# --- NOUVELLE FONCTION DE REMISE À ZÉRO ---
+def wipe_all_user_data():
+    """Supprime toutes les données des joueurs (points, cartes, fragments, etc.)."""
+    with sqlite3.connect(DB_NAME) as con:
+        cur = con.cursor()
+        print("!!! INITIATING FULL WIPE OF USER DATA !!!")
+        cur.execute("DELETE FROM users")
+        cur.execute("DELETE FROM user_cards")
+        print("!!! WIPE COMPLETE !!!")
         con.commit()
 
 def check_user(user_id):
-    """Vérifie si un utilisateur existe dans la DB, sinon le crée avec des valeurs initiales."""
+    """Vérifie si un utilisateur existe dans la DB, sinon le crée."""
     with sqlite3.connect(DB_NAME) as con:
         cur = con.cursor()
         cur.execute("SELECT user_id FROM users WHERE user_id = ?", (user_id,))
         if cur.fetchone() is None:
             cur.execute("INSERT INTO users (user_id, points, packs) VALUES (?, 100, 1)", (user_id,))
             con.commit()
+
+# --- NOUVELLE FONCTION ---
+def set_onboarding_received(user_id):
+    """Marque un utilisateur comme ayant reçu le message d'accueil."""
+    check_user(user_id)
+    with sqlite3.connect(DB_NAME) as con:
+        cur = con.cursor()
+        cur.execute("UPDATE users SET has_received_onboarding = 1 WHERE user_id = ?", (user_id,))
+        con.commit()
 
 def get_user_data(user_id):
     check_user(user_id)
