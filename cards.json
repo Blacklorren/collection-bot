@@ -235,7 +235,7 @@
     "nom": "Matic GROSELJ",
     "club": "Chambéry",
     "rarete": "Peu Commun",
-    "image_url": "https://i.imgur.com/cpjGpLd.png"
+    "image_url": "https://i.imgur.com/GrABhuE.png"
   },
   {
     "id": 36,
@@ -326,14 +326,14 @@
     "nom": "Milan BOMASTAR",
     "club": "Chartres",
     "rarete": "Épique",
-    "image_url": "https://i.imgur.com/mh2MRty.png"
+    "image_url": "https://i.imgur.com/pTOsvC0.png"
   },
   {
     "id": 49,
     "nom": "Eduardo CADARSO CABALLERO",
     "club": "Chartres",
     "rarete": "Rare",
-    "image_url": "https://i.imgur.com/WdPy1kp.png"
+    "image_url": "https://i.imgur.com/kg3yjjQ.png"
   },
   {
     "id": 50,
@@ -354,28 +354,21 @@
     "nom": "Svetlin DIMITROV",
     "club": "Chartres",
     "rarete": "Peu Commun",
-    "image_url": "https://i.imgur.com/WdPy1kp.png"
+    "image_url": "https://i.imgur.com/0mkCzXS.png"
   },
   {
     "id": 53,
     "nom": "Koussay BEN FRAJ",
     "club": "Chartres",
     "rarete": "Commun",
-    "image_url": "https://i.imgur.com/PWLJ8fx.png"
-  },
-  {
-    "id": 54,
-    "nom": "Manuel GASPAR CAMPANICO FERREIRA",
-    "club": "Chartres",
-    "rarete": "Commun",
-    "image_url": "https://i.imgur.com/j7Yh64G.png"
+    "image_url": "https://i.imgur.com/DTUcu35.png"
   },
   {
     "id": 55,
     "nom": "Vanja ILIC",
     "club": "Chartres",
     "rarete": "Rare",
-    "image_url": "https://i.imgur.com/mh2MRty.png"
+    "image_url": "https://i.imgur.com/muDkFNE.png"
   },
   {
     "id": 56,
@@ -403,14 +396,14 @@
     "nom": "Quentin MINEL",
     "club": "Chartres",
     "rarete": "Rare",
-    "image_url": "https://i.imgur.com/j7Yh64G.png"
+    "image_url": "https://i.imgur.com/GpdESwN.png"
   },
   {
     "id": 60,
     "nom": "Paulo RAMOS MORENO",
     "club": "Chartres",
     "rarete": "Peu Commun",
-    "image_url": "https://i.imgur.com/j7Yh64G.png"
+    "image_url": "https://i.imgur.com/tNaEkyY.png"
   },
   {
     "id": 61,
@@ -438,14 +431,14 @@
     "nom": "Gaël TRIBILLON",
     "club": "Chartres",
     "rarete": "Épique",
-    "image_url": "https://i.imgur.com/j7Yh64G.png"
+    "image_url": "https://i.imgur.com/dHAXnEL.png"
   },
   {
     "id": 65,
     "nom": "Yvan VERIN",
     "club": "Chartres",
     "rarete": "Rare",
-    "image_url": "https://i.imgur.com/WdPy1kp.png"
+    "image_url": "https://i.imgur.com/W9csfrj.jpeg"
   },
   {
     "id": 66,
@@ -977,63 +970,63 @@
     "nom": "Ayyoub ABDI",
     "club": "Nantes",
     "rarete": "Épique",
-    "image_url": "https://i.imgur.com/j7Yh64G.png"
+    "image_url": "https://i.imgur.com/H95Jy6Z.png"
   },
   {
     "id": 142,
     "nom": "Thibaud BRIET",
     "club": "Nantes",
     "rarete": "Légendaire",
-    "image_url": "https://i.imgur.com/j7Yh64G.png"
+    "image_url": "https://i.imgur.com/wjNc8Yj.gif"
   },
   {
     "id": 143,
     "nom": "Julien BOS",
     "club": "Nantes",
     "rarete": "Épique",
-    "image_url": "https://i.imgur.com/WdPy1kp.png"
+    "image_url": "https://i.imgur.com/RlKTLT9.png"
   },
   {
     "id": 144,
     "nom": "Théo AVELANGE DEMOUGE",
     "club": "Nantes",
     "rarete": "Peu Commun",
-    "image_url": "https://i.imgur.com/PWLJ8fx.png"
+    "image_url": "https://i.imgur.com/HWNod22.png"
   },
   {
     "id": 145,
     "nom": "Matej GABER",
     "club": "Nantes",
     "rarete": "Peu Commun",
-    "image_url": "https://i.imgur.com/WdPy1kp.png"
+    "image_url": "https://i.imgur.com/FRMEv5j.png"
   },
   {
     "id": 146,
     "nom": "Ignacio BIOSCA GARCIA",
     "club": "Nantes",
     "rarete": "Peu Commun",
-    "image_url": "https://i.imgur.com/j7Yh64G.png"
+    "image_url": "https://i.imgur.com/4JtRZO2.png"
   },
   {
     "id": 147,
     "nom": "Romain LAGARDE",
     "club": "Nantes",
     "rarete": "Peu Commun",
-    "image_url": "https://i.imgur.com/j7Yh64G.png"
+    "image_url": "https://i.imgur.com/AI9qEID.png"
   },
   {
     "id": 148,
     "nom": "Noam LEOPOLD",
     "club": "Nantes",
     "rarete": "Peu Commun",
-    "image_url": "https://i.imgur.com/WdPy1kp.png"
+    "image_url": "https://i.imgur.com/8Z48llh.png"
   },
   {
     "id": 149,
     "nom": "Aymeric MINNE",
     "club": "Nantes",
     "rarete": "Légendaire",
-    "image_url": "https://i.imgur.com/PWLJ8fx.png"
+    "image_url": "https://i.imgur.com/0g8npWt.gif"
   },
   {
     "id": 150,
@@ -1586,7 +1579,7 @@
     "nom": "Hugo JUND",
     "club": "Toulouse",
     "rarete": "Peu Commun",
-    "image_url": "https://i.imgur.com/cpjGpLd.png"
+    "image_url": "https://i.imgur.com/91Uk0mi.png"
   },
   {
     "id": 229,
