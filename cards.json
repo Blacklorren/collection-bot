@@ -563,7 +563,7 @@
     "id": 83,
     "nom": "Florian BILLANT",
     "club": "Dunkerque",
-    "rarete": "Peu Commun",
+    "rarete": "Rare",
     "image_url": "https://i.imgur.com/j7Yh64G.png"
   },
   {
@@ -580,9 +580,9 @@
     "rarete": "Commun",
     "image_url": "https://i.imgur.com/cpjGpLd.png"
   },
-  {
+    {
     "id": 86,
-    "nom": "Jean-pierre DUPOUX",
+    "nom": "Quentin Dupuy",
     "club": "Dunkerque",
     "rarete": "Peu Commun",
     "image_url": "https://i.imgur.com/WdPy1kp.png"
@@ -1722,3 +1722,10 @@
     "image_url": "https://i.imgur.com/j7Yh64G.png"
   }
 ]
+  {
+    "id": 249,
+    "nom": "Jean-pierre DUPOUX",
+    "club": "Tremblay",
+    "rarete": "Peu Commun",
+    "image_url": "https://i.imgur.com/WdPy1kp.png"
+  },
