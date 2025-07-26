@@ -4,7 +4,6 @@ import requests
 import json
 from discord.ext import commands
 from bs4 import BeautifulSoup
-from textwrap import dedent # Outil indispensable pour nettoyer le script
 
 # URL cible
 LNH_URL = "https://www.lnh.fr/liquimoly-starligue/calendrier"
@@ -21,42 +20,36 @@ class EventsCog(commands.Cog):
 
         print(f"🌍 (API /function) Exécution du script de clic distant pour la journée {journee_number}...")
 
-        # Le script est une chaîne de caractères normale (pas de 'f' devant).
-        # Python ne touchera pas aux accolades.
-        raw_puppeteer_script = """
-            async ({ page, context }) => {
-                // Aller à l'URL fournie dans le contexte
-                await page.goto(context.LNH_URL);
-                
-                // Attendre et cliquer sur le menu déroulant
-                const dropdownButtonSelector = 'button:has-text("Toutes les journées")';
-                await page.waitForSelector(dropdownButtonSelector);
-                await page.click(dropdownButtonSelector);
-                
-                // Formater le numéro de journée en JS avec un '0' devant si besoin.
-                const journeeTextToFind = `Journée ${String(context.journee_number).padStart(2, '0')}`;
-                
-                // Utiliser un sélecteur XPath, très robuste pour trouver par texte.
-                const [journeeListItem] = await page.$x(`//li[contains(., "${journeeTextToFind}")]`);
-                
-                if (journeeListItem) {
-                    await journeeListItem.click();
-                } else {
-                    // Si on ne trouve pas l'élément, on renvoie une erreur claire.
-                    throw new Error(`Impossible de trouver l'élément de liste pour : '${journeeTextToFind}'`);
-                }
-                
-                // Attendre que le contenu se recharge et renvoyer le HTML final
-                await page.waitForSelector('div[class^="Calendarstyles__StyledContainer"]');
-                await page.waitForTimeout(1500);
-                return await page.content();
-            }
-        """
-        
-        # On nettoie l'indentation du script pour qu'il soit valide en JS.
-        puppeteer_script = dedent(raw_puppeteer_script)
+        # Script Puppeteer sans dedent() - on le garde tel quel
+        puppeteer_script = """async ({ page, context }) => {
+    // Aller à l'URL fournie dans le contexte
+    await page.goto(context.LNH_URL);
+    
+    // Attendre et cliquer sur le menu déroulant
+    const dropdownButtonSelector = 'button:has-text("Toutes les journées")';
+    await page.waitForSelector(dropdownButtonSelector);
+    await page.click(dropdownButtonSelector);
+    
+    // Formater le numéro de journée en JS avec un '0' devant si besoin.
+    const journeeTextToFind = `Journée ${String(context.journee_number).padStart(2, '0')}`;
+    
+    // Utiliser un sélecteur XPath, très robuste pour trouver par texte.
+    const [journeeListItem] = await page.$x(`//li[contains(., "${journeeTextToFind}")]`);
+    
+    if (journeeListItem) {
+        await journeeListItem.click();
+    } else {
+        // Si on ne trouve pas l'élément, on renvoie une erreur claire.
+        throw new Error(`Impossible de trouver l'élément de liste pour : '${journeeTextToFind}'`);
+    }
+    
+    // Attendre que le contenu se recharge et renvoyer le HTML final
+    await page.waitForSelector('div[class^="Calendarstyles__StyledContainer"]');
+    await page.waitForTimeout(1500);
+    return await page.content();
+}"""
 
-        # --- LOGS REMIS EN PLACE POUR LE DÉBOGAGE ---
+        # --- LOGS POUR LE DÉBOGAGE ---
         print("\n--- SCRIPT JS PRÊT À ÊTRE ENVOYÉ ---")
         print(puppeteer_script)
         print("------------------------------------\n")
@@ -95,7 +88,8 @@ class EventsCog(commands.Cog):
                 
                 if team1_elem and team2_elem:
                     scraped_matches.append({
-                        "team1": team1_elem.get_text(strip=True), "team2": team2_elem.get_text(strip=True),
+                        "team1": team1_elem.get_text(strip=True), 
+                        "team2": team2_elem.get_text(strip=True),
                         "score1": score1_elem.get_text(strip=True) if score1_elem else "N/A",
                         "score2": score2_elem.get_text(strip=True) if score2_elem else "N/A",
                     })
@@ -116,25 +110,36 @@ class EventsCog(commands.Cog):
     @commands.command(name='results')
     @commands.has_permissions(manage_guild=True)
     async def results_command(self, ctx, journee: int):
+        import discord  # N'oubliez pas d'importer discord !
+        
         thinking_message = await ctx.send(f"🔍 **Recherche en cours...** Je consulte le site de la LNH pour les résultats de la journée n°{journee}.")
         matches_or_error = await self.bot.loop.run_in_executor(None, self._scrape_lnh_results, journee)
+        
         if isinstance(matches_or_error, str):
             await thinking_message.edit(content=f"❌ **Erreur :** {matches_or_error}")
             return
+            
         if not matches_or_error:
             await thinking_message.edit(content=f"ℹ️ Aucun match trouvé pour la journée {journee}.")
             return
+            
         embed = discord.Embed(title=f"🏆 Résultats - Journée {journee}", color=0x006eff)
         description = []
+        
         for match in matches_or_error:
             try:
                 score1, score2 = int(match['score1']), int(match['score2'])
-                if score1 > score2: team1_display, team2_display = f"**{match['team1']}**", match['team2']
-                elif score2 > score1: team1_display, team2_display = match['team1'], f"**{match['team2']}**"
-                else: team1_display, team2_display = match['team1'], match['team2']
+                if score1 > score2: 
+                    team1_display, team2_display = f"**{match['team1']}**", match['team2']
+                elif score2 > score1: 
+                    team1_display, team2_display = match['team1'], f"**{match['team2']}**"
+                else: 
+                    team1_display, team2_display = match['team1'], match['team2']
             except (ValueError, TypeError):
                 team1_display, team2_display = match['team1'], match['team2']
+                
             description.append(f"{team1_display} `{match['score1']} - {match['score2']}` {team2_display}")
+            
         embed.description = "\n".join(description)
         embed.set_footer(text="Résultats scrapés depuis lnh.fr")
         await thinking_message.edit(content=None, embed=embed)
