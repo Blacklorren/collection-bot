@@ -152,3 +152,7 @@ class EventsCog(commands.Cog):
         
         # 5. Modifier le message d'attente pour afficher le résultat final
         await thinking_message.edit(content=None, embed=embed)
+
+async def setup(bot):
+    """Fonction requise par discord.py pour charger le Cog."""
+    await bot.add_cog(EventsCog(bot))
