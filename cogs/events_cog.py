@@ -1,6 +1,7 @@
 import os
 import re
-import time # Pour une attente simple
+import time
+from discord.ext import commands  
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options as ChromeOptions
 from bs4 import BeautifulSoup
