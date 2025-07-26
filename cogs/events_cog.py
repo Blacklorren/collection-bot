@@ -4,7 +4,7 @@ import requests
 import json
 from discord.ext import commands
 from bs4 import BeautifulSoup
-from textwrap import dedent # On garde cet outil très utile
+from textwrap import dedent
 
 LNH_URL = "https://www.lnh.fr/liquimoly-starligue/calendrier"
 
@@ -20,48 +20,48 @@ class EventsCog(commands.Cog):
 
         print(f"🌍 (API /function) Exécution du script de clic distant pour la journée {journee_number}...")
 
-        # Le script JavaScript PUR. Pas de "f" devant.
-        # Il attend les variables "LNH_URL" et "journee_number" du contexte.
+        # Le script est maintenant une chaîne de caractères standard, PAS un f-string.
+        # Les variables sont UNIQUEMENT accédées via `context.variable`.
         puppeteer_script = dedent("""
             async ({ page, context }) => {
+                // Aller sur la page cible
                 await page.goto(context.LNH_URL);
                 
+                // Attendre et cliquer sur le menu déroulant principal
                 const dropdownButtonSelector = 'button:has-text("Toutes les journées")';
                 await page.waitForSelector(dropdownButtonSelector);
                 await page.click(dropdownButtonSelector);
                 
-                // On formate le numéro de journée en JS pour être sûr (ex: 1 -> "01")
+                // Formater le numéro de journée en JavaScript (ex: 1 -> "01")
                 const journeeTextToFind = `Journée ${String(context.journee_number).padStart(2, '0')}`;
                 
-                // On utilise un sélecteur XPath, très puissant pour trouver par texte.
+                // Utiliser un sélecteur XPath pour trouver le <li> par son texte.
+                // C'est la méthode la plus robuste pour votre site.
                 const [journeeListItem] = await page.$x(`//li[contains(., "${journeeTextToFind}")]`);
                 
                 if (journeeListItem) {
                     await journeeListItem.click();
                 } else {
-                    throw new Error(`Impossible de trouver l'élément de liste pour : ${journeeTextToFind}`);
+                    // Si on ne trouve pas l'élément, on lève une erreur claire.
+                    throw new Error(`Impossible de trouver l'élément de liste pour : '${journeeTextToFind}'`);
                 }
                 
+                // Attendre que le contenu se mette à jour et retourner le HTML final.
                 await page.waitForSelector('div[class^="Calendarstyles__StyledContainer"]');
                 await page.waitForTimeout(1500);
                 return await page.content();
             }
         """)
 
-        # --- AJOUT DES LOGS ---
-        print("\n--- SCRIPT JS PRÊT À ÊTRE ENVOYÉ ---\n")
-        print(puppeteer_script)
-        print("\n------------------------------------\n")
-
         api_url = f"https://production-sfo.browserless.io/function?token={BROWSERLESS_TOKEN}"
         headers = { 'Content-Type': 'application/json' }
         
-        # On passe la variable 'journee_number' dans le contexte, sans la formater en Python.
+        # Le corps de la requête. Toutes les variables sont passées ici.
         data = {
             "code": puppeteer_script,
             "context": {
                 "LNH_URL": LNH_URL,
-                "journee_number": journee_number # Le script JS s'occupera de la formater
+                "journee_number": journee_number
             }
         }
 
