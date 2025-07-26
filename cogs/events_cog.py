@@ -1,66 +1,88 @@
 import os
 import re
-import time
-from discord.ext import commands  
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options as ChromeOptions
+import requests  # Remplaçant de Selenium
+import json      # Pour préparer la requête API
+from discord.ext import commands
 from bs4 import BeautifulSoup
 
-# URL cible
+# --- CONFIGURATION ---
 LNH_URL = "https://www.lnh.fr/liquimoly-starligue/calendrier"
 
-class EventsCog(commands.Cog): 
+class EventsCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        # ... (le reste de votre __init__)
 
     def _scrape_lnh_results(self, journee_number: int) -> list | str:
         """
-        Scrape la page LNH avec Browserless pour trouver les résultats d'une journée.
-        Retourne une liste de matchs ou un message d'erreur (str).
+        Scrape la page LNH en exécutant un script distant sur Browserless
+        qui clique sur le bon menu déroulant pour afficher la bonne journée.
         """
         BROWSERLESS_TOKEN = os.getenv('BROWSERLESS_TOKEN')
         if not BROWSERLESS_TOKEN:
             print("❌ ERREUR : Le token Browserless est manquant dans les variables d'environnement.")
             return "Erreur de configuration du bot : Le token Browserless est manquant."
 
-        print(f"🌍 (SELENIUM) Connexion à Browserless pour la journée {journee_number}...")
-        
-        chrome_options = ChromeOptions()
-           
-        driver = None
-        try:
-            connection_url = f"https://production-sfo.browserless.io/webdriver?token={BROWSERLESS_TOKEN}"
-            driver = webdriver.Remote(command_executor=connection_url)
+        print(f"🌍 (API /function) Exécution du script de clic distant pour la journée {journee_number}...")
 
-            driver.get(LNH_URL)
-            # Attendre que le contenu JavaScript se charge. 5 secondes est une attente "brute".
-            # Une approche plus robuste utiliserait WebDriverWait, mais c'est parfait pour un test.
-            time.sleep(5) 
+        # Le script JavaScript (Puppeteer) que Browserless va exécuter pour nous.
+        # Il reproduit exactement les actions d'un utilisateur.
+        puppeteer_script = f"""
+        async ({{ page, context }}) => {{
+            // 1. Aller sur la page
+            await page.goto(context.LNH_URL);
             
-            page_source = driver.page_source
+            // 2. Attendre que le bouton principal du menu "Toutes les journées" soit présent et cliquable
+            const dropdownButtonSelector = 'button:has-text("Toutes les journées")';
+            await page.waitForSelector(dropdownButtonSelector);
+            
+            // 3. Cliquer sur ce bouton pour ouvrir le menu
+            await page.click(dropdownButtonSelector);
+            
+            // 4. Construire le sélecteur pour le lien de la journée voulue (ex: Journée 1)
+            // L'URL dans le 'href' est la manière la plus fiable de le trouver.
+            const journeeLinkSelector = 'a[href="/liquimoly-starligue/calendrier?day={journee_number}"]';
+            await page.waitForSelector(journeeLinkSelector);
+            
+            // 5. Cliquer sur le lien de la journée
+            await page.click(journeeLinkSelector);
+            
+            // 6. Attendre que la page se mette à jour et que les nouveaux matchs s'affichent
+            await page.waitForSelector('div[class^="Calendarstyles__StyledContainer"]');
+            await page.waitForTimeout(1500); // Petite attente de sécurité pour la fin du rendu
+
+            // 7. Renvoyer le code HTML final de la page, prêt à être parsé
+            return await page.content();
+        }}
+        """
+
+        # L'URL de l'API /function de Browserless
+        api_url = f"https://chrome.browserless.io/function?token={BROWSERLESS_TOKEN}"
+        
+        headers = { 'Content-Type': 'application/json' }
+        
+        # Le corps de notre requête : le script et le contexte (les variables pour le script)
+        data = {
+            "code": puppeteer_script,
+            "context": { "LNH_URL": LNH_URL }
+        }
+
+        try:
+            # Envoi de la requête à Browserless
+            response = requests.post(api_url, headers=headers, data=json.dumps(data), timeout=45)
+            response.raise_for_status() # Lève une erreur si le statut est 4xx ou 5xx
+            
+            # Le HTML final est dans la réponse
+            page_source = response.text
+            
+            print("✅ (API /function) HTML final récupéré. Début du parsing avec BeautifulSoup.")
+            
+            # --- Le code de parsing ci-dessous reste valide ---
             soup = BeautifulSoup(page_source, 'html.parser')
             
-            print("✅ (SELENIUM) Page récupérée. Début du parsing avec BeautifulSoup.")
-            
-            # 1. Trouver le titre de la journée (ex: "Journée 1")
-            # On utilise une expression régulière pour être flexible
-            journee_header = soup.find('h2', string=re.compile(f'Journée {journee_number}', re.IGNORECASE))
-            
-            if not journee_header:
-                return f"Désolé, je n'ai pas trouvé la journée n°{journee_number} sur la page."
-            
-            # 2. Trouver le conteneur des matchs qui suit directement ce titre
-            journee_container = journee_header.find_next_sibling('div')
-            
-            if not journee_container:
-                return f"Un problème est survenu lors de l'analyse de la page pour la journée {journee_number}."
-
-            # 3. Sélectionner tous les blocs de match à l'intérieur de ce conteneur
-            match_elements = journee_container.select('div[class^="Calendarstyles__StyledContainer"]')
+            match_elements = soup.select('div[class^="Calendarstyles__StyledContainer"]')
             
             if not match_elements:
-                return f"Aucun match trouvé pour la journée {journee_number}. Il est possible qu'elle n'ait pas encore eu lieu."
+                return f"Aucun match trouvé pour la journée {journee_number} après le clic. Le site a peut-être changé."
 
             scraped_matches = []
             for match_element in match_elements:
@@ -70,63 +92,56 @@ class EventsCog(commands.Cog):
                 score2_elem = match_element.select_one('div[class*="StyledScore"]:nth-of-type(2)')
                 
                 if team1_elem and team2_elem:
-                    match_data = {
+                    scraped_matches.append({
                         "team1": team1_elem.get_text(strip=True),
                         "team2": team2_elem.get_text(strip=True),
                         "score1": score1_elem.get_text(strip=True) if score1_elem else "N/A",
                         "score2": score2_elem.get_text(strip=True) if score2_elem else "N/A",
-                    }
-                    scraped_matches.append(match_data)
+                    })
             
+            if not scraped_matches:
+                return f"La journée {journee_number} a bien été sélectionnée, mais aucun match n'est affiché."
+
             return scraped_matches
 
-        except Exception as e:
-            print(f"❌ (SELENIUM) Une erreur est survenue : {e}")
-            return "Une erreur technique est survenue lors du scraping de la page."
-        finally:
-            # Très important : toujours fermer la session du navigateur !
-            if driver:
-                driver.quit()
-                print("👍 (SELENIUM) Connexion à Browserless fermée.")
-
+        except requests.exceptions.HTTPError as e:
+            error_text = e.response.text
+            print(f"❌ (API) Erreur HTTP de Browserless : {e.response.status_code} - {error_text}")
+            if "timeout" in error_text.lower():
+                return "Le script de scraping a mis trop de temps à s'exécuter. Le site est peut-être lent."
+            return f"Browserless a retourné une erreur {e.response.status_code}. Vérifiez le token ou le statut du service."
+        except requests.exceptions.RequestException as e:
+            print(f"❌ (API) Erreur de connexion : {e}")
+            return "Impossible de contacter le service de scraping."
 
     @commands.command(name='results')
-    @commands.has_permissions(manage_guild=True) # Sécurité : réservé aux admins pour le test
+    @commands.has_permissions(manage_guild=True)
     async def results_command(self, ctx, journee: int):
         """
         Scrape et affiche les résultats d'une journée de Liqui Moly Starligue.
         Utilisation : !results <numéro_de_la_journée>
         """
-        
-        # 1. Envoyer un message d'attente
         thinking_message = await ctx.send(f"🔍 **Recherche en cours...** Je consulte le site de la LNH pour les résultats de la journée n°{journee}.")
 
-        # 2. Lancer le scraping (qui est une fonction bloquante) dans un thread séparé
-        # pour ne pas geler le bot. C'est crucial.
         matches_or_error = await self.bot.loop.run_in_executor(
             None, self._scrape_lnh_results, journee
         )
 
-        # 3. Traiter le résultat
         if isinstance(matches_or_error, str):
-            # C'est un message d'erreur
             await thinking_message.edit(content=f"❌ **Erreur :** {matches_or_error}")
             return
 
         if not matches_or_error:
-            # C'est une liste vide
             await thinking_message.edit(content=f"ℹ️ Aucun match trouvé pour la journée {journee}.")
             return
 
-        # 4. Construire un bel embed avec les résultats
         embed = discord.Embed(
             title=f"🏆 Résultats - Journée {journee}",
-            color=0x006eff # Un bleu LNH
+            color=0x006eff
         )
         
         description = []
         for match in matches_or_error:
-            # Déterminer le gagnant pour le mettre en gras
             try:
                 score1 = int(match['score1'])
                 score2 = int(match['score2'])
@@ -134,9 +149,9 @@ class EventsCog(commands.Cog):
                     team1_display, team2_display = f"**{match['team1']}**", match['team2']
                 elif score2 > score1:
                     team1_display, team2_display = match['team1'], f"**{match['team2']}**"
-                else: # Match nul
+                else:
                     team1_display, team2_display = match['team1'], match['team2']
-            except (ValueError, TypeError): # Si scores sont "N/A"
+            except (ValueError, TypeError):
                 team1_display, team2_display = match['team1'], match['team2']
             
             description.append(
@@ -146,7 +161,6 @@ class EventsCog(commands.Cog):
         embed.description = "\n".join(description)
         embed.set_footer(text="Résultats scrapés depuis lnh.fr")
         
-        # 5. Modifier le message d'attente pour afficher le résultat final
         await thinking_message.edit(content=None, embed=embed)
 
 async def setup(bot):
