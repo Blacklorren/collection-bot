@@ -4,8 +4,9 @@ import requests
 import json
 from discord.ext import commands
 from bs4 import BeautifulSoup
-from textwrap import dedent
+from textwrap import dedent # Outil indispensable pour nettoyer le script
 
+# URL cible
 LNH_URL = "https://www.lnh.fr/liquimoly-starligue/calendrier"
 
 class EventsCog(commands.Cog):
@@ -20,43 +21,50 @@ class EventsCog(commands.Cog):
 
         print(f"🌍 (API /function) Exécution du script de clic distant pour la journée {journee_number}...")
 
-        # Le script JavaScript est maintenant une chaîne de caractères normale.
-        # Le 'f' a été retiré pour empêcher Python de l'interpréter.
-        # Toutes les variables sont UNIQUEMENT accédées via `context.variable`.
-        puppeteer_script = dedent("""
+        # Le script est une chaîne de caractères normale (pas de 'f' devant).
+        # Python ne touchera pas aux accolades.
+        raw_puppeteer_script = """
             async ({ page, context }) => {
-                // Aller sur la page cible
+                // Aller à l'URL fournie dans le contexte
                 await page.goto(context.LNH_URL);
                 
-                // Attendre et cliquer sur le menu déroulant principal
+                // Attendre et cliquer sur le menu déroulant
                 const dropdownButtonSelector = 'button:has-text("Toutes les journées")';
                 await page.waitForSelector(dropdownButtonSelector);
                 await page.click(dropdownButtonSelector);
                 
-                // Formater le numéro de journée en JS. C'est plus sûr.
+                // Formater le numéro de journée en JS avec un '0' devant si besoin.
                 const journeeTextToFind = `Journée ${String(context.journee_number).padStart(2, '0')}`;
                 
-                // Utiliser un sélecteur XPath pour trouver le <li> par son texte.
+                // Utiliser un sélecteur XPath, très robuste pour trouver par texte.
                 const [journeeListItem] = await page.$x(`//li[contains(., "${journeeTextToFind}")]`);
                 
                 if (journeeListItem) {
                     await journeeListItem.click();
                 } else {
-                    // Si on ne trouve pas l'élément, on lève une erreur claire.
+                    // Si on ne trouve pas l'élément, on renvoie une erreur claire.
                     throw new Error(`Impossible de trouver l'élément de liste pour : '${journeeTextToFind}'`);
                 }
                 
-                // Attendre que le contenu se mette à jour et retourner le HTML final.
+                // Attendre que le contenu se recharge et renvoyer le HTML final
                 await page.waitForSelector('div[class^="Calendarstyles__StyledContainer"]');
                 await page.waitForTimeout(1500);
                 return await page.content();
             }
-        """)
+        """
         
+        # On nettoie l'indentation du script pour qu'il soit valide en JS.
+        puppeteer_script = dedent(raw_puppeteer_script)
+
+        # --- LOGS REMIS EN PLACE POUR LE DÉBOGAGE ---
+        print("\n--- SCRIPT JS PRÊT À ÊTRE ENVOYÉ ---")
+        print(puppeteer_script)
+        print("------------------------------------\n")
+
         api_url = f"https://production-sfo.browserless.io/function?token={BROWSERLESS_TOKEN}"
         headers = { 'Content-Type': 'application/json' }
         
-        # Le corps de la requête avec le script et le contexte.
+        # Le corps de la requête avec le script et le contexte
         data = {
             "code": puppeteer_script,
             "context": {
