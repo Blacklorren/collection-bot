@@ -9,7 +9,7 @@ from bs4 import BeautifulSoup
 # URL cible
 LNH_URL = "https://www.lnh.fr/liquimoly-starligue/calendrier"
 
-    class EventsCog(commands.Cog): 
+class EventsCog(commands.Cog): 
     def __init__(self, bot):
         self.bot = bot
         # ... (le reste de votre __init__)
@@ -27,14 +27,16 @@ LNH_URL = "https://www.lnh.fr/liquimoly-starligue/calendrier"
         print(f"🌍 (SELENIUM) Connexion à Browserless pour la journée {journee_number}...")
         
         chrome_options = ChromeOptions()
-        # Important : cette capacité permet à Browserless de vous authentifier
-        chrome_options.set_capability('browserless:token', BROWSERLESS_TOKEN)
+    
+        # On construit une URL de connexion qui inclut directement le token.
+        # C'est la méthode d'authentification standard pour le protocole WebDriver.
+        connection_url = f"https://chrome.browserless.io/webdriver?token={BROWSERLESS_TOKEN}"
         
-        driver = None # Initialiser à None
+        driver = None
         try:
-            # Connexion au navigateur distant hébergé par Browserless
+            # On utilise la nouvelle URL de connexion
             driver = webdriver.Remote(
-                command_executor='https://chrome.browserless.io/webdriver',
+                command_executor=connection_url,
                 options=chrome_options
             )
 
