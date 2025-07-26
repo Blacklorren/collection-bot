@@ -77,7 +77,7 @@ class EventsCog(commands.Cog):
         data = {
             "code": puppeteer_script, 
             "context": {
-                "LNH_URL": LNH_URL,  # Pas de ; ici
+                "LNH_URL": LNH_URL  # Pas de ; ici
                 "journee_number": journee_number
             }
         }
