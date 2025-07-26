@@ -9,7 +9,7 @@ from bs4 import BeautifulSoup
 # URL cible
 LNH_URL = "https://www.lnh.fr/liquimoly-starligue/calendrier"
 
-class EventsCog(commands.Cog): 
+    class EventsCog(commands.Cog): 
     def __init__(self, bot):
         self.bot = bot
         # ... (le reste de votre __init__)
