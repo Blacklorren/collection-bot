@@ -2,7 +2,6 @@ import os
 import requests
 import json
 import discord
-import textwrap
 from discord.ext import commands
 from bs4 import BeautifulSoup
 
@@ -19,72 +18,67 @@ class EventsCog(commands.Cog):
 
         print(f"🌍 (API /function) Lancement du scraping pour la journée n°{journee_number}...")
 
-        # Script JS final, sans aucun commentaire.
-        puppeteer_script = textwrap.dedent("""
-            async ({ page, context }) => {
-                const { LNH_URL, journee_number } = context;
-                let step = 'Initialisation';
-
-                try {
-                    step = '1. Navigation vers la page';
-                    await page.goto(LNH_URL, { waitUntil: 'networkidle2', timeout: 30000 });
-                    
-                    step = '2. Gestion de la bannière de cookies';
-                    try {
-                        const cookieButtonSelector = '#axeptio_btn_acceptAll';
-                        await page.waitForSelector(cookieButtonSelector, { timeout: 5000 });
-                        await page.click(cookieButtonSelector);
-                        await page.waitForTimeout(500);
-                    } catch (e) {
-                        console.log("-> Bannière de cookies non trouvée.");
-                    }
-
-                    step = '3. Clic sur le menu déroulant';
-                    const dropdownXPath = "//button[contains(., 'Toutes les journées')]";
-                    await page.waitForXPath(dropdownXPath, { timeout: 10000 });
-                    const [dropdownButton] = await page.$x(dropdownXPath);
-                    if (!dropdownButton) throw new Error('Élément du menu déroulant introuvable.');
-                    await dropdownButton.click();
-
-                    step = '4. Sélection de la journée';
-                    const journeeTextToFind = `Journée ${String(journee_number).padStart(2, '0')}`;
-                    const listItemXPath = `//li[contains(., "${journeeTextToFind}")]`;
-                    await page.waitForXPath(listItemXPath, { visible: true, timeout: 10000 });
-                    const [journeeListItem] = await page.$x(listItemXPath);
-                    if (!journeeListItem) throw new Error(`Élément de la journée '${journeeTextToFind}' introuvable.`);
-                    await journeeListItem.click();
-
-                    step = '5. Attente du rechargement des matchs';
-                    const matchContainerSelector = 'a[class*="Calendarstyles__StyledLink"]';
-                    await page.waitForSelector(matchContainerSelector, { visible: true, timeout: 15000 });
-
-                    step = '6. Récupération du HTML final';
-                    return await page.content();
-
-                } catch (error) {
-                    console.error(`Échec à l'étape: ${step} | Erreur: ${error.message}`);
-                    return { error: `Échec à l'étape : ${step}`, errorMessage: error.message };
-                }
-            }
-        """).lstrip()
+        # --- NOUVELLE STRATÉGIE : Construction du script ligne par ligne ---
+        # Ceci élimine TOUTE possibilité de caractères parasites (BOM, etc.)
+        script_lines = [
+            "async ({ page, context }) => {",
+            "    const { LNH_URL, journee_number } = context;",
+            "    let step = 'Initialisation';",
+            "    try {",
+            "        step = '1. Navigation vers la page';",
+            "        await page.goto(LNH_URL, { waitUntil: 'networkidle2', timeout: 30000 });",
+            "        step = '2. Gestion de la bannière de cookies';",
+            "        try {",
+            "            const cookieButtonSelector = '#axeptio_btn_acceptAll';",
+            "            await page.waitForSelector(cookieButtonSelector, { timeout: 5000 });",
+            "            await page.click(cookieButtonSelector);",
+            "            await page.waitForTimeout(500);",
+            "        } catch (e) {",
+            "            console.log('-> Bannière de cookies non trouvée.');",
+            "        }",
+            "        step = '3. Clic sur le menu déroulant';",
+            "        const dropdownXPath = \"//button[contains(., 'Toutes les journées')]\";",
+            "        await page.waitForXPath(dropdownXPath, { timeout: 10000 });",
+            "        const [dropdownButton] = await page.$x(dropdownXPath);",
+            "        if (!dropdownButton) throw new Error('Élément du menu déroulant introuvable.');",
+            "        await dropdownButton.click();",
+            "        step = '4. Sélection de la journée';",
+            "        const journeeTextToFind = `Journée ${String(journee_number).padStart(2, '0')}`;",
+            "        const listItemXPath = `//li[contains(., \"${journeeTextToFind}\")]`;",
+            "        await page.waitForXPath(listItemXPath, { visible: true, timeout: 10000 });",
+            "        const [journeeListItem] = await page.$x(listItemXPath);",
+            "        if (!journeeListItem) throw new Error(`Élément de la journée '${journeeTextToFind}' introuvable.`);",
+            "        await journeeListItem.click();",
+            "        step = '5. Attente du rechargement des matchs';",
+            "        const matchContainerSelector = 'a[class*=\"Calendarstyles__StyledLink\"]';",
+            "        await page.waitForSelector(matchContainerSelector, { visible: true, timeout: 15000 });",
+            "        step = '6. Récupération du HTML final';",
+            "        return await page.content();",
+            "    } catch (error) {",
+            "        console.error(`Échec à l'étape: ${step} | Erreur: ${error.message}`);",
+            "        return { error: `Échec à l'étape : ${step}`, errorMessage: error.message };",
+            "    }",
+            "}"
+        ]
+        puppeteer_script = "\n".join(script_lines)
         
         api_url = f"https://production-sfo.browserless.io/function?token={BROWSERLESS_TOKEN}"
-        headers = {'Content-Type': 'application/json'}
+        headers = {'Content-Type': 'application/json; charset=utf-8'}
         data = {"code": puppeteer_script, "context": {"LNH_URL": LNH_URL, "journee_number": journee_number}}
 
-        # --- LOGS DE DÉBOGAGE DU PAYLOAD ---
+        # --- LOGS DE DÉBOGAGE MAXIMUM ---
         print("\n" + "="*25 + " PAYLOAD ENVOYÉ À BROWSERLESS " + "="*25)
-        print("--- Représentation de la chaîne 'code' (pour voir les caractères cachés) ---")
+        print("--- Représentation de la chaîne 'code' ---")
         print(repr(data['code']))
         print("--- Payload JSON complet ---")
-        print(json.dumps(data, indent=2))
+        # On force l'encodage en UTF-8 pour être sûr
+        print(json.dumps(data, indent=2, ensure_ascii=False))
         print("="*78 + "\n")
         
         try:
-            # On utilise data=json.dumps() pour être 100% explicite sur ce qui est envoyé
-            response = requests.post(api_url, headers=headers, data=json.dumps(data), timeout=60)
+            # On envoie le payload encodé manuellement en UTF-8
+            response = requests.post(api_url, headers=headers, data=json.dumps(data, ensure_ascii=False).encode('utf-8'), timeout=60)
             
-            # --- LOGS DE DÉBOGAGE MAXIMUM DE LA RÉPONSE ---
             print("\n" + "="*25 + " RÉPONSE REÇUE DE BROWSERLESS " + "="*25)
             print(f"Status Code: {response.status_code}")
             print(f"Headers: {response.headers}")
@@ -92,22 +86,20 @@ class EventsCog(commands.Cog):
             print(response.text)
             print("------------------------------------")
             print("="*79 + "\n")
-            # --- FIN DES LOGS DE DÉBOGAGE ---
 
             if response.status_code != 200:
                 return f"Erreur de l'API Browserless (Code {response.status_code}): {response.text}"
             
             result = response.json()
             if isinstance(result, dict) and 'error' in result:
-                error_details = result.get('errorMessage', 'Aucun détail technique.')
-                print(f"❌ Erreur DÉTAILLÉE retournée par Puppeteer: {result['error']} | Détails: {error_details}")
-                return f"Erreur lors du scraping : {result['error']}"
+                return f"Erreur lors du scraping : {result.get('error', 'Inconnue')}"
 
             print("✅ Scraping réussi, analyse du HTML.")
             soup = BeautifulSoup(result, 'html.parser')
             match_elements = soup.select('a[class*="Calendarstyles__StyledLink"]')
             
             if not match_elements: return f"Aucun match trouvé pour la journée {journee_number}."
+            
             scraped_matches = []
             for match_element in match_elements:
                 teams = match_element.select('span[class*="TeamName"]')
@@ -117,15 +109,13 @@ class EventsCog(commands.Cog):
             
             return scraped_matches
 
-        except requests.exceptions.RequestException as e:
-            return f"Impossible de contacter le service de scraping : {e}"
         except Exception as e:
-            return f"Une erreur inattendue est survenue : {e}"
+            return f"Une erreur inattendue est survenue : {type(e).__name__} - {e}"
 
     @commands.command(name='results')
     @commands.has_permissions(manage_guild=True)
     async def results_command(self, ctx, journee: int):
-        thinking_message = await ctx.send(f"🔍 **Recherche en cours...** Je consulte le site de la LNH pour les résultats de la journée n°{journee}.")
+        thinking_message = await ctx.send(f"🔍 **Recherche en cours...** Je consulte le site de la LNH pour la journée n°{journee}.")
         matches_or_error = await self.bot.loop.run_in_executor(None, self._scrape_lnh_results, journee)
         
         if isinstance(matches_or_error, str): await thinking_message.edit(content=f"❌ **Erreur :** {matches_or_error}")
