@@ -17,7 +17,7 @@ class EventsCog(commands.Cog):
         if not BROWSERLESS_TOKEN:
             return "Erreur de configuration : Le token Browserless est manquant."
 
-        print(f"🌍 Lancement du scraping pour la journée n°{journee_number}...")
+        print(f"🌍 (API /function) Lancement du scraping pour la journée n°{journee_number}...")
 
         # Script JS final, sans aucun commentaire.
         puppeteer_script = textwrap.dedent("""
@@ -69,10 +69,30 @@ class EventsCog(commands.Cog):
         """).lstrip()
         
         api_url = f"https://production-sfo.browserless.io/function?token={BROWSERLESS_TOKEN}"
+        headers = {'Content-Type': 'application/json'}
         data = {"code": puppeteer_script, "context": {"LNH_URL": LNH_URL, "journee_number": journee_number}}
 
+        # --- LOGS DE DÉBOGAGE DU PAYLOAD ---
+        print("\n" + "="*25 + " PAYLOAD ENVOYÉ À BROWSERLESS " + "="*25)
+        print("--- Représentation de la chaîne 'code' (pour voir les caractères cachés) ---")
+        print(repr(data['code']))
+        print("--- Payload JSON complet ---")
+        print(json.dumps(data, indent=2))
+        print("="*78 + "\n")
+        
         try:
-            response = requests.post(api_url, json=data, timeout=60)
+            # On utilise data=json.dumps() pour être 100% explicite sur ce qui est envoyé
+            response = requests.post(api_url, headers=headers, data=json.dumps(data), timeout=60)
+            
+            # --- LOGS DE DÉBOGAGE MAXIMUM DE LA RÉPONSE ---
+            print("\n" + "="*25 + " RÉPONSE REÇUE DE BROWSERLESS " + "="*25)
+            print(f"Status Code: {response.status_code}")
+            print(f"Headers: {response.headers}")
+            print("--- Contenu brut de la réponse ---")
+            print(response.text)
+            print("------------------------------------")
+            print("="*79 + "\n")
+            # --- FIN DES LOGS DE DÉBOGAGE ---
 
             if response.status_code != 200:
                 return f"Erreur de l'API Browserless (Code {response.status_code}): {response.text}"
