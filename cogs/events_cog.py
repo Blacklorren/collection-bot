@@ -19,7 +19,7 @@ class EventsCog(commands.Cog):
         """
         BROWSERLESS_TOKEN = os.getenv('BROWSERLESS_TOKEN')
         if not BROWSERLESS_TOKEN:
-            print("❌ ERREUR : Le token Browserless est manquant dans les variables d'environnement.")
+            print("❌ ERREUR : Le token Browserless est manquant.")
             return "Erreur de configuration du bot : Le token Browserless est manquant."
 
         print(f"🌍 (API /function) Lancement du scraping pour la journée n°{journee_number}...")
@@ -52,7 +52,10 @@ class EventsCog(commands.Cog):
                     console.log('Menu déroulant ouvert.');
 
                     const journeeTextToFind = `Journée ${String(journee_number).padStart(2, '0')}`;
-                    const listItemXPath = `//li[normalize-space() = '${journeeTextToFind}']`;
+                    
+                    // --- MODIFICATION CI-DESSOUS ---
+                    // On utilise 'contains' au lieu d'une correspondance exacte pour plus de robustesse.
+                    const listItemXPath = `//li[contains(., "${journeeTextToFind}")]`;
                     
                     await page.waitForXPath(listItemXPath, { visible: true });
                     const [journeeListItem] = await page.$x(listItemXPath);
@@ -87,11 +90,7 @@ class EventsCog(commands.Cog):
             }
         }
 
-        # --- LOGS DE DÉBOGAGE AJOUTÉS ---
-        # Affiche le payload exact qui sera envoyé à Browserless.
-        # C'est crucial pour vérifier que le script JS n'a pas de problème de formatage.
         print("\n" + "="*25 + " PAYLOAD POUR BROWSERLESS " + "="*25)
-        # On utilise repr() pour voir la chaîne exacte, y compris les espaces/sauts de ligne.
         print(f"URL de l'API: {api_url}")
         print("--- SCRIPT JS ENVOYÉ (repr) ---")
         print(repr(data['code']))
@@ -104,8 +103,9 @@ class EventsCog(commands.Cog):
             
             result = response.json()
             if isinstance(result, dict) and 'error' in result:
-                print(f"❌ Erreur retournée par le script Puppeteer: {result['error']}")
-                return f"Une erreur est survenue lors du scraping : {result['error']}"
+                # Cette erreur vient maintenant du script Puppeteer lui-même (ex: "Impossible de trouver la journée...")
+                print(f"❌ Erreur retournée par l'exécution du script Puppeteer: {result['error']}")
+                return f"Une erreur est survenue lors du scraping sur le site : {result['error']}"
 
             page_source = result
             print("✅ (API /function) Succès ! HTML final récupéré.")
@@ -115,7 +115,6 @@ class EventsCog(commands.Cog):
             match_elements = soup.select('a[class*="Calendarstyles__StyledLink"]')
             
             if not match_elements:
-                print("Aucun élément de match trouvé avec le sélecteur CSS. Le site a peut-être changé.")
                 return f"Aucun match trouvé pour la journée {journee_number}. La structure du site a peut-être changé."
 
             scraped_matches = []
@@ -138,12 +137,10 @@ class EventsCog(commands.Cog):
             return scraped_matches
 
         except requests.exceptions.HTTPError as e:
-            # --- GESTION D'ERREUR AMÉLIORÉE ---
             error_text = e.response.text
-            # Cible spécifiquement l'erreur "code is not a function"
             if e.response.status_code == 400 and 'code is not a function' in error_text:
-                error_message = ("L'API Browserless indique que le script JavaScript est mal formaté (Erreur 400: code is not a function). "
-                                 "Veuillez vérifier les logs de la console pour voir le payload exact envoyé.")
+                error_message = ("L'API Browserless indique que le script JavaScript est mal formaté. "
+                                 "Vérifiez les logs de la console pour voir le payload envoyé.")
                 print(f"❌ ERREUR SPÉCIFIQUE DÉTECTÉE : {error_message}")
                 return error_message
             else:
