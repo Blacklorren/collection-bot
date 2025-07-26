@@ -18,8 +18,6 @@ class EventsCog(commands.Cog):
 
         print(f"🌍 (API /function) Lancement du scraping pour la journée n°{journee_number}...")
 
-        # --- NOUVELLE STRATÉGIE : Construction du script ligne par ligne ---
-        # Ceci élimine TOUTE possibilité de caractères parasites (BOM, etc.)
         script_lines = [
             "async ({ page, context }) => {",
             "    const { LNH_URL, journee_number } = context;",
@@ -64,24 +62,26 @@ class EventsCog(commands.Cog):
         
         api_url = f"https://production-sfo.browserless.io/function?token={BROWSERLESS_TOKEN}"
         headers = {'Content-Type': 'application/json; charset=utf-8'}
-        data = {"code": puppeteer_script, "context": {"LNH_URL": LNH_URL, "journee_number": journee_number}}
+        
+        # --- LA CORRECTION EST ICI ---
+        # Le point-virgule a été retiré. Le JSON sera maintenant valide.
+        data = {
+            "code": puppeteer_script,
+            "context": {
+                "LNH_URL": LNH_URL, # PAS DE POINT-VIRGULE ICI
+                "journee_number": journee_number
+            }
+        }
 
-        # --- LOGS DE DÉBOGAGE MAXIMUM ---
         print("\n" + "="*25 + " PAYLOAD ENVOYÉ À BROWSERLESS " + "="*25)
-        print("--- Représentation de la chaîne 'code' ---")
-        print(repr(data['code']))
-        print("--- Payload JSON complet ---")
-        # On force l'encodage en UTF-8 pour être sûr
         print(json.dumps(data, indent=2, ensure_ascii=False))
         print("="*78 + "\n")
         
         try:
-            # On envoie le payload encodé manuellement en UTF-8
-            response = requests.post(api_url, headers=headers, data=json.dumps(data, ensure_ascii=False).encode('utf-8'), timeout=60)
+            response = requests.post(api_url, headers=headers, data=json.dumps(data).encode('utf-8'), timeout=60)
             
             print("\n" + "="*25 + " RÉPONSE REÇUE DE BROWSERLESS " + "="*25)
             print(f"Status Code: {response.status_code}")
-            print(f"Headers: {response.headers}")
             print("--- Contenu brut de la réponse ---")
             print(response.text)
             print("------------------------------------")
