@@ -27,18 +27,11 @@ class EventsCog(commands.Cog):
         print(f"🌍 (SELENIUM) Connexion à Browserless pour la journée {journee_number}...")
         
         chrome_options = ChromeOptions()
-    
-        # On construit une URL de connexion qui inclut directement le token.
-        # C'est la méthode d'authentification standard pour le protocole WebDriver.
-        connection_url = f"https://production-sfo.browserless.io/webdriver?token={BROWSERLESS_TOKEN}"
-        
+           
         driver = None
         try:
-            # On utilise la nouvelle URL de connexion
-            driver = webdriver.Remote(
-                command_executor=connection_url,
-                options=chrome_options
-            )
+            connection_url = f"https://production-sfo.browserless.io/webdriver?token={BROWSERLESS_TOKEN}"
+            driver = webdriver.Remote(command_executor=connection_url)
 
             driver.get(LNH_URL)
             # Attendre que le contenu JavaScript se charge. 5 secondes est une attente "brute".
