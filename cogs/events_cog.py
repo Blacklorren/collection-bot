@@ -4,6 +4,7 @@ import requests
 import json
 from discord.ext import commands
 from bs4 import BeautifulSoup
+from textwrap import dedent  # <-- 1. AJOUT DE L'IMPORT NÉCESSAIRE
 
 LNH_URL = "https://www.lnh.fr/liquimoly-starligue/calendrier"
 
@@ -19,49 +20,37 @@ class EventsCog(commands.Cog):
 
         print(f"🌍 (API /function) Exécution du script de clic distant pour la journée {journee_number}...")
 
-        # --- CORRECTION MAJEURE ---
-        # 1. On prépare le texte exact à rechercher, avec un zéro devant (ex: "Journée 01")
-        #    Le :02d force l'affichage sur 2 chiffres.
         journee_text_to_find = f"Journée {journee_number:02d}"
 
-        # 2. Le script est maintenant une chaîne de caractères NORMALE (pas de 'f' devant)
-        #    Il est conçu pour trouver et cliquer sur le <li> contenant le bon texte.
-        puppeteer_script = """
-        async ({ page, context }) => {
-            await page.goto(context.LNH_URL);
-            
-            const dropdownButtonSelector = 'button:has-text("Toutes les journées")';
-            await page.waitForSelector(dropdownButtonSelector);
-            await page.click(dropdownButtonSelector);
-            
-            // On cherche un élément <li> qui contient le texte "Journée XX"
-            // `page.$x` utilise un sélecteur XPath, très puissant pour trouver par texte.
-            const [journeeListItem] = await page.$x(`//li[contains(., "${context.journee_text}")]`);
-            
-            if (journeeListItem) {
-                // Si on l'a trouvé, on clique dessus.
-                await journeeListItem.click();
-            } else {
-                // Sinon, on envoie une erreur claire.
-                throw new Error(`Impossible de trouver l'élément de liste pour : ${context.journee_text}`);
-            }
-            
-            await page.waitForSelector('div[class^="Calendarstyles__StyledContainer"]');
-            await page.waitForTimeout(1500);
-            return await page.content();
-        }
-        """
+        # 2. On nettoie le script de son indentation avec dedent()
+        puppeteer_script = dedent(f"""
+            async ({{ page, context }}) => {{
+                await page.goto(context.LNH_URL);
+                
+                const dropdownButtonSelector = 'button:has-text("Toutes les journées")';
+                await page.waitForSelector(dropdownButtonSelector);
+                await page.click(dropdownButtonSelector);
+                
+                const [journeeListItem] = await page.$x(`//li[contains(., "{journee_text_to_find}")]`);
+                
+                if (journeeListItem) {{
+                    await journeeListItem.click();
+                }} else {{
+                    throw new Error(`Impossible de trouver l'élément de liste pour : {journee_text_to_find}`);
+                }}
+                
+                await page.waitForSelector('div[class^="Calendarstyles__StyledContainer"]');
+                await page.waitForTimeout(1500);
+                return await page.content();
+            }}
+        """)
 
         api_url = f"https://production-sfo.browserless.io/function?token={BROWSERLESS_TOKEN}"
         headers = { 'Content-Type': 'application/json' }
         
-        # 3. On passe le texte pré-formaté au script via le contexte.
         data = {
             "code": puppeteer_script,
-            "context": {
-                "LNH_URL": LNH_URL,
-                "journee_text": journee_text_to_find
-            }
+            "context": { "LNH_URL": LNH_URL }
         }
 
         try:
