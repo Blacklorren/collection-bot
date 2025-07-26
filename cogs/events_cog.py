@@ -24,7 +24,7 @@ class EventsCog(commands.Cog):
 
         print(f"🌍 (API /function) Lancement du scraping pour la journée n°{journee_number}...")
 
-        # --- Les commentaires JS ont été retirés de cette section pour éviter les erreurs de parsing ---
+        # Le script est nettoyé de son indentation ET de tout espace/saut de ligne au début.
         puppeteer_script = textwrap.dedent("""
             async ({ page, context }) => {
                 const { LNH_URL, journee_number } = context;
@@ -76,7 +76,7 @@ class EventsCog(commands.Cog):
                     return { error: error.message, html: errorContent };
                 }
             }
-        """)
+        """).lstrip() # <--- LA CORRECTION FINALE : Supprime le \n initial !
         
         api_url = f"https://production-sfo.browserless.io/function?token={BROWSERLESS_TOKEN}"
         headers = { 'Content-Type': 'application/json' }
@@ -108,7 +108,6 @@ class EventsCog(commands.Cog):
             print("✅ (API /function) Succès ! HTML final récupéré.")
             
             soup = BeautifulSoup(page_source, 'html.parser')
-            
             match_elements = soup.select('a[class*="Calendarstyles__StyledLink"]')
             
             if not match_elements:
@@ -118,14 +117,8 @@ class EventsCog(commands.Cog):
             for match_element in match_elements:
                 teams = match_element.select('span[class*="TeamName"]')
                 scores = match_element.select('div[class*="Score"]')
-                
                 if len(teams) == 2 and len(scores) == 2:
-                    scraped_matches.append({
-                        "team1": teams[0].get_text(strip=True), 
-                        "team2": teams[1].get_text(strip=True),
-                        "score1": scores[0].get_text(strip=True),
-                        "score2": scores[1].get_text(strip=True),
-                    })
+                    scraped_matches.append({"team1": teams[0].get_text(strip=True),"team2": teams[1].get_text(strip=True),"score1": scores[0].get_text(strip=True),"score2": scores[1].get_text(strip=True)})
             
             if not scraped_matches:
                 return f"La journée {journee_number} a été trouvée, mais le format des matchs semble avoir changé."
@@ -136,8 +129,7 @@ class EventsCog(commands.Cog):
         except requests.exceptions.HTTPError as e:
             error_text = e.response.text
             if e.response.status_code == 400 and 'code is not a function' in error_text:
-                error_message = ("L'API Browserless indique que le script JavaScript est mal formaté. "
-                                 "Vérifiez les logs de la console (le problème est probablement des commentaires ou une syntaxe invalide dans la chaîne de caractères du script).")
+                error_message = ("L'API Browserless indique que le script JS est mal formaté. Vérifiez les logs (le problème est souvent un espace/saut de ligne au début du script).")
                 print(f"❌ ERREUR SPÉCIFIQUE DÉTECTÉE : {error_message}")
                 return error_message
             else:
@@ -168,10 +160,7 @@ class EventsCog(commands.Cog):
             await thinking_message.edit(content=f"ℹ️ Aucun match trouvé pour la journée {journee}.")
             return
             
-        embed = discord.Embed(
-            title=f"🏆 Résultats - Liqui Moly Starligue - Journée {journee}",
-            color=0x006eff
-        )
+        embed = discord.Embed(title=f"🏆 Résultats - Liqui Moly Starligue - Journée {journee}",color=0x006eff)
         description = []
         
         for match in matches_or_error:
