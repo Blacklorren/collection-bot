@@ -20,115 +20,72 @@ class EventsCog(commands.Cog):
 
         print(f"🌍 (API /function) Exécution du script de clic distant pour la journée {journee_number}...")
 
-        # Script Puppeteer - format simple fonction async
-        puppeteer_script = """async ({ page, context }) => {
+        # --- SCRIPT PUPPETEER AMÉLIORÉ ---
+        # Ce script est plus robuste car il utilise des attentes explicites (waitForSelector)
+        # au lieu de délais fixes (waitForTimeout) et des sélecteurs plus stables (XPath).
+        puppeteer_script = """
+async ({ page, context }) => {
+    const { LNH_URL, journee_number } = context;
+    console.log(`Début du script Puppeteer pour la journée ${journee_number} sur ${LNH_URL}`);
+
     try {
-        console.log('Début du script Puppeteer');
-        console.log('URL cible:', context.LNH_URL);
-        console.log('Journée recherchée:', context.journee_number);
-        
-        // Aller à l'URL fournie dans le contexte
-        await page.goto(context.LNH_URL, { waitUntil: 'networkidle2' });
-        console.log('Page chargée avec succès');
-        
-        // Attendre et cliquer sur le menu déroulant - utiliser un sélecteur plus simple
-        // Chercher le bouton qui contient le texte "Toutes les journées"
-        const buttons = await page.$('button');
-        let dropdownButton = null;
-        for (const button of buttons) {
-            const text = await page.evaluate(el => el.textContent, button);
-            if (text && text.includes('Toutes les journées')) {
-                dropdownButton = button;
-                break;
-            }
+        await page.goto(LNH_URL, { waitUntil: 'networkidle2' });
+        console.log('Page chargée avec succès.');
+
+        // Attendre et fermer la bannière de cookies si elle existe
+        try {
+            const cookieButtonSelector = '#axeptio_btn_acceptAll';
+            await page.waitForSelector(cookieButtonSelector, { timeout: 5000 });
+            await page.click(cookieButtonSelector);
+            console.log('Bannière de cookies acceptée.');
+            await page.waitForTimeout(500); // Petite pause après le clic
+        } catch (e) {
+            console.log("Bannière de cookies non trouvée ou déjà acceptée, on continue.");
         }
+
+        // Clic sur le menu déroulant des journées
+        // Utilisation de XPath pour trouver le bouton par son texte, c'est plus robuste.
+        const dropdownXPath = "//button[contains(., 'Toutes les journées')]";
+        await page.waitForXPath(dropdownXPath);
+        const [dropdownButton] = await page.$x(dropdownXPath);
+        if (!dropdownButton) throw new Error('Bouton du menu déroulant introuvable.');
         
-        if (!dropdownButton) {
-            throw new Error('Bouton dropdown non trouvé');
-        }
-        
-        console.log('Bouton dropdown trouvé, clic...');
         await dropdownButton.click();
-        console.log('Menu déroulant ouvert');
+        console.log('Menu déroulant ouvert.');
+
+        // Sélection de la journée voulue
+        const journeeTextToFind = `Journée ${String(journee_number).padStart(2, '0')}`;
+        const listItemXPath = `//li[normalize-space() = '${journeeTextToFind}']`;
         
-        // Attendre que le menu soit visible
-        await page.waitForTimeout(1000);
-        
-        // Formater le numéro de journée en JS avec un '0' devant si besoin.
-        const journeeTextToFind = `Journée ${String(context.journee_number).padStart(2, '0')}`;
-        console.log('Recherche de:', journeeTextToFind);
-        
-        // Utiliser un sélecteur XPath, très robuste pour trouver par texte.
-        const [journeeListItem] = await page.$x(`//li[contains(., "${journeeTextToFind}")]`);
-        
-        if (journeeListItem) {
-            await journeeListItem.click();
-            console.log('Journée sélectionnée avec succès');
-        } else {
-            // Log des éléments li disponibles pour debug
-            const allListItems = await page.$eval('li', items => items.map(item => item.textContent));
-            console.log('Éléments de liste disponibles:', allListItems);
-            throw new Error(`Impossible de trouver l'élément de liste pour : '${journeeTextToFind}'`);
-        }
-        
-        // Attendre que le contenu se recharge
-        console.log('Attente du rechargement du contenu...');
-        await page.waitForTimeout(2000); // Attendre un peu avant de chercher
-        
-        // Essayer plusieurs sélecteurs possibles
-        const possibleSelectors = [
-            'div[class*="Calendarstyles__StyledContainer"]',
-            'div[class*="Calendar"]',
-            '[class*="match"]',
-            '[class*="game"]'
-        ];
-        
-        let found = false;
-        for (const selector of possibleSelectors) {
-            try {
-                await page.waitForSelector(selector, { timeout: 3000 });
-                console.log(`Sélecteur trouvé: ${selector}`);
-                found = true;
-                break;
-            } catch (e) {
-                console.log(`Sélecteur ${selector} non trouvé`);
-            }
-        }
-        
-        if (!found) {
-            console.log('Aucun sélecteur de match trouvé, récupération du HTML quand même...');
-        }
-        
-        await page.waitForTimeout(1000);
-        
-        console.log('Récupération du HTML final...');
+        await page.waitForXPath(listItemXPath, { visible: true });
+        const [journeeListItem] = await page.$x(listItemXPath);
+        if (!journeeListItem) throw new Error(`Impossible de trouver la journée : '${journeeTextToFind}'`);
+
+        await journeeListItem.click();
+        console.log(`Journée '${journeeTextToFind}' sélectionnée.`);
+
+        // Attendre que le contenu se mette à jour.
+        // On attend qu'un conteneur de match soit de nouveau visible. C'est plus fiable qu'un timeout.
+        const matchContainerSelector = 'div[class^="Calendarstyles__StyledContainer"]';
+        await page.waitForSelector(matchContainerSelector, { visible: true, timeout: 10000 });
+        console.log('Le contenu des matchs a été rechargé.');
+
+        // Récupérer le HTML final
         const content = await page.content();
-        console.log('HTML récupéré avec succès');
+        console.log(`Récupération du HTML final (${content.length} caractères).`);
         return content;
-        
+
     } catch (error) {
         console.error('Erreur dans le script Puppeteer:', error.message);
-        
-        // Essayer de récupérer le HTML même en cas d'erreur
-        try {
-            const content = await page.content();
-            console.log('HTML récupéré malgré l\'erreur');
-            return content;
-        } catch (e) {
-            throw error;
-        }
+        // En cas d'erreur, on essaie quand même de retourner le HTML pour le débogage.
+        const errorContent = await page.content();
+        return { error: error.message, html: errorContent };
     }
-}"""
-
-        # --- LOGS POUR LE DÉBOGAGE ---
-        print("\n--- SCRIPT JS PRÊT À ÊTRE ENVOYÉ ---")
-        print(puppeteer_script)
-        print("------------------------------------\n")
-
+}
+"""
+        
         api_url = f"https://production-sfo.browserless.io/function?token={BROWSERLESS_TOKEN}"
         headers = { 'Content-Type': 'application/json' }
-        
-        # Le corps de la requête avec le script et le contexte
         data = {
             "code": puppeteer_script,
             "context": {
@@ -137,85 +94,59 @@ class EventsCog(commands.Cog):
             }
         }
 
-        # Log du payload complet
-        print("\n--- PAYLOAD COMPLET ---")
-        print(json.dumps(data, indent=2))
-        print("----------------------\n")
-
         try:
-            response = requests.post(api_url, headers=headers, data=json.dumps(data), timeout=45)
-            
-            # Log détaillé de la réponse
-            print(f"Status Code: {response.status_code}")
-            print(f"Response Headers: {dict(response.headers)}")
-            
-            if response.status_code != 200:
-                print(f"Response Body: {response.text}")
-            
+            response = requests.post(api_url, headers=headers, data=json.dumps(data), timeout=60)
             response.raise_for_status()
-            page_source = response.text
             
+            # Browserless renvoie un objet JSON si le script renvoie un objet.
+            # S'il y a une erreur dans Puppeteer, on la récupère ici.
+            result = response.json()
+            if isinstance(result, dict) and 'error' in result:
+                print(f"❌ Erreur retournée par le script Puppeteer: {result['error']}")
+                # Afficher le début du HTML pour aider au débogage
+                if 'html' in result and result['html']:
+                     print("\n--- DÉBUT DU HTML RÉCUPÉRÉ (POUR DÉBOGAGE) ---")
+                     print(result['html'][:2000])
+                     print("-------------------------------------------\n")
+                return f"Une erreur est survenue lors du scraping : {result['error']}"
+
+            # Si tout va bien, la réponse est le code HTML de la page.
+            page_source = result
             print("✅ (API /function) Succès ! HTML final récupéré.")
-            print(f"Taille du HTML récupéré: {len(page_source)} caractères")
             
             soup = BeautifulSoup(page_source, 'html.parser')
-            match_elements = soup.select('div[class^="Calendarstyles__StyledContainer"]')
             
-            print(f"Nombre d'éléments de match trouvés: {len(match_elements)}")
+            # Le sélecteur `select` avec `[class^=...]` est une bonne pratique pour les classes dynamiques. [1, 12]
+            match_elements = soup.select('a[class*="Calendarstyles__StyledLink"]')
             
             if not match_elements:
-                # Log pour debug - voir la structure HTML
-                print("\n--- STRUCTURE HTML (premiers 2000 caractères) ---")
-                print(page_source[:2000])
-                print("--------------------------------------------------\n")
                 return f"Aucun match trouvé pour la journée {journee_number}. Le site a peut-être changé."
 
             scraped_matches = []
-            for idx, match_element in enumerate(match_elements):
-                print(f"\nAnalyse du match {idx + 1}...")
+            for match_element in match_elements:
+                teams = match_element.select('span[class*="TeamName"]')
+                scores = match_element.select('div[class*="Score"]')
                 
-                team1_elem = match_element.select_one('div[class*="StyledTeamContainer"]:nth-of-type(1) span')
-                team2_elem = match_element.select_one('div[class*="StyledTeamContainer"]:nth-of-type(3) span')
-                score1_elem = match_element.select_one('div[class*="StyledScore"]:nth-of-type(1)')
-                score2_elem = match_element.select_one('div[class*="StyledScore"]:nth-of-type(2)')
-                
-                if team1_elem and team2_elem:
+                if len(teams) == 2 and len(scores) == 2:
                     match_data = {
-                        "team1": team1_elem.get_text(strip=True), 
-                        "team2": team2_elem.get_text(strip=True),
-                        "score1": score1_elem.get_text(strip=True) if score1_elem else "N/A",
-                        "score2": score2_elem.get_text(strip=True) if score2_elem else "N/A",
+                        "team1": teams[0].get_text(strip=True), 
+                        "team2": teams[1].get_text(strip=True),
+                        "score1": scores[0].get_text(strip=True),
+                        "score2": scores[1].get_text(strip=True),
                     }
-                    print(f"Match trouvé: {match_data}")
                     scraped_matches.append(match_data)
-                else:
-                    print(f"Équipes non trouvées pour le match {idx + 1}")
             
             if not scraped_matches:
-                return f"La journée {journee_number} a été sélectionnée, mais aucun match n'est affiché."
+                return f"La journée {journee_number} a été sélectionnée, mais le format des matchs est inattendu."
 
-            print(f"\n✅ Total de {len(scraped_matches)} matches trouvés")
             return scraped_matches
 
         except requests.exceptions.HTTPError as e:
-            error_text = e.response.text
-            print(f"❌ (API) Erreur HTTP de Browserless : {e.response.status_code}")
-            print(f"Message d'erreur complet : {error_text}")
-            
-            # Tentative de parser l'erreur JSON si possible
-            try:
-                error_json = json.loads(error_text)
-                print(f"Erreur parsée : {json.dumps(error_json, indent=2)}")
-            except:
-                pass
-                
-            return f"Browserless a retourné une erreur {e.response.status_code} : {error_text}"
+            return f"Browserless a retourné une erreur {e.response.status_code} : {e.response.text}"
         except requests.exceptions.RequestException as e:
-            print(f"❌ (API) Erreur de connexion : {type(e).__name__} - {e}")
-            return "Impossible de contacter le service de scraping."
+            return f"Impossible de contacter le service de scraping : {e}"
         except Exception as e:
-            print(f"❌ Erreur inattendue : {type(e).__name__} - {e}")
-            return f"Erreur inattendue : {str(e)}"
+            return f"Erreur inattendue : {e}"```
 
     @commands.command(name='results')
     @commands.has_permissions(manage_guild=True)
