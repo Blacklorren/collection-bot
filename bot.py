@@ -37,13 +37,9 @@ class CollectionBot(commands.Bot):
         super().__init__(command_prefix='!', intents=intents)
 
     async def setup_hook(self):
-        """Cette fonction est appelée une seule fois avant que le bot soit prêt."""
-        # Chargement du Cog qui contient toutes nos commandes
-        try:
-            await self.load_extension('cogs.collection_cog')
-            print("Le Cog 'collection_cog' a été chargé avec succès.")
-        except Exception as e:
-            print(f"Erreur lors du chargement du Cog : {e}")
+        await self.load_extension('cogs.collection_cog')
+        await self.load_extension('cogs.events_cog')
+        print("Tous les Cogs ont été chargés.")
         
         # Lancement de la tâche de fond pour la remise à zéro
         self.loop.create_task(self.reset_scheduler_loop())
