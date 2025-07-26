@@ -24,6 +24,7 @@ class EventsCog(commands.Cog):
 
         print(f"🌍 (API /function) Lancement du scraping pour la journée n°{journee_number}...")
 
+        # --- Les commentaires JS ont été retirés de cette section pour éviter les erreurs de parsing ---
         puppeteer_script = textwrap.dedent("""
             async ({ page, context }) => {
                 const { LNH_URL, journee_number } = context;
@@ -52,9 +53,6 @@ class EventsCog(commands.Cog):
                     console.log('Menu déroulant ouvert.');
 
                     const journeeTextToFind = `Journée ${String(journee_number).padStart(2, '0')}`;
-                    
-                    // --- MODIFICATION CI-DESSOUS ---
-                    // On utilise 'contains' au lieu d'une correspondance exacte pour plus de robustesse.
                     const listItemXPath = `//li[contains(., "${journeeTextToFind}")]`;
                     
                     await page.waitForXPath(listItemXPath, { visible: true });
@@ -103,7 +101,6 @@ class EventsCog(commands.Cog):
             
             result = response.json()
             if isinstance(result, dict) and 'error' in result:
-                # Cette erreur vient maintenant du script Puppeteer lui-même (ex: "Impossible de trouver la journée...")
                 print(f"❌ Erreur retournée par l'exécution du script Puppeteer: {result['error']}")
                 return f"Une erreur est survenue lors du scraping sur le site : {result['error']}"
 
@@ -140,7 +137,7 @@ class EventsCog(commands.Cog):
             error_text = e.response.text
             if e.response.status_code == 400 and 'code is not a function' in error_text:
                 error_message = ("L'API Browserless indique que le script JavaScript est mal formaté. "
-                                 "Vérifiez les logs de la console pour voir le payload envoyé.")
+                                 "Vérifiez les logs de la console (le problème est probablement des commentaires ou une syntaxe invalide dans la chaîne de caractères du script).")
                 print(f"❌ ERREUR SPÉCIFIQUE DÉTECTÉE : {error_message}")
                 return error_message
             else:
