@@ -22,37 +22,36 @@ class EventsCog(commands.Cog):
 
         # Le script JavaScript est maintenant une chaîne de caractères normale.
         # Le 'f' a été retiré pour empêcher Python de l'interpréter.
-        # Toutes les variables sont accédées via `context.variable`.
+        # Toutes les variables sont UNIQUEMENT accédées via `context.variable`.
         puppeteer_script = dedent("""
             async ({ page, context }) => {
+                // Aller sur la page cible
                 await page.goto(context.LNH_URL);
                 
+                // Attendre et cliquer sur le menu déroulant principal
                 const dropdownButtonSelector = 'button:has-text("Toutes les journées")';
                 await page.waitForSelector(dropdownButtonSelector);
                 await page.click(dropdownButtonSelector);
                 
-                // On formate le numéro en JS. C'est plus sûr.
+                // Formater le numéro de journée en JS. C'est plus sûr.
                 const journeeTextToFind = `Journée ${String(context.journee_number).padStart(2, '0')}`;
                 
-                // On utilise un sélecteur XPath pour trouver le <li> par son texte.
+                // Utiliser un sélecteur XPath pour trouver le <li> par son texte.
                 const [journeeListItem] = await page.$x(`//li[contains(., "${journeeTextToFind}")]`);
                 
                 if (journeeListItem) {
                     await journeeListItem.click();
                 } else {
+                    // Si on ne trouve pas l'élément, on lève une erreur claire.
                     throw new Error(`Impossible de trouver l'élément de liste pour : '${journeeTextToFind}'`);
                 }
                 
+                // Attendre que le contenu se mette à jour et retourner le HTML final.
                 await page.waitForSelector('div[class^="Calendarstyles__StyledContainer"]');
                 await page.waitForTimeout(1500);
                 return await page.content();
             }
         """)
-
-        # --- LOGS RÉ-AJOUTÉS ET AMÉLIORÉS ---
-        print("\n--- SCRIPT JS PRÊT À ÊTRE ENVOYÉ ---")
-        print(puppeteer_script)
-        print("------------------------------------\n")
         
         api_url = f"https://production-sfo.browserless.io/function?token={BROWSERLESS_TOKEN}"
         headers = { 'Content-Type': 'application/json' }
