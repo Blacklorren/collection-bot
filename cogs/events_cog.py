@@ -73,11 +73,11 @@ class EventsCog(commands.Cog):
         api_url = f"https://production-sfo.browserless.io/function?token={BROWSERLESS_TOKEN}"
         headers = {'Content-Type': 'application/json'}
         
-        # CORRECTION ICI : suppression du point-virgule après l'URL
+        # CORRECTION FINALE: suppression du point-virgule après l'URL
         data = {
             "code": puppeteer_script, 
             "context": {
-                "LNH_URL": LNH_URL  # Pas de ; ici
+                "LNH_URL": LNH_URL,  # PAS DE POINT-VIRGULE ICI
                 "journee_number": journee_number
             }
         }
@@ -87,7 +87,7 @@ class EventsCog(commands.Cog):
         print("--- Représentation de la chaîne 'code' (pour voir les caractères cachés) ---")
         print(repr(data['code']))
         print("--- Payload JSON complet ---")
-        print(json.dumps(data, indent=2, ensure_ascii=False))  # ensure_ascii=False pour garder les accents
+        print(json.dumps(data, indent=2, ensure_ascii=False))
         print("="*78 + "\n")
         
         try:
@@ -104,7 +104,6 @@ class EventsCog(commands.Cog):
             if response.status_code == 400:
                 print("\n⚠️ Détails supplémentaires de l'erreur 400:")
                 try:
-                    # Essayons de parser comme JSON même si c'est du texte
                     error_details = json.loads(response.text)
                     print(json.dumps(error_details, indent=2))
                 except:
@@ -136,7 +135,9 @@ class EventsCog(commands.Cog):
             soup = BeautifulSoup(result, 'html.parser')
             match_elements = soup.select('a[class*="Calendarstyles__StyledLink"]')
             
-            if not match_elements: return f"Aucun match trouvé pour la journée {journee_number}."
+            if not match_elements: 
+                return f"Aucun match trouvé pour la journée {journee_number}."
+            
             scraped_matches = []
             for match_element in match_elements:
                 teams = match_element.select('span[class*="TeamName"]')
