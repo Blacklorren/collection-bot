@@ -30,7 +30,7 @@ class EventsCog(commands.Cog):
     
         # On construit une URL de connexion qui inclut directement le token.
         # C'est la méthode d'authentification standard pour le protocole WebDriver.
-        connection_url = f"https://chrome.browserless.io/webdriver?token={BROWSERLESS_TOKEN}"
+        connection_url = f"https://production-sfo.browserless.io/webdriver?token={BROWSERLESS_TOKEN}"
         
         driver = None
         try:
