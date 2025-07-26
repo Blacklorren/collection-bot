@@ -21,7 +21,8 @@ class EventsCog(commands.Cog):
 
         # Script JS final avec signature corrigée
         puppeteer_script = textwrap.dedent("""
-            async (page, context) => {
+            async (browserlessContext) => {
+                const { page, context } = browserlessContext;
                 const LNH_URL = context.LNH_URL;
                 const journee_number = context.journee_number;
                 let step = 'Initialisation';
@@ -71,18 +72,26 @@ class EventsCog(commands.Cog):
         
         api_url = f"https://production-sfo.browserless.io/function?token={BROWSERLESS_TOKEN}"
         headers = {'Content-Type': 'application/json'}
-        data = {"code": puppeteer_script, "context": {"LNH_URL": LNH_URL, "journee_number": journee_number}}
+        
+        # CORRECTION ICI : suppression du point-virgule après l'URL
+        data = {
+            "code": puppeteer_script, 
+            "context": {
+                "LNH_URL": LNH_URL,  # Pas de ; ici
+                "journee_number": journee_number
+            }
+        }
 
         # --- LOGS DE DÉBOGAGE DU PAYLOAD ---
         print("\n" + "="*25 + " PAYLOAD ENVOYÉ À BROWSERLESS " + "="*25)
         print("--- Représentation de la chaîne 'code' (pour voir les caractères cachés) ---")
         print(repr(data['code']))
         print("--- Payload JSON complet ---")
-        print(json.dumps(data, indent=2))
+        print(json.dumps(data, indent=2, ensure_ascii=False))  # ensure_ascii=False pour garder les accents
         print("="*78 + "\n")
         
         try:
-            response = requests.post(api_url, headers=headers, data=json.dumps(data), timeout=60)
+            response = requests.post(api_url, headers=headers, data=json.dumps(data, ensure_ascii=False), timeout=60)
             
             # --- LOGS DE DÉBOGAGE MAXIMUM DE LA RÉPONSE ---
             print("\n" + "="*25 + " RÉPONSE REÇUE DE BROWSERLESS " + "="*25)
@@ -95,10 +104,11 @@ class EventsCog(commands.Cog):
             if response.status_code == 400:
                 print("\n⚠️ Détails supplémentaires de l'erreur 400:")
                 try:
-                    error_details = response.json()
+                    # Essayons de parser comme JSON même si c'est du texte
+                    error_details = json.loads(response.text)
                     print(json.dumps(error_details, indent=2))
                 except:
-                    print("Impossible de parser la réponse JSON")
+                    print(f"Impossible de parser la réponse JSON: {response.text[:200]}")
             
             print("="*79 + "\n")
             # --- FIN DES LOGS DE DÉBOGAGE ---
@@ -142,7 +152,7 @@ class EventsCog(commands.Cog):
             return scraped_matches
 
         except requests.exceptions.RequestException as e:
-            return f"Impossible de contacter le service de scraping : {e}"
+            return f"Impossible de contacter le service de scraping : {str(e)}"
         except Exception as e:
             return f"Une erreur inattendue est survenue : {str(e)}"
 
