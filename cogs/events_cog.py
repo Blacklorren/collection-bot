@@ -24,46 +24,37 @@ class EventsCog(commands.Cog):
 
         print(f"🌍 (API /function) Exécution du script de clic distant pour la journée {journee_number}...")
 
-        # Le script JavaScript (Puppeteer) que Browserless va exécuter pour nous.
-        # Il reproduit exactement les actions d'un utilisateur.
-        puppeteer_script = f"""
-        async ({{ page, context }}) => {{
-            // 1. Aller sur la page
+        puppeteer_script = """
+        async ({ page, context }) => {
             await page.goto(context.LNH_URL);
             
-            // 2. Attendre que le bouton principal du menu "Toutes les journées" soit présent et cliquable
             const dropdownButtonSelector = 'button:has-text("Toutes les journées")';
             await page.waitForSelector(dropdownButtonSelector);
-            
-            // 3. Cliquer sur ce bouton pour ouvrir le menu
             await page.click(dropdownButtonSelector);
             
-            // 4. Construire le sélecteur pour le lien de la journée voulue (ex: Journée 1)
-            // L'URL dans le 'href' est la manière la plus fiable de le trouver.
-            const journeeLinkSelector = 'a[href="/liquimoly-starligue/calendrier?day={journee_number}"]';
+            // On utilise une template literal JS (`) pour insérer la variable du contexte
+            const journeeLinkSelector = `a[href="/liquimoly-starligue/calendrier?day=${context.journee_number}"]`;
             await page.waitForSelector(journeeLinkSelector);
-            
-            // 5. Cliquer sur le lien de la journée
             await page.click(journeeLinkSelector);
             
-            // 6. Attendre que la page se mette à jour et que les nouveaux matchs s'affichent
             await page.waitForSelector('div[class^="Calendarstyles__StyledContainer"]');
-            await page.waitForTimeout(1500); // Petite attente de sécurité pour la fin du rendu
-
-            // 7. Renvoyer le code HTML final de la page, prêt à être parsé
+            await page.waitForTimeout(1500);
             return await page.content();
-        }}
+        }
         """
 
-        # L'URL de l'API /function de Browserless
+        # On utilise la bonne URL de production
         api_url = f"https://production-sfo.browserless.io/function?token={BROWSERLESS_TOKEN}"
         
         headers = { 'Content-Type': 'application/json' }
         
-        # Le corps de notre requête : le script et le contexte (les variables pour le script)
+        # On ajoute 'journee_number' au contexte pour que le script JS puisse l'utiliser
         data = {
             "code": puppeteer_script,
-            "context": { "LNH_URL": LNH_URL }
+            "context": {
+                "LNH_URL": LNH_URL,
+                "journee_number": journee_number
+            }
         }
 
         try:
