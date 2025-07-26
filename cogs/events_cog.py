@@ -20,60 +20,104 @@ class EventsCog(commands.Cog):
 
         print(f"🌍 (API /function) Exécution du script de clic distant pour la journée {journee_number}...")
 
-        # Script Puppeteer - format fonction pure sans async au début
-        puppeteer_script = """({ page, context }) => {
-    return (async () => {
-        try {
-            console.log('Début du script Puppeteer');
-            console.log('URL cible:', context.LNH_URL);
-            console.log('Journée recherchée:', context.journee_number);
-            
-            // Aller à l'URL fournie dans le contexte
-            await page.goto(context.LNH_URL, { waitUntil: 'networkidle2' });
-            console.log('Page chargée avec succès');
-            
-            // Attendre et cliquer sur le menu déroulant
-            const dropdownButtonSelector = 'button:has-text("Toutes les journées")';
-            console.log('Recherche du bouton dropdown...');
-            await page.waitForSelector(dropdownButtonSelector, { timeout: 10000 });
-            await page.click(dropdownButtonSelector);
-            console.log('Menu déroulant ouvert');
-            
-            // Attendre que le menu soit visible
-            await page.waitForTimeout(500);
-            
-            // Formater le numéro de journée en JS avec un '0' devant si besoin.
-            const journeeTextToFind = `Journée ${String(context.journee_number).padStart(2, '0')}`;
-            console.log('Recherche de:', journeeTextToFind);
-            
-            // Utiliser un sélecteur XPath, très robuste pour trouver par texte.
-            const [journeeListItem] = await page.$x(`//li[contains(., "${journeeTextToFind}")]`);
-            
-            if (journeeListItem) {
-                await journeeListItem.click();
-                console.log('Journée sélectionnée avec succès');
-            } else {
-                // Log des éléments li disponibles pour debug
-                const allListItems = await page.$$eval('li', items => items.map(item => item.textContent));
-                console.log('Éléments de liste disponibles:', allListItems);
-                throw new Error(`Impossible de trouver l'élément de liste pour : '${journeeTextToFind}'`);
+        # Script Puppeteer - format simple fonction async
+        puppeteer_script = """async ({ page, context }) => {
+    try {
+        console.log('Début du script Puppeteer');
+        console.log('URL cible:', context.LNH_URL);
+        console.log('Journée recherchée:', context.journee_number);
+        
+        // Aller à l'URL fournie dans le contexte
+        await page.goto(context.LNH_URL, { waitUntil: 'networkidle2' });
+        console.log('Page chargée avec succès');
+        
+        // Attendre et cliquer sur le menu déroulant - utiliser un sélecteur plus simple
+        // Chercher le bouton qui contient le texte "Toutes les journées"
+        const buttons = await page.$('button');
+        let dropdownButton = null;
+        for (const button of buttons) {
+            const text = await page.evaluate(el => el.textContent, button);
+            if (text && text.includes('Toutes les journées')) {
+                dropdownButton = button;
+                break;
             }
-            
-            // Attendre que le contenu se recharge
-            console.log('Attente du rechargement du contenu...');
-            await page.waitForSelector('div[class^="Calendarstyles__StyledContainer"]', { timeout: 10000 });
-            await page.waitForTimeout(1500);
-            
-            console.log('Récupération du HTML final...');
+        }
+        
+        if (!dropdownButton) {
+            throw new Error('Bouton dropdown non trouvé');
+        }
+        
+        console.log('Bouton dropdown trouvé, clic...');
+        await dropdownButton.click();
+        console.log('Menu déroulant ouvert');
+        
+        // Attendre que le menu soit visible
+        await page.waitForTimeout(1000);
+        
+        // Formater le numéro de journée en JS avec un '0' devant si besoin.
+        const journeeTextToFind = `Journée ${String(context.journee_number).padStart(2, '0')}`;
+        console.log('Recherche de:', journeeTextToFind);
+        
+        // Utiliser un sélecteur XPath, très robuste pour trouver par texte.
+        const [journeeListItem] = await page.$x(`//li[contains(., "${journeeTextToFind}")]`);
+        
+        if (journeeListItem) {
+            await journeeListItem.click();
+            console.log('Journée sélectionnée avec succès');
+        } else {
+            // Log des éléments li disponibles pour debug
+            const allListItems = await page.$eval('li', items => items.map(item => item.textContent));
+            console.log('Éléments de liste disponibles:', allListItems);
+            throw new Error(`Impossible de trouver l'élément de liste pour : '${journeeTextToFind}'`);
+        }
+        
+        // Attendre que le contenu se recharge
+        console.log('Attente du rechargement du contenu...');
+        await page.waitForTimeout(2000); // Attendre un peu avant de chercher
+        
+        // Essayer plusieurs sélecteurs possibles
+        const possibleSelectors = [
+            'div[class*="Calendarstyles__StyledContainer"]',
+            'div[class*="Calendar"]',
+            '[class*="match"]',
+            '[class*="game"]'
+        ];
+        
+        let found = false;
+        for (const selector of possibleSelectors) {
+            try {
+                await page.waitForSelector(selector, { timeout: 3000 });
+                console.log(`Sélecteur trouvé: ${selector}`);
+                found = true;
+                break;
+            } catch (e) {
+                console.log(`Sélecteur ${selector} non trouvé`);
+            }
+        }
+        
+        if (!found) {
+            console.log('Aucun sélecteur de match trouvé, récupération du HTML quand même...');
+        }
+        
+        await page.waitForTimeout(1000);
+        
+        console.log('Récupération du HTML final...');
+        const content = await page.content();
+        console.log('HTML récupéré avec succès');
+        return content;
+        
+    } catch (error) {
+        console.error('Erreur dans le script Puppeteer:', error.message);
+        
+        // Essayer de récupérer le HTML même en cas d'erreur
+        try {
             const content = await page.content();
-            console.log('HTML récupéré avec succès');
+            console.log('HTML récupéré malgré l\'erreur');
             return content;
-            
-        } catch (error) {
-            console.error('Erreur dans le script Puppeteer:', error.message);
+        } catch (e) {
             throw error;
         }
-    })();
+    }
 }"""
 
         # --- LOGS POUR LE DÉBOGAGE ---
