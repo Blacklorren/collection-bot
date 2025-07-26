@@ -56,7 +56,7 @@ class EventsCog(commands.Cog):
         """
 
         # L'URL de l'API /function de Browserless
-        api_url = f"https://chrome.browserless.io/function?token={BROWSERLESS_TOKEN}"
+         api_url = f"https://production-sfo.browserless.io/function?token={BROWSERLESS_TOKEN}"
         
         headers = { 'Content-Type': 'application/json' }
         
