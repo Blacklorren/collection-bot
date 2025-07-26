@@ -2,7 +2,6 @@ import os
 import requests
 import json
 import discord
-import textwrap
 from discord.ext import commands
 from bs4 import BeautifulSoup
 
@@ -17,65 +16,69 @@ class EventsCog(commands.Cog):
         if not BROWSERLESS_TOKEN:
             return "Erreur de configuration : Le token Browserless est manquant."
 
-        print(f"🌍 (API /content) Lancement du scraping pour la journée n°{journee_number}...")
+        print(f"🌍 (API /scrape) Lancement du scraping pour la journée n°{journee_number}...")
 
-        # Configuration pour l'endpoint /content
-        api_url = f"https://production-sfo.browserless.io/content?token={BROWSERLESS_TOKEN}"
+        # On utilise maintenant l'endpoint /scrape qui supporte les actions
+        api_url = f"https://production-sfo.browserless.io/scrape?token={BROWSERLESS_TOKEN}"
         headers = {'Content-Type': 'application/json'}
         
-        # Payload pour /content
+        # Payload corrigé (sans point-virgule et avec le bon endpoint)
         data = {
-            "url": LNH_URL,
-            "waitFor": {
-                "selector": 'a[class*="Calendarstyles__StyledLink"]',
-                "timeout": 30000
-            },
+            "url": LNH_URL,  # CORRECTION: pas de point-virgule ici
             "actions": [
                 {
                     "type": "cookies",
                     "action": "accept",
-                    "selector": "#axeptio_btn_acceptAll"
+                    "selector": "#axeptio_btn_acceptAll",
+                    "timeout": 5000
                 },
                 {
                     "type": "click",
                     "selector": "//button[contains(., 'Toutes les journées')]",
                     "xpath": True,
-                    "waitForNavigation": True
+                    "timeout": 10000
                 },
                 {
                     "type": "click",
                     "selector": f"//li[contains(., 'Journée {str(journee_number).zfill(2)}')]",
                     "xpath": True,
-                    "waitForNavigation": True,
+                    "timeout": 10000,
                     "waitFor": {
                         "selector": 'a[class*="Calendarstyles__StyledLink"]',
                         "timeout": 15000
                     }
                 }
-            ]
+            ],
+            "waitFor": {
+                "selector": 'a[class*="Calendarstyles__StyledLink"]',
+                "timeout": 30000
+            }
         }
 
-        # --- LOGS DE DÉBOGAGE DU PAYLOAD ---
         print("\n" + "="*25 + " PAYLOAD ENVOYÉ À BROWSERLESS " + "="*25)
-        print("--- Payload JSON complet ---")
         print(json.dumps(data, indent=2, ensure_ascii=False))
         print("="*78 + "\n")
         
         try:
             response = requests.post(api_url, headers=headers, data=json.dumps(data, ensure_ascii=False), timeout=60)
             
-            # --- LOGS DE DÉBOGAGE DE LA RÉPONSE ---
             print("\n" + "="*25 + " RÉPONSE REÇUE DE BROWSERLESS " + "="*25)
             print(f"Status Code: {response.status_code}")
             print(f"Headers: {response.headers}")
-            print(f"Taille du contenu: {len(response.text)} caractères")
             
             if response.status_code != 200:
-                print(f"--- Début du contenu d'erreur ---\n{response.text[:500]}\n--- Fin du contenu d'erreur ---")
-                return f"Erreur de l'API Browserless (Code {response.status_code})"
+                print(f"Erreur: {response.text[:500]}")
+                return f"Erreur Browserless (Code {response.status_code})"
             
+            # Browserless renvoie un objet JSON avec le HTML dans la clé 'data'
+            result = response.json()
+            html_content = result.get('data', '')
+            
+            if not html_content:
+                return "Aucun contenu HTML retourné par Browserless"
+                
             print("✅ Scraping réussi, analyse du HTML...")
-            soup = BeautifulSoup(response.text, 'html.parser')
+            soup = BeautifulSoup(html_content, 'html.parser')
             match_elements = soup.select('a[class*="Calendarstyles__StyledLink"]')
             
             if not match_elements: 
@@ -97,9 +100,9 @@ class EventsCog(commands.Cog):
             return scraped_matches
 
         except requests.exceptions.RequestException as e:
-            return f"Impossible de contacter le service de scraping : {str(e)}"
+            return f"Erreur réseau : {str(e)}"
         except Exception as e:
-            return f"Une erreur inattendue est survenue : {str(e)}"
+            return f"Erreur inattendue : {str(e)}"
 
     @commands.command(name='results')
     @commands.has_permissions(manage_guild=True)
@@ -124,9 +127,11 @@ class EventsCog(commands.Cog):
                     
                     if score1 is not None and score2 is not None:
                         if score1 > score2: 
-                            team1_display, team2_display = f"**{match['team1']}**", match['team2']
+                            team1_display = f"**{match['team1']}**"
+                            team2_display = match['team2']
                         elif score2 > score1: 
-                            team1_display, team2_display = match['team1'], f"**{match['team2']}**"
+                            team1_display = match['team1']
+                            team2_display = f"**{match['team2']}**"
                         else: 
                             team1_display, team2_display = match['team1'], match['team2']
                     else:
