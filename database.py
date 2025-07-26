@@ -8,6 +8,7 @@ def initialize_database():
     with sqlite3.connect(DB_NAME) as con:
         cur = con.cursor()
         
+        # Tables existantes pour le jeu de cartes
         cur.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 user_id INTEGER PRIMARY KEY,
@@ -21,7 +22,7 @@ def initialize_database():
             )
         ''')
 
-        # --- AJOUT SÉCURISÉ DES NOUVELLES COLONNES ---
+        # Ajout sécurisé des colonnes existantes
         try:
             cur.execute("ALTER TABLE users ADD COLUMN daily_message_points INTEGER NOT NULL DEFAULT 0")
         except sqlite3.OperationalError: pass
@@ -43,9 +44,73 @@ def initialize_database():
                 FOREIGN KEY (user_id) REFERENCES users (user_id)
             )
         ''')
+        
+        # NOUVELLES TABLES POUR LES PRONOSTICS
+        
+        # Table des journées
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS journees (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                numero INTEGER NOT NULL,
+                date_debut TIMESTAMP,
+                date_fin TIMESTAMP,
+                is_active BOOLEAN DEFAULT 1,
+                rappel_envoye BOOLEAN DEFAULT 0
+            )
+        ''')
+        
+        # Table des matchs
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS matchs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                journee_id INTEGER,
+                event_id TEXT UNIQUE,
+                discord_event_id INTEGER,
+                equipe1 TEXT NOT NULL,
+                equipe2 TEXT NOT NULL,
+                date_match TIMESTAMP,
+                resultat TEXT,
+                score TEXT,
+                pronos_fermes BOOLEAN DEFAULT 0,
+                FOREIGN KEY (journee_id) REFERENCES journees(id)
+            )
+        ''')
+        
+        # Table des pronostics
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS pronostics (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                match_id INTEGER,
+                pronostic TEXT NOT NULL,
+                points_gagnes INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(user_id),
+                FOREIGN KEY (match_id) REFERENCES matchs(id),
+                UNIQUE(user_id, match_id)
+            )
+        ''')
+        
+        # Table des messages de pronostics
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS prono_messages (
+                match_id INTEGER PRIMARY KEY,
+                message_id INTEGER,
+                channel_id INTEGER,
+                FOREIGN KEY (match_id) REFERENCES matchs(id)
+            )
+        ''')
+        
+        # Index pour optimiser les requêtes
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_matchs_date ON matchs(date_match)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_matchs_journee ON matchs(journee_id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_pronostics_user ON pronostics(user_id)")
+        
         con.commit()
 
-# --- NOUVELLE FONCTION DE REMISE À ZÉRO ---
+# === FONCTIONS EXISTANTES POUR LE JEU DE CARTES ===
+
 def wipe_all_user_data():
     """Supprime toutes les données des joueurs (points, cartes, fragments, etc.)."""
     with sqlite3.connect(DB_NAME) as con:
@@ -53,6 +118,7 @@ def wipe_all_user_data():
         print("!!! INITIATING FULL WIPE OF USER DATA !!!")
         cur.execute("DELETE FROM users")
         cur.execute("DELETE FROM user_cards")
+        # Les pronostics ne sont PAS supprimés
         print("!!! WIPE COMPLETE !!!")
         con.commit()
 
@@ -65,7 +131,6 @@ def check_user(user_id):
             cur.execute("INSERT INTO users (user_id, points, packs) VALUES (?, 100, 1)", (user_id,))
             con.commit()
 
-# --- NOUVELLE FONCTION ---
 def set_onboarding_received(user_id):
     """Marque un utilisateur comme ayant reçu le message d'accueil."""
     check_user(user_id)
@@ -165,7 +230,6 @@ def get_leaderboard_data():
     """Récupère les données pour le classement (top collectionneurs)."""
     with sqlite3.connect(DB_NAME) as con:
         cur = con.cursor()
-        # Compte le nombre de card_id uniques pour chaque user_id
         cur.execute("""
             SELECT user_id, COUNT(DISTINCT card_id) as unique_cards
             FROM user_cards
@@ -174,3 +238,236 @@ def get_leaderboard_data():
             LIMIT 10
         """)
         return cur.fetchall()
+
+# === NOUVELLES FONCTIONS POUR LES PRONOSTICS ===
+
+def create_or_update_journee(numero, date_debut, date_fin):
+    """Crée ou met à jour une journée."""
+    with sqlite3.connect(DB_NAME) as con:
+        cur = con.cursor()
+        cur.execute("""
+            INSERT INTO journees (numero, date_debut, date_fin)
+            VALUES (?, ?, ?)
+            ON CONFLICT(numero) DO UPDATE SET
+                date_debut = excluded.date_debut,
+                date_fin = excluded.date_fin
+        """, (numero, date_debut, date_fin))
+        con.commit()
+        return cur.lastrowid
+
+def get_active_journee():
+    """Récupère la journée active."""
+    with sqlite3.connect(DB_NAME) as con:
+        con.row_factory = sqlite3.Row
+        cur = con.cursor()
+        cur.execute("""
+            SELECT * FROM journees 
+            WHERE is_active = 1 
+            ORDER BY date_debut DESC 
+            LIMIT 1
+        """)
+        return cur.fetchone()
+
+def create_match(journee_id, event_id, discord_event_id, equipe1, equipe2, date_match):
+    """Crée un match dans la base de données."""
+    with sqlite3.connect(DB_NAME) as con:
+        cur = con.cursor()
+        cur.execute("""
+            INSERT OR IGNORE INTO matchs 
+            (journee_id, event_id, discord_event_id, equipe1, equipe2, date_match)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (journee_id, event_id, discord_event_id, equipe1, equipe2, date_match))
+        con.commit()
+        return cur.lastrowid
+
+def get_match_by_event_id(event_id):
+    """Récupère un match par son event_id Livescore."""
+    with sqlite3.connect(DB_NAME) as con:
+        con.row_factory = sqlite3.Row
+        cur = con.cursor()
+        cur.execute("SELECT * FROM matchs WHERE event_id = ?", (event_id,))
+        return cur.fetchone()
+
+def get_match_by_id(match_id):
+    """Récupère un match par son ID."""
+    with sqlite3.connect(DB_NAME) as con:
+        con.row_factory = sqlite3.Row
+        cur = con.cursor()
+        cur.execute("SELECT * FROM matchs WHERE id = ?", (match_id,))
+        return cur.fetchone()
+
+def update_match_result(match_id, resultat, score):
+    """Met à jour le résultat d'un match."""
+    with sqlite3.connect(DB_NAME) as con:
+        cur = con.cursor()
+        cur.execute("""
+            UPDATE matchs 
+            SET resultat = ?, score = ?
+            WHERE id = ?
+        """, (resultat, score, match_id))
+        con.commit()
+
+def save_prono_message(match_id, message_id, channel_id):
+    """Sauvegarde l'ID du message de pronostic."""
+    with sqlite3.connect(DB_NAME) as con:
+        cur = con.cursor()
+        cur.execute("""
+            INSERT OR REPLACE INTO prono_messages 
+            (match_id, message_id, channel_id)
+            VALUES (?, ?, ?)
+        """, (match_id, message_id, channel_id))
+        con.commit()
+
+def get_prono_message(match_id):
+    """Récupère les infos du message de pronostic."""
+    with sqlite3.connect(DB_NAME) as con:
+        con.row_factory = sqlite3.Row
+        cur = con.cursor()
+        cur.execute("SELECT * FROM prono_messages WHERE match_id = ?", (match_id,))
+        return cur.fetchone()
+
+def save_or_update_pronostic(user_id, match_id, pronostic):
+    """Sauvegarde ou met à jour un pronostic."""
+    check_user(user_id)
+    with sqlite3.connect(DB_NAME) as con:
+        cur = con.cursor()
+        cur.execute("""
+            INSERT INTO pronostics (user_id, match_id, pronostic)
+            VALUES (?, ?, ?)
+            ON CONFLICT(user_id, match_id) DO UPDATE SET
+                pronostic = excluded.pronostic,
+                updated_at = CURRENT_TIMESTAMP
+        """, (user_id, match_id, pronostic))
+        con.commit()
+
+def get_user_pronostic(user_id, match_id):
+    """Récupère le pronostic d'un utilisateur pour un match."""
+    with sqlite3.connect(DB_NAME) as con:
+        con.row_factory = sqlite3.Row
+        cur = con.cursor()
+        cur.execute("""
+            SELECT * FROM pronostics 
+            WHERE user_id = ? AND match_id = ?
+        """, (user_id, match_id))
+        return cur.fetchone()
+
+def get_match_pronostics(match_id):
+    """Récupère tous les pronostics pour un match."""
+    with sqlite3.connect(DB_NAME) as con:
+        cur = con.cursor()
+        cur.execute("""
+            SELECT user_id, pronostic FROM pronostics 
+            WHERE match_id = ?
+        """, (match_id,))
+        return cur.fetchall()
+
+def attribute_points_for_match(match_id, resultat, points_par_bon_prono=50):
+    """Attribue les points aux bons pronostiqueurs."""
+    with sqlite3.connect(DB_NAME) as con:
+        cur = con.cursor()
+        # Récupérer les bons pronostics
+        cur.execute("""
+            UPDATE pronostics 
+            SET points_gagnes = ?
+            WHERE match_id = ? AND pronostic = ?
+        """, (points_par_bon_prono, match_id, resultat))
+        
+        # Ajouter les points aux utilisateurs
+        cur.execute("""
+            UPDATE users 
+            SET points = points + ?
+            WHERE user_id IN (
+                SELECT user_id FROM pronostics 
+                WHERE match_id = ? AND pronostic = ?
+            )
+        """, (points_par_bon_prono, match_id, resultat))
+        
+        con.commit()
+
+def get_journee_leaderboard(journee_id):
+    """Récupère le classement des pronostiqueurs pour une journée."""
+    with sqlite3.connect(DB_NAME) as con:
+        cur = con.cursor()
+        cur.execute("""
+            SELECT 
+                p.user_id,
+                COUNT(CASE WHEN p.points_gagnes > 0 THEN 1 END) as bons_pronos,
+                SUM(p.points_gagnes) as total_points
+            FROM pronostics p
+            JOIN matchs m ON p.match_id = m.id
+            WHERE m.journee_id = ?
+            GROUP BY p.user_id
+            ORDER BY bons_pronos DESC, total_points DESC
+        """, (journee_id,))
+        return cur.fetchall()
+
+def get_matchs_journee(journee_id):
+    """Récupère tous les matchs d'une journée."""
+    with sqlite3.connect(DB_NAME) as con:
+        con.row_factory = sqlite3.Row
+        cur = con.cursor()
+        cur.execute("""
+            SELECT * FROM matchs 
+            WHERE journee_id = ?
+            ORDER BY date_match
+        """, (journee_id,))
+        return cur.fetchall()
+
+def close_match_pronostics(match_id):
+    """Ferme les pronostics pour un match."""
+    with sqlite3.connect(DB_NAME) as con:
+        cur = con.cursor()
+        cur.execute("UPDATE matchs SET pronos_fermes = 1 WHERE id = ?", (match_id,))
+        con.commit()
+
+def mark_journee_rappel_sent(journee_id):
+    """Marque qu'un rappel a été envoyé pour une journée."""
+    with sqlite3.connect(DB_NAME) as con:
+        cur = con.cursor()
+        cur.execute("UPDATE journees SET rappel_envoye = 1 WHERE id = ?", (journee_id,))
+        con.commit()
+
+def get_journees_for_rappel():
+    """Récupère les journées nécessitant un rappel (24h avant)."""
+    with sqlite3.connect(DB_NAME) as con:
+        con.row_factory = sqlite3.Row
+        cur = con.cursor()
+        tomorrow = datetime.datetime.now() + datetime.timedelta(days=1)
+        cur.execute("""
+            SELECT * FROM journees 
+            WHERE rappel_envoye = 0 
+            AND date_debut <= ? 
+            AND is_active = 1
+        """, (tomorrow,))
+        return cur.fetchall()
+
+def determine_journee_from_matches(matches):
+    """Détermine automatiquement le numéro de journée à partir des matchs."""
+    if not matches:
+        return None
+        
+    # Logique simple : grouper par semaine
+    match_dates = [match['start_time_utc'] for match in matches]
+    min_date = min(match_dates)
+    
+    # Récupérer la dernière journée
+    with sqlite3.connect(DB_NAME) as con:
+        cur = con.cursor()
+        cur.execute("SELECT MAX(numero) FROM journees")
+        last_numero = cur.fetchone()[0] or 0
+        
+        # Vérifier si ces matchs appartiennent à une journée existante
+        cur.execute("""
+            SELECT id, numero FROM journees 
+            WHERE date_debut <= ? AND date_fin >= ?
+        """, (min_date, min_date))
+        existing = cur.fetchone()
+        
+        if existing:
+            return existing[0], existing[1]
+        else:
+            # Créer une nouvelle journée
+            max_date = max(match_dates)
+            new_numero = last_numero + 1
+            journee_id = create_or_update_journee(new_numero, min_date, max_date)
+            return journee_id, new_numero
