@@ -38,7 +38,7 @@ class CollectionBot(commands.Bot):
 
     async def setup_hook(self):
         await self.load_extension('cogs.collection_cog')
-        await self.load_extension('cogs.events_cog')
+        #await self.load_extension('cogs.events_cog')
         print("Tous les Cogs ont été chargés.")
         
         # Lancement de la tâche de fond pour la remise à zéro
