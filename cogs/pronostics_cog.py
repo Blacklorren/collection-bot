@@ -6,8 +6,8 @@ import asyncio
 import pytz
 
 # Configuration
-PRONO_CHANNEL_ID = 0  # À remplacer par l'ID du canal de pronostics
-ANNONCE_CHANNEL_ID = 0  # À remplacer par l'ID du canal d'annonces
+PRONO_CHANNEL_ID = 1398822619809185895  # À remplacer par l'ID du canal de pronostics
+ANNONCE_CHANNEL_ID = 1398822619809185895  # À remplacer par l'ID du canal d'annonces
 POINTS_BON_PRONO = 50
 
 # Emojis pour les pronostics
