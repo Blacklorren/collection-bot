@@ -96,21 +96,17 @@ class PronosticsCog(commands.Cog):
         # Vérifier si c'est dans le canal de pronostics
         if payload.channel_id != PRONO_CHANNEL_ID:
             return
-            
-        # Vérifier si c'est un emoji de pronostic
-        if str(payload.emoji) not in PRONO_EMOJIS:
-            return
-
+                    
         # Si l'emoji n'est pas un emoji de pronostic, on le supprime
         if str(payload.emoji) not in PRONO_EMOJIS:
             try:
                 channel = self.bot.get_channel(payload.channel_id)
                 message = await channel.fetch_message(payload.message_id)
-                # On vérifie que c'est bien un message du bot avec un embed pour ne pas agir sur n'importe quoi
+                # On vérifie que c'est bien un message de prono du bot avant de supprimer
                 if message.author.id == self.bot.user.id and message.embeds:
                     await message.remove_reaction(payload.emoji, payload.member)
             except (discord.Forbidden, discord.NotFound):
-                pass 
+                pass  
             return 
         
         # Récupérer le match associé au message
