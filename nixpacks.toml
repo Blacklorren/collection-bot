@@ -1,0 +1,9 @@
+[phases.setup]
+aptPkgs = [
+    "libglib2.0-0",
+    "libdbus-glib-1-2",
+    "libgtk-3-0",
+    "libnss3",
+    "libasound2",
+    "libxtst6"
+]
