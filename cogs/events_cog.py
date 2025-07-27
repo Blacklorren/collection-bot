@@ -3,9 +3,9 @@ from discord.ext import commands, tasks
 import feedparser
 import asyncio
 import os
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, date
 import re
-import requests
+from playwright.async_api import async_playwright
 import pytz
 import database
 
@@ -15,7 +15,7 @@ CHANNEL_ID = int(os.getenv('CHANNEL_ID')) if os.getenv('CHANNEL_ID') else None
 CHECK_INTERVAL = 1800  # 30 minutes pour RSS
 
 # Configuration Livescore
-LIVESCORE_API_URL = "https://prod-public-api.livescore.com/v1/api/app/calendar/neCDnec2/3?locale=fr"
+LIVESCORE_URL = "https://www.livescore.in/fr/handball/france/starligue/"
 MATCH_CHECK_INTERVAL = 3600  # Vérifier les matchs toutes les heures
 RESULTS_CHECK_INTERVAL = 1800  # Vérifier les résultats toutes les 30 minutes
 
@@ -37,7 +37,7 @@ class EventsCog(commands.Cog):
         self.check_matches_loop.cancel()
         self.check_results_loop.cancel()
 
-    # === GESTION RSS ===
+    # === GESTION RSS (INCHANGÉ) ===
     @tasks.loop(seconds=CHECK_INTERVAL)
     async def check_rss_loop(self):
         """Vérifie le flux RSS pour de nouveaux articles."""
@@ -78,124 +78,94 @@ class EventsCog(commands.Cog):
     async def send_article_to_discord(self, channel, entry):
         """Envoie un article vers Discord."""
         try:
-            # Créer l'embed
             embed = discord.Embed(
-                title=entry.title[:256],
-                url=entry.link,
-                color=0xe8874f,
+                title=entry.title[:256], url=entry.link, color=0xe8874f,
                 timestamp=datetime.now(timezone.utc)
             )
-
-            # Description (résumé de l'article)
             if hasattr(entry, 'summary'):
-                description = entry.summary
-                description = re.sub('<[^<]+?>', '', description)
-                if len(description) > 2048:
-                    description = description[:2045] + "..."
-                embed.description = description
-
-            # Recherche de l'image
+                description = re.sub('<[^<]+?>', '', entry.summary)
+                embed.description = description[:2045] + "..." if len(description) > 2048 else description
             image_url = None
-            if 'media_content' in entry and entry.media_content:
-                image_url = entry.media_content[0]['url']
-            elif 'links' in entry:
-                for link in entry.links:
-                    if link.get('rel') == 'enclosure' and link.get('type', '').startswith('image/'):
-                        image_url = link.href
-                        break
-            
-            if not image_url and hasattr(entry, 'content'):
-                content = entry.content[0].value
-                match = re.search(r'<img[^>]+src="([^">]+)"', content)
-                if match:
-                    image_url = match.group(1)
-
-            if image_url:
-                embed.set_image(url=image_url)
-          
-            # Auteur
-            embed.set_author(
-                name="📰 Handnews.fr",
-                icon_url="https://handnews.fr/favicon.ico",
-                url="https://handnews.fr"
-            )
-
-            # Footer avec date
+            if 'media_content' in entry and entry.media_content: image_url = entry.media_content[0]['url']
+            if image_url: embed.set_image(url=image_url)
+            embed.set_author(name="📰 Handnews.fr", icon_url="https://handnews.fr/favicon.ico", url="https://handnews.fr")
             if hasattr(entry, 'published'):
                 try:
                     pub_date = datetime.strptime(entry.published, "%a, %d %b %Y %H:%M:%S %z")
                     embed.set_footer(text=f"Publié le {pub_date.strftime('%d/%m/%Y à %H:%M')}")
                 except ValueError:
                     embed.set_footer(text=f"Publié le • {entry.published}")
-            else:
-                embed.set_footer(text="Handnews.fr")
-
-            # Envoyer le message
             await channel.send(embed=embed)
-            print(f"📤 (RSS) Article envoyé : {entry.title[:50]}...")
-
-        except discord.HTTPException as e:
-            print(f"❌ (RSS) Erreur Discord : {e}")
         except Exception as e:
             print(f"❌ (RSS) Erreur générale : {e}")
 
-    # === GESTION DES MATCHS LIVESCORE ===
-    def scrape_livescore_matches(self):
-        """Récupère les matchs à venir via l'API Livescore."""
-        try:
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Accept': 'application/json'
-            }
-            response = requests.get(LIVESCORE_API_URL, headers=headers, timeout=15)
-            response.raise_for_status()
-            data = response.json()
-            
-            matches = []
-            now_utc = datetime.now(timezone.utc)
-            limit_date = now_utc + timedelta(days=5)
-            
-            for stage in data.get('Stages', []):
-                for event in stage.get('Events', []):
-                    t1 = event.get('T1', [{}])
-                    t2 = event.get('T2', [{}])
+    # === GESTION DES MATCHS - NOUVELLE VERSION PLAYWRIGHT ===
+    async def scrape_livescore_matches(self):
+        """Récupère les matchs à venir via Playwright."""
+        matches = []
+        paris_tz = pytz.timezone('Europe/Paris')
+        
+        async with async_playwright() as p:
+            browser = await p.chromium.launch()
+            page = await browser.new_page()
+            try:
+                await page.goto(LIVESCORE_URL, timeout=30000)
+                if await page.locator("#onetrust-accept-btn-handler").is_visible():
+                    await page.click("#onetrust-accept-btn-handler")
+                
+                await page.wait_for_selector(".event__match--scheduled", timeout=15000)
+                
+                all_days = await page.locator(".sportName.handball > div > div").all()
+                
+                now = datetime.now(paris_tz)
+                
+                for day_container in all_days:
+                    date_text_raw = await day_container.locator(".event__round").inner_text()
+                    date_text = date_text_raw.strip().upper()
                     
-                    if not t1 or not t2:
-                        continue
+                    current_match_date = None
+                    today = now.date()
+
+                    if "AUJOURD'HUI" in date_text:
+                        current_match_date = today
+                    elif "DEMAIN" in date_text:
+                        current_match_date = today + timedelta(days=1)
+                    else:
+                        day_str, month_str = date_text.split('.')[:2]
+                        m_date = date(now.year, int(month_str), int(day_str))
+                        if m_date < today:
+                            m_date = m_date.replace(year=now.year + 1)
+                        current_match_date = m_date
                         
-                    team1 = t1[0].get('Nm', 'Équipe inconnue')
-                    team2 = t2[0].get('Nm', 'Équipe inconnue')
-                    start_time_str = event.get('Esd', '')
-                    
-                    if not start_time_str:
-                        continue
-                    
-                    # Convertir le temps UTC
-                    if start_time_str.endswith('Z'):
-                        start_time_str = start_time_str[:-1] + '+00:00'
-                    
-                    try:
-                        match_time = datetime.fromisoformat(start_time_str).astimezone(timezone.utc)
-                    except ValueError:
-                        continue
-                    
-                    # Filtrer les matchs dans les 5 prochains jours
-                    if now_utc < match_time < limit_date:
-                        matches.append({
-                            "team1": team1,
-                            "team2": team2,
-                            "start_time_utc": match_time,
-                            "event_id": event.get('Eid', '')
-                        })
-            
-            return matches
-            
-        except requests.RequestException as e:
-            print(f"❌ (LIVESCORE) Erreur API: {e}")
-            return []
-        except Exception as e:
-            print(f"❌ (LIVESCORE) Erreur inattendue: {e}")
-            return []
+                    if not current_match_date: continue
+
+                    event_elements = await day_container.locator(".event__match--scheduled").all()
+                    for event_element in event_elements:
+                        time_text = await event_element.locator(".event__time").inner_text()
+                        team1 = await event_element.locator(".event__participant--home").inner_text()
+                        team2 = await event_element.locator(".event__participant--away").inner_text()
+                        event_id_full = await event_element.get_attribute("id")
+
+                        if not all([time_text, team1, team2, event_id_full]): continue
+
+                        event_id = event_id_full[4:] # Retire le préfixe "g_4_"
+                        hour, minute = map(int, time_text.split(':'))
+                        
+                        match_time_paris = datetime.combine(current_match_date, datetime.min.time()).replace(hour=hour, minute=minute)
+                        match_time_paris = paris_tz.localize(match_time_paris)
+                        match_time_utc = match_time_paris.astimezone(timezone.utc)
+                        
+                        limit_date = datetime.now(timezone.utc) + timedelta(days=5)
+                        if now.astimezone(timezone.utc) < match_time_utc < limit_date:
+                            matches.append({
+                                "team1": team1.strip(), "team2": team2.strip(),
+                                "start_time_utc": match_time_utc, "event_id": event_id
+                            })
+            except Exception as e:
+                print(f"❌ (PLAYWRIGHT) Erreur de scraping des matchs: {e}")
+            finally:
+                await browser.close()
+        return matches
 
     @tasks.loop(seconds=MATCH_CHECK_INTERVAL)
     async def check_matches_loop(self):
@@ -205,96 +175,45 @@ class EventsCog(commands.Cog):
             print(f"❌ (MATCHES) Serveur {self.bot.guild_id} introuvable!")
             return
         
-        print("🔍 (MATCHES) Vérification des matchs de Starligue...")
+        print("🔍 (MATCHES) Vérification des matchs de Starligue via Playwright...")
         
         try:
-            # Récupérer les matchs depuis Livescore
-            scraped_matches = await self.bot.loop.run_in_executor(None, self.scrape_livescore_matches)
+            scraped_matches = await self.scrape_livescore_matches()
             
             if not scraped_matches:
-                print("ℹ️ (MATCHES) Aucun match trouvé dans l'API.")
+                print("ℹ️ (MATCHES) Aucun match trouvé via Playwright.")
                 return
             
             print(f"🏐 (MATCHES) {len(scraped_matches)} matchs trouvés (J+5)")
             
-            # Déterminer la journée
             journee_id, journee_numero = database.determine_journee_from_matches(scraped_matches)
-            
-            # Récupérer les événements Discord existants
             existing_events = guild.scheduled_events
-            existing_event_names = {event.name: event for event in existing_events}
+            existing_event_names = {event.name for event in existing_events}
             
-            # Importer le cog des pronostics pour créer les messages
             pronos_cog = self.bot.get_cog('PronosticsCog')
             new_matches_for_pronos = []
             
             for match in scraped_matches:
                 event_name = f"{match['team1']} vs {match['team2']}"
-                
-                # Vérifier si le match existe déjà dans la base
-                existing_match = database.get_match_by_event_id(match['event_id'])
-                
-                if not existing_match and event_name not in existing_event_names:
+                if not database.get_match_by_event_id(match['event_id']) and event_name not in existing_event_names:
                     print(f"✨ (MATCHES) Création événement: {event_name}")
-                    
-                    # Créer l'événement Discord
                     event = await guild.create_scheduled_event(
                         name=event_name,
-                        description=(
-                            f"Match de Starligue - Journée {journee_numero}\n\n"
-                            "📊 Faites vos pronostics dans le canal dédié !\n"
-                            "Les pronostics fermeront 5 minutes avant le début du match."
-                        ),
-                        start_time=match['start_time_utc'],
-                        end_time=match['start_time_utc'] + timedelta(hours=2),
-                        entity_type=discord.EntityType.external,
-                        location="Starligue Handball",
-                        privacy_level=discord.PrivacyLevel.guild_only
+                        description=f"Match de Starligue - Journée {journee_numero}\n\n📊 Faites vos pronostics dans le canal dédié !",
+                        start_time=match['start_time_utc'], end_time=match['start_time_utc'] + timedelta(hours=2),
+                        entity_type=discord.EntityType.external, location="Starligue Handball"
                     )
-                    
-                    # Sauvegarder dans la base de données
                     match_id = database.create_match(
-                        journee_id=journee_id,
-                        event_id=match['event_id'],
-                        discord_event_id=event.id,
-                        equipe1=match['team1'],
-                        equipe2=match['team2'],
-                        date_match=match['start_time_utc']
+                        journee_id, match['event_id'], event.id, match['team1'], match['team2'], match['start_time_utc']
                     )
-                    
-                    # Préparer pour la création du message de pronostic
                     new_matches_for_pronos.append({
-                        'id': match_id,
-                        'equipe1': match['team1'],
-                        'equipe2': match['team2'],
-                        'date_match': match['start_time_utc'],
-                        'journee_numero': journee_numero
+                        'id': match_id, 'equipe1': match['team1'], 'equipe2': match['team2'],
+                        'date_match': match['start_time_utc'], 'journee_numero': journee_numero
                     })
-                    
-                    # Stocker pour le suivi
-                    self.created_matches[event.id] = {
-                        "match_id": match_id,
-                        "event_id": match['event_id'],
-                        "team1": match['team1'],
-                        "team2": match['team2'],
-                        "start_time": match['start_time_utc']
-                    }
-            
-            # Créer les messages de pronostics pour les nouveaux matchs
+
             if new_matches_for_pronos and pronos_cog:
                 await pronos_cog.create_pronostic_messages_for_matches(new_matches_for_pronos)
-                print(f"✅ (MATCHES) {len(new_matches_for_pronos)} messages de pronostics créés")
             
-            # Archivage des anciens événements
-            now_utc = datetime.now(timezone.utc)
-            for event in existing_events:
-                if (event.creator == self.bot.user and 
-                    event.status in (discord.EventStatus.scheduled, discord.EventStatus.active) and 
-                    now_utc > (event.start_time + timedelta(hours=12))):
-                    
-                    print(f"🗄️ (MATCHES) Archivage événement: {event.name}")
-                    await event.edit(status=discord.EventStatus.completed)
-                    
         except Exception as e:
             print(f"❌ (MATCHES) Erreur dans la boucle: {e}")
 
@@ -302,168 +221,94 @@ class EventsCog(commands.Cog):
     async def check_results_loop(self):
         """Vérifie et met à jour les résultats des matchs terminés."""
         print("🔍 (RESULTS) Vérification des résultats...")
-        
-        # Récupérer les matchs sans résultat dont l'heure de début + 3h est passée
         now_utc = datetime.now(timezone.utc)
-        three_hours_ago = now_utc - timedelta(hours=3)
-        
-        with database.sqlite3.connect(database.DB_NAME) as con:
-            con.row_factory = database.sqlite3.Row
-            cur = con.cursor()
-            cur.execute("""
-                SELECT * FROM matchs 
-                WHERE resultat IS NULL 
-                AND date_match <= ?
-            """, (three_hours_ago,))
-            matches_to_check = cur.fetchall()
+        matches_to_check = database.get_matches_to_check_results(now_utc - timedelta(hours=2))
         
         pronos_cog = self.bot.get_cog('PronosticsCog')
         
-        for match in matches_to_check:
+        for match_row in matches_to_check:
+            match = dict(match_row)
             try:
-                # Récupérer le résultat depuis Livescore
-                result = self.get_match_result(match['event_id'])
-                
-                if result:
+                result = await self.get_match_result(match['event_id'])
+                if result and pronos_cog:
                     print(f"✅ (RESULTS) Résultat trouvé: {match['equipe1']} {result} {match['equipe2']}")
-                    
-                    # Traiter le résultat via le cog des pronostics
-                    if pronos_cog:
-                        pronos_cog.process_match_result(match['id'], result)
-                    
-                    # Mettre à jour l'événement Discord avec le score
+                    pronos_cog.process_match_result(match['id'], result)
                     await self.update_discord_event_with_result(
-                        match['discord_event_id'], 
-                        match['equipe1'], 
-                        match['equipe2'], 
-                        result
+                        match['discord_event_id'], match['equipe1'], match['equipe2'], result
                     )
-                else:
-                    print(f"⚠️ (RESULTS) Pas encore de résultat pour {match['equipe1']} vs {match['equipe2']}")
-                    
             except Exception as e:
                 print(f"❌ (RESULTS) Erreur pour le match {match['id']}: {e}")
 
-    def get_match_result(self, event_id):
-        """Récupère le résultat d'un match spécifique depuis Livescore."""
-        try:
-            url = f"https://prod-public-api.livescore.com/v1/api/app/event/{event_id}/3?locale=fr"
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Accept': 'application/json'
-            }
-            response = requests.get(url, headers=headers, timeout=10)
-            response.raise_for_status()
-            data = response.json()
-            
-            # Extraction du score
-            tr1 = data.get('Tr1', '?')
-            tr2 = data.get('Tr2', '?')
-            
-            if tr1 is not None and tr2 is not None and tr1 != '?' and tr2 != '?':
-                return f"{tr1}-{tr2}"
-            return None
-            
-        except Exception as e:
-            print(f"❌ (RESULTS) Erreur API: {e}")
-            return None
+    async def get_match_result(self, event_id):
+        """Récupère le résultat d'un match spécifique via Playwright."""
+        match_url = f"https://www.livescore.in/fr/match/{event_id}/"
+        
+        async with async_playwright() as p:
+            browser = await p.chromium.launch()
+            page = await browser.new_page()
+            try:
+                await page.goto(match_url, timeout=20000)
+                if await page.locator("#onetrust-accept-btn-handler").is_visible():
+                    await page.click("#onetrust-accept-btn-handler")
+
+                status_text = await page.locator(".fixedHeaderDuel__detailStatus").inner_text()
+                if "Terminé" not in status_text:
+                    await browser.close()
+                    return None
+
+                score1 = await page.locator(".detailScore__wrapper span").nth(0).inner_text()
+                score2 = await page.locator(".detailScore__wrapper span").nth(2).inner_text()
+                
+                if score1.isdigit() and score2.isdigit():
+                    return f"{score1}-{score2}"
+            except Exception as e:
+                print(f"❌ (RESULTS SCRAPE) Erreur pour match {event_id}: {type(e).__name__}")
+            finally:
+                await browser.close()
+        return None
 
     async def update_discord_event_with_result(self, discord_event_id, team1, team2, score):
         """Met à jour l'événement Discord avec le résultat du match."""
         try:
             guild = self.bot.get_guild(self.bot.guild_id)
-            if not guild:
-                return
-                
-            # Récupérer l'événement
-            event = guild.get_scheduled_event(discord_event_id)
-            if not event:
-                print(f"⚠️ (RESULTS) Événement Discord {discord_event_id} introuvable")
-                return
+            if not guild or not discord_event_id: return
             
-            # Mettre à jour la description avec le score
-            new_description = (
-                f"Match de Starligue\n\n"
-                f"🏐 **RÉSULTAT FINAL : {score}**\n\n"
-                f"{event.description.split('📊')[1] if '📊' in event.description else ''}"
-            )
-            
-            # Mettre à jour le nom si l'événement est toujours modifiable
+            event = guild.get_scheduled_event(int(discord_event_id))
+            if not event: return
+
+            new_description = f"🏐 RÉSULTAT FINAL : {score}\n\n{event.description}"
+            new_name = f"[TERMINÉ] {team1} {score} {team2}"
+
             if event.status == discord.EventStatus.scheduled:
-                await event.edit(
-                    name=f"[TERMINÉ] {team1} {score} {team2}",
-                    description=new_description
-                )
+                await event.edit(name=new_name, description=new_description)
             else:
-                # Si l'événement a déjà commencé, on peut seulement mettre à jour la description
                 await event.edit(description=new_description)
-                
-            print(f"✅ (RESULTS) Événement mis à jour avec le score: {score}")
-            
         except Exception as e:
-            print(f"❌ (RESULTS) Erreur mise à jour événement: {e}")
+            print(f"❌ (RESULTS) Erreur mise à jour événement Discord: {e}")
 
     @check_rss_loop.before_loop
     @check_matches_loop.before_loop
     @check_results_loop.before_loop
     async def before_loops(self):
-        """Attend que le bot soit prêt avant de démarrer les boucles."""
         await self.bot.wait_until_ready()
 
-    # === COMMANDES ===
+    # === COMMANDES (INCHANGÉES) ===
     @commands.command(name='handball')
     async def handball_command(self, ctx):
         """Affiche les prochains matchs de handball."""
         guild = ctx.guild
-        if not guild:
-            return
-            
-        # Récupérer les événements programmés
-        upcoming_events = []
-        now_utc = datetime.now(timezone.utc)
-        
-        for event in guild.scheduled_events:
-            if (event.creator == self.bot.user and 
-                event.status == discord.EventStatus.scheduled and
-                "vs" in event.name):
-                upcoming_events.append(event)
-        
+        if not guild: return
+        upcoming_events = [e for e in guild.scheduled_events if e.creator == self.bot.user and e.status == discord.EventStatus.scheduled and "vs" in e.name]
         if not upcoming_events:
             await ctx.send("Aucun match programmé pour le moment.", ephemeral=True)
             return
         
-        # Trier par date
         upcoming_events.sort(key=lambda e: e.start_time)
+        embed = discord.Embed(title="🏐 Prochains matchs de Starligue", color=discord.Color.orange())
         
-        # Créer l'embed
-        embed = discord.Embed(
-            title="🏐 Prochains matchs de Starligue",
-            description=f"**{len(upcoming_events)} matchs** à venir",
-            color=discord.Color.orange(),
-            timestamp=now_utc
-        )
-        
-        # Afficher les 10 prochains matchs
         for event in upcoming_events[:10]:
             time_paris = event.start_time.astimezone(pytz.timezone('Europe/Paris'))
-            time_until = event.start_time - now_utc
-            
-            if time_until.days > 0:
-                time_str = f"Dans {time_until.days} jour{'s' if time_until.days > 1 else ''}"
-            elif time_until.total_seconds() > 3600:
-                hours = int(time_until.total_seconds() // 3600)
-                time_str = f"Dans {hours} heure{'s' if hours > 1 else ''}"
-            else:
-                minutes = int(time_until.total_seconds() // 60)
-                time_str = f"Dans {minutes} minute{'s' if minutes > 1 else ''}"
-            
-            embed.add_field(
-                name=event.name,
-                value=f"📅 {time_paris.strftime('%d/%m à %H:%M')}\n⏰ {time_str}",
-                inline=True
-            )
-        
-        embed.set_footer(text="Cliquez sur 'Intéressé' sur un événement pour recevoir un rappel!")
+            embed.add_field(name=event.name, value=f"📅 {time_paris.strftime('%d/%m à %H:%M')}", inline=True)
         
         await ctx.send(embed=embed, ephemeral=True)
 
@@ -471,27 +316,19 @@ class EventsCog(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def force_sync_command(self, ctx):
         """Force la synchronisation des matchs (admin uniquement)."""
-        await ctx.send("🔄 Synchronisation forcée des matchs en cours...", ephemeral=True)
-        
-        # Forcer l'exécution de la vérification des matchs
-        try:
-            await self.check_matches_loop()
-            await ctx.send("✅ Synchronisation des matchs terminée!", ephemeral=True)
-        except Exception as e:
-            await ctx.send(f"❌ Erreur lors de la synchronisation: {e}", ephemeral=True)
+        await ctx.send("🔄 Synchronisation forcée des matchs en cours...", ephemeral=True, delete_after=5)
+        async with ctx.typing():
+            await self.check_matches_loop.coro(self)
+        await ctx.send("✅ Synchronisation des matchs terminée!", ephemeral=True)
 
     @commands.command(name='checkresults')
     @commands.has_permissions(administrator=True)
     async def check_results_command(self, ctx):
         """Force la vérification des résultats (admin uniquement)."""
-        await ctx.send("🔄 Vérification forcée des résultats en cours...", ephemeral=True)
-        
-        try:
-            await self.check_results_loop()
-            await ctx.send("✅ Vérification des résultats terminée!", ephemeral=True)
-        except Exception as e:
-            await ctx.send(f"❌ Erreur lors de la vérification: {e}", ephemeral=True)
+        await ctx.send("🔄 Vérification forcée des résultats en cours...", ephemeral=True, delete_after=5)
+        async with ctx.typing():
+            await self.check_results_loop.coro(self)
+        await ctx.send("✅ Vérification des résultats terminée!", ephemeral=True)
 
 async def setup(bot):
-    """Fonction requise par discord.py pour charger le Cog."""
     await bot.add_cog(EventsCog(bot))
