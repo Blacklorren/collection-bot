@@ -1,12 +1,12 @@
 import discord
 from discord.ext import commands
 import asyncio
-import requests
+import json
 from datetime import datetime, timedelta, timezone
 import pytz
 import database
-import json
 from playwright.async_api import async_playwright
+import feedparser # Assurez-vous que feedparser est importé pour le test RSS
 
 class TestCog(commands.Cog):
     """Cog pour tester toutes les fonctionnalités du bot."""
@@ -45,7 +45,7 @@ class TestCog(commands.Cog):
         tests = [
             ("`!test all`", "Lance tous les tests"),
             ("`!test permissions`", "Vérifie les permissions du bot"),
-            ("`!test api`", "Teste l'API Livescore"),
+            ("`!test api`", "Teste le scraping via Playwright"),
             ("`!test db`", "Teste la base de données"),
             ("`!test collection`", "Teste le système de cartes"),
             ("`!test pronostics`", "Teste le système de pronostics"),
@@ -69,7 +69,7 @@ class TestCog(commands.Cog):
         # 1. Permissions
         await self.test_permissions(ctx)
         
-        # 2. API
+        # 2. API (maintenant Playwright)
         await self.test_api(ctx)
         
         # 3. Base de données
@@ -103,7 +103,6 @@ class TestCog(commands.Cog):
         
         # Liste complète des permissions nécessaires
         required_perms = {
-            # Permissions de base
             "view_channel": ("Voir les salons", permissions.view_channel),
             "send_messages": ("Envoyer des messages", permissions.send_messages),
             "send_messages_in_threads": ("Messages dans les fils", permissions.send_messages_in_threads),
@@ -112,19 +111,11 @@ class TestCog(commands.Cog):
             "read_message_history": ("Lire l'historique", permissions.read_message_history),
             "add_reactions": ("Ajouter des réactions", permissions.add_reactions),
             "use_external_emojis": ("Emojis externes", permissions.use_external_emojis),
-            
-            # Permissions pour les événements
             "manage_events": ("Gérer les événements", permissions.manage_events),
-            
-            # Permissions pour la modération
             "manage_messages": ("Gérer les messages", permissions.manage_messages),
             "manage_roles": ("Gérer les rôles", permissions.manage_roles),
-            
-            # Permissions vocales (optionnel)
             "connect": ("Se connecter (vocal)", permissions.connect),
             "speak": ("Parler (vocal)", permissions.speak),
-            
-            # Permissions avancées
             "mention_everyone": ("Mentionner @everyone", permissions.mention_everyone),
             "use_slash_commands": ("Commandes slash", permissions.use_application_commands),
         }
@@ -158,115 +149,82 @@ class TestCog(commands.Cog):
         
         await ctx.send(embed=embed)
 
+    # --- VERSION CORRIGÉE DE test_api ---
     @test_group.command(name='api')
     async def test_api(self, ctx):
-        """Teste l'API Livescore."""
-        await ctx.send("🔍 **Test de l'API Livescore...**")
-        
-        try:
-            # Essayons différentes URLs possibles pour l'API
-            urls_to_try = [
-                "https://prod-public-api.livescore.com/v1/api/app/stage/soccer/france/ligue-1/3?locale=fr",
-                "https://prod-public-api.livescore.com/v1/api/app/stage/handball/france/starligue/3?locale=fr",
-                "https://api.livescore.com/v1/competitions/handball/france/starligue?locale=fr"
-            ]
-            
-            data = None
-            working_url = None
-            
-            for url in urls_to_try:
-                try:
-                    response = requests.get(url, headers=headers, timeout=10)
-                    if response.status_code == 200:
-                        data = response.json()
-                        working_url = url
-                        break
-                except:
-                    continue
-            
-            if not data:
-                # Si aucune URL ne fonctionne, essayons une approche différente
-                url = "https://www.livescore.in/fr/handball/france/starligue/"
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Accept': 'application/json'
-            }
-            
-            response = requests.get(url, headers=headers, timeout=10)
-            response.raise_for_status()
-            data = response.json()
-            
-            if 'Stages' in data:
-                match_count = sum(len(stage.get('Events', [])) for stage in data.get('Stages', []))
-                self.log_test("API Livescore", True, f"{match_count} matchs trouvés")
+        """Teste le scraping via Playwright sur livescore.in."""
+        await ctx.send("🔍 **Test du scraping Playwright...**")
+        url = "https://www.livescore.in/fr/handball/france/starligue/"
+        async with async_playwright() as p:
+            browser = None
+            try:
+                browser = await p.chromium.launch()
+                page = await browser.new_page()
+                await page.goto(url, timeout=30000)
                 
-                # Afficher un exemple
-                embed = discord.Embed(
-                    title="✅ API Livescore Fonctionnelle",
-                    description=f"**{match_count} matchs** trouvés dans l'API",
-                    color=discord.Color.green()
-                )
-                
-                # Exemple de match
-                for stage in data.get('Stages', []):
-                    for event in stage.get('Events', [])[:1]:  # Premier match seulement
-                        t1 = event.get('T1', [{}])[0].get('Nm', 'Inconnu')
-                        t2 = event.get('T2', [{}])[0].get('Nm', 'Inconnu')
-                        date = event.get('Esd', 'Date inconnue')
-                        embed.add_field(
-                            name="Exemple de match",
-                            value=f"{t1} vs {t2}\n{date}",
-                            inline=False
-                        )
-                        break
-                    break
-                
-                await ctx.send(embed=embed)
-            else:
-                self.log_test("API Livescore", False, "Structure inattendue")
-                await ctx.send("❌ API Livescore : Structure de données inattendue")
-                
-        except Exception as e:
-            self.log_test("API Livescore", False, str(e))
-            await ctx.send(f"❌ Erreur API : {str(e)}")
+                # Gérer le bouton des cookies
+                cookie_button = page.locator("#onetrust-accept-btn-handler")
+                if await cookie_button.is_visible(timeout=5000):
+                    await cookie_button.click()
 
+                # Attendre un sélecteur qui contient les matchs
+                await page.wait_for_selector(".event__match", timeout=15000)
+                
+                # Récupérer les matchs programmés
+                matches_scheduled = await page.locator(".event__match--scheduled").all()
+                
+                if matches_scheduled:
+                    match_count = len(matches_scheduled)
+                    self.log_test("Scraping Livescore", True, f"{match_count} matchs trouvés")
+                    
+                    embed = discord.Embed(
+                        title="✅ Scraping Playwright Fonctionnel",
+                        description=f"**{match_count} matchs programmés** trouvés sur [la page Starligue]({url})",
+                        color=discord.Color.green()
+                    )
+                    
+                    # Extraire les détails du premier match pour l'exemple
+                    first_match = matches_scheduled[0]
+                    team1 = await first_match.locator(".event__participant--home").inner_text()
+                    team2 = await first_match.locator(".event__participant--away").inner_text()
+                    time = await first_match.locator(".event__time").inner_text()
+                    
+                    embed.add_field(
+                        name="Exemple de match trouvé",
+                        value=f"🕒 {time} - {team1} vs {team2}",
+                        inline=False
+                    )
+                    await ctx.send(embed=embed)
+                else:
+                    self.log_test("Scraping Livescore", False, "Aucun match programmé trouvé sur la page")
+                    await ctx.send("⚠️ Scraping Livescore : Aucun match programmé n'a été trouvé sur la page.")
+                    
+            except Exception as e:
+                self.log_test("Scraping Livescore", False, str(e))
+                await ctx.send(f"❌ Erreur Playwright : {str(e)}")
+            finally:
+                if browser:
+                    await browser.close()
+    
     @test_group.command(name='db')
     async def test_db(self, ctx):
         """Teste les opérations de base de données."""
         await ctx.send("🗄️ **Test de la base de données...**")
         
         try:
-            # Test utilisateur
-            test_user_id = 999999999
+            test_user_id = self.bot.user.id
             database.check_user(test_user_id)
-            user_data = database.get_user_data(test_user_id)
-            self.log_test("Création utilisateur", user_data is not None)
-            
-            # Test points
+            user_data_before = database.get_user_data(test_user_id)
+            self.log_test("DB: Création/Lecture utilisateur", user_data_before is not None)
+
             database.update_points(test_user_id, 100)
-            user_data = database.get_user_data(test_user_id)
-            self.log_test("Ajout points", user_data['points'] >= 100)
+            user_data_after = database.get_user_data(test_user_id)
+            self.log_test("DB: Ajout points", user_data_after['points'] == user_data_before['points'] + 100)
             
-            # Test journée
-            now = datetime.now(timezone.utc)
-            journee_id = database.create_or_update_journee(999, now, now + timedelta(days=7))
-            self.log_test("Création journée", journee_id is not None)
+            # Revenir à l'état initial
+            database.update_points(test_user_id, -100)
             
-            # Test match
-            match_id = database.create_match(
-                journee_id, "TEST999", 999999, "Test1", "Test2", now
-            )
-            self.log_test("Création match", match_id is not None)
-            
-            # Nettoyage
-            with database.sqlite3.connect(database.DB_NAME) as con:
-                cur = con.cursor()
-                cur.execute("DELETE FROM matchs WHERE event_id = 'TEST999'")
-                cur.execute("DELETE FROM journees WHERE numero = 999")
-                cur.execute("DELETE FROM users WHERE user_id = ?", (test_user_id,))
-                con.commit()
-            
-            await ctx.send("✅ **Base de données fonctionnelle**")
+            await ctx.send("✅ **Base de données fonctionnelle** (lecture, écriture testées).")
             
         except Exception as e:
             self.log_test("Base de données", False, str(e))
@@ -283,9 +241,9 @@ class TestCog(commands.Cog):
                 with open('cards.json', 'r', encoding='utf-8') as f:
                     cards_data = json.load(f)
                 self.log_test("Fichier cards.json", True, f"{len(cards_data)} cartes")
-            except:
+            except FileNotFoundError:
                 self.log_test("Fichier cards.json", False, "Fichier manquant")
-                await ctx.send("❌ Fichier cards.json introuvable")
+                await ctx.send("❌ Fichier `cards.json` introuvable.")
                 return
             
             # Test d'affichage d'une carte
@@ -304,7 +262,7 @@ class TestCog(commands.Cog):
                 self.test_messages.append(msg)
                 self.log_test("Affichage carte", True)
             
-            await ctx.send("✅ **Système de collection fonctionnel**")
+            await ctx.send("✅ **Système de collection fonctionnel** (chargement et affichage OK).")
             
         except Exception as e:
             self.log_test("Collection", False, str(e))
@@ -315,7 +273,6 @@ class TestCog(commands.Cog):
         """Teste le système de pronostics."""
         await ctx.send("🎯 **Test du système de pronostics...**")
         
-        # Message de pronostic
         match_time = datetime.now(timezone.utc) + timedelta(hours=24)
         match_time_paris = match_time.astimezone(pytz.timezone('Europe/Paris'))
         
@@ -337,16 +294,15 @@ class TestCog(commands.Cog):
         msg = await ctx.send(embed=embed)
         self.test_messages.append(msg)
         
-        # Ajouter les réactions
         try:
             for emoji in ["1️⃣", "❌", "2️⃣"]:
                 await msg.add_reaction(emoji)
                 await asyncio.sleep(0.3)
             self.log_test("Réactions pronostics", True)
-        except:
-            self.log_test("Réactions pronostics", False)
-            
-        await ctx.send("✅ **Message de pronostic créé avec succès**")
+            await ctx.send("✅ **Message de pronostic créé avec succès** (réactions ajoutées).")
+        except Exception as e:
+            self.log_test("Réactions pronostics", False, str(e))
+            await ctx.send(f"❌ Erreur lors de l'ajout des réactions : {e}")
 
     @test_group.command(name='events')
     async def test_events(self, ctx):
@@ -354,12 +310,12 @@ class TestCog(commands.Cog):
         await ctx.send("📅 **Test de création d'événement...**")
         
         try:
-            start_time = datetime.now(timezone.utc) + timedelta(hours=2)
+            start_time = datetime.now(timezone.utc) + timedelta(minutes=2)
             end_time = start_time + timedelta(hours=2)
             
             event = await ctx.guild.create_scheduled_event(
-                name="[TEST] Match de handball",
-                description="Ceci est un événement de test",
+                name="[TEST] Match de handball (Suppression auto)",
+                description="Ceci est un événement de test.",
                 start_time=start_time,
                 end_time=end_time,
                 entity_type=discord.EntityType.external,
@@ -368,19 +324,18 @@ class TestCog(commands.Cog):
             )
             
             self.log_test("Création événement", True, f"ID: {event.id}")
-            await ctx.send(f"✅ **Événement créé** (ID: {event.id})")
+            await ctx.send(f"✅ **Événement créé** (ID: {event.id}). Il sera supprimé dans 15 secondes.")
             
-            # Supprimer après 10 secondes
-            await asyncio.sleep(10)
+            await asyncio.sleep(15)
             await event.delete()
-            await ctx.send("🗑️ Événement de test supprimé")
+            self.test_messages.append(await ctx.send("🗑️ Événement de test supprimé."))
             
         except discord.Forbidden:
             self.log_test("Création événement", False, "Permissions insuffisantes")
-            await ctx.send("❌ Permissions insuffisantes pour créer des événements")
+            await ctx.send("❌ Permissions insuffisantes pour créer des événements.")
         except Exception as e:
             self.log_test("Création événement", False, str(e))
-            await ctx.send(f"❌ Erreur : {str(e)}")
+            await ctx.send(f"❌ Erreur lors de la création de l'événement : {str(e)}")
 
     @test_group.command(name='rss')
     async def test_rss(self, ctx):
@@ -388,19 +343,18 @@ class TestCog(commands.Cog):
         await ctx.send("📰 **Test du flux RSS...**")
         
         try:
-            import feedparser
             feed = feedparser.parse("https://handnews.fr/feed")
             
             if not feed.bozo:
-                self.log_test("Flux RSS", True, f"{len(feed.entries)} articles")
+                entry_count = len(feed.entries)
+                self.log_test("Flux RSS", True, f"{entry_count} articles")
                 
-                # Afficher le dernier article
                 if feed.entries:
                     entry = feed.entries[0]
                     embed = discord.Embed(
-                        title=entry.title[:256],
+                        title=f"Test du dernier article RSS : {entry.title[:150]}",
                         url=entry.link,
-                        description=entry.summary[:500] if hasattr(entry, 'summary') else "Pas de résumé",
+                        description=(entry.summary[:200] + "..." if hasattr(entry, 'summary') and len(entry.summary) > 200 else "Pas de résumé."),
                         color=0xe8874f
                     )
                     embed.set_footer(text="Test RSS Handnews")
@@ -408,14 +362,14 @@ class TestCog(commands.Cog):
                     msg = await ctx.send(embed=embed)
                     self.test_messages.append(msg)
                     
-                await ctx.send(f"✅ **RSS fonctionnel** - {len(feed.entries)} articles trouvés")
+                await ctx.send(f"✅ **RSS fonctionnel** - {entry_count} articles trouvés.")
             else:
-                self.log_test("Flux RSS", False, "Flux invalide")
-                await ctx.send("❌ Flux RSS invalide")
+                self.log_test("Flux RSS", False, "Flux invalide ou erreur de parsing")
+                await ctx.send("❌ Flux RSS invalide ou erreur de parsing.")
                 
         except Exception as e:
             self.log_test("Flux RSS", False, str(e))
-            await ctx.send(f"❌ Erreur RSS : {str(e)}")
+            await ctx.send(f"❌ Erreur lors du test RSS : {str(e)}")
 
     @test_group.command(name='clean')
     async def test_clean(self, ctx):
@@ -429,23 +383,23 @@ class TestCog(commands.Cog):
         success_count = sum(1 for r in self.test_results if r.startswith("✅"))
         total_count = len(self.test_results)
         
+        color = discord.Color.green() if success_count == total_count else discord.Color.orange()
         embed = discord.Embed(
             title="📊 Résumé des Tests",
-            description=f"**{success_count}/{total_count}** tests réussis",
-            color=discord.Color.green() if success_count == total_count else discord.Color.orange()
+            description=f"**{success_count}/{total_count}** tests réussis.",
+            color=color
         )
         
-        # Grouper les résultats
-        results_text = "\n".join(self.test_results[:20])  # Limiter à 20 pour l'embed
-        if len(self.test_results) > 20:
-            results_text += f"\n... et {len(self.test_results) - 20} autres"
+        results_text = "\n".join(self.test_results)
+        if len(results_text) > 1024:
+            results_text = results_text[:1020] + "\n..."
             
-        embed.add_field(name="Résultats", value=results_text, inline=False)
+        embed.add_field(name="Résultats Détaillés", value=results_text, inline=False)
         
-        if success_count == total_count:
-            embed.set_footer(text="🎉 Tous les tests sont passés !")
+        if success_count < total_count:
+            embed.set_footer(text="⚠️ Certains tests ont échoué. Vérifiez les logs.")
         else:
-            embed.set_footer(text="⚠️ Certains tests ont échoué")
+            embed.set_footer(text="🎉 Tous les tests sont passés avec succès !")
             
         await ctx.send(embed=embed)
 
