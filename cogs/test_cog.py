@@ -59,7 +59,7 @@ class TestCog(commands.Cog):
         await ctx.send(embed=embed)
 
     # --- TEST DE PRONOSTIC D'INTÉGRATION COMPLET ---
-   @test_group.command(name='pronos')
+    @test_group.command(name='pronos')
     async def test_pronostics_integration(self, ctx):
         """Scrape le prochain match réel et lance un test fonctionnel dans le salon de pronostics."""
         
