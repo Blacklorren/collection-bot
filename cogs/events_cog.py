@@ -5,12 +5,10 @@ import asyncio
 import os
 from datetime import datetime, timezone, timedelta, date
 import re
-from playwright.async_api import async_playwright
 import pytz
 import database
 import aiohttp
 from bs4 import BeautifulSoup
-import json
 
 # Configuration
 RSS_URL = "https://handnews.fr/feed"
@@ -22,30 +20,17 @@ LIVESCORE_URL = "https://www.livescore.in/fr/handball/france/starligue/"
 MATCH_CHECK_INTERVAL = 3600  # Vérifier les matchs toutes les heures
 RESULTS_CHECK_INTERVAL = 1800  # Vérifier les résultats toutes les 30 minutes
 
-# Détection de l'environnement
-IS_RAILWAY = os.getenv('RAILWAY_ENVIRONMENT') is not None
-USE_PLAYWRIGHT = os.getenv('USE_PLAYWRIGHT', 'true').lower() == 'true' and not IS_RAILWAY
-
 class EventsCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.seen_articles = set()
         self.first_check = True
         self.created_matches = {}
-        self.matches_cache = None
-        self.cache_timestamp = None
-        self.CACHE_DURATION = 300  # 5 minutes
         
         # Démarrer les tâches
         self.check_rss_loop.start()
         self.check_matches_loop.start()
         self.check_results_loop.start()
-        
-        # Log de l'environnement
-        if IS_RAILWAY:
-            print("🚂 (ENV) Détection Railway - Mode scraping alternatif activé")
-        else:
-            print("💻 (ENV) Environnement local - Playwright activé")
         
     def cog_unload(self):
         """Arrête les tâches lors du déchargement du cog."""
@@ -115,169 +100,132 @@ class EventsCog(commands.Cog):
         except Exception as e:
             print(f"❌ (RSS) Erreur générale : {e}")
 
-    # === MÉTHODE DE SCRAPING ALTERNATIVE POUR RAILWAY ===
-    async def scrape_livescore_api(self):
-        """Méthode alternative de scraping via API/HTML parsing pour Railway."""
+    # === GESTION DES MATCHS - VERSION SIMPLE HTML ===
+    async def scrape_livescore_matches(self):
+        """Récupère les matchs à venir via parsing HTML simple."""
         matches = []
         paris_tz = pytz.timezone('Europe/Paris')
         
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'fr-FR,fr;q=0.9',
+            'Accept-Encoding': 'gzip, deflate',
+            'Connection': 'keep-alive',
+        }
+        
         try:
-            print("🌐 (API) Tentative de scraping via méthode alternative...")
-            
-            # Headers pour simuler un navigateur
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8',
-                'Accept-Encoding': 'gzip, deflate, br',
-                'DNT': '1',
-                'Connection': 'keep-alive',
-                'Upgrade-Insecure-Requests': '1',
-                'Cache-Control': 'max-age=0'
-            }
+            print("🌐 (HTML) Récupération de la page Livescore...")
             
             async with aiohttp.ClientSession() as session:
                 async with session.get(LIVESCORE_URL, headers=headers) as response:
                     if response.status != 200:
-                        print(f"⚠️ (API) Status HTTP {response.status}")
+                        print(f"⚠️ (HTML) Status HTTP {response.status}")
                         return matches
                     
                     html = await response.text()
-                    
-                    # Recherche de données JSON intégrées
-                    json_pattern = r'window\.__data\s*=\s*({.*?});'
-                    json_match = re.search(json_pattern, html, re.DOTALL)
-                    
-                    if json_match:
-                        print("✅ (API) Données JSON trouvées dans la page")
-                        # Traitement des données JSON si trouvées
-                        # Note: Cette partie dépend de la structure exacte du site
-                        return matches
-                    
-                    # Fallback: parsing HTML basique avec BeautifulSoup
                     soup = BeautifulSoup(html, 'html.parser')
                     
-                    # Tentative de récupération basique d'informations
-                    # Note: Ces sélecteurs peuvent nécessiter des ajustements
-                    match_elements = soup.find_all('div', class_='event__match')
+                    # Sauvegarde du HTML pour debug (optionnel)
+                    if os.getenv('DEBUG_HTML', 'false').lower() == 'true':
+                        with open('livescore_debug.html', 'w', encoding='utf-8') as f:
+                            f.write(html)
+                        print("📝 (DEBUG) HTML sauvegardé dans livescore_debug.html")
                     
-                    if match_elements:
-                        print(f"📊 (API) {len(match_elements)} éléments de match trouvés")
-                    else:
-                        print("⚠️ (API) Aucun match trouvé via parsing HTML")
-                        
-        except Exception as e:
-            print(f"❌ (API) Erreur lors du scraping alternatif: {type(e).__name__}: {str(e)}")
-            
-        return matches
-
-    # === GESTION DES MATCHS - VERSION HYBRIDE ===
-    async def scrape_livescore_matches(self):
-        """Récupère les matchs à venir - méthode hybride."""
-        # Utiliser le cache si disponible
-        if self.matches_cache and self.cache_timestamp:
-            if (datetime.now() - self.cache_timestamp).seconds < self.CACHE_DURATION:
-                print("📦 (CACHE) Utilisation des matchs en cache")
-                return self.matches_cache
-        
-        # Sur Railway, utiliser la méthode alternative
-        if IS_RAILWAY or not USE_PLAYWRIGHT:
-            matches = await self.scrape_livescore_api()
-            if matches:
-                self.matches_cache = matches
-                self.cache_timestamp = datetime.now()
-            return matches
-        
-        # Sinon, utiliser Playwright
-        return await self.scrape_livescore_with_playwright()
-
-    async def scrape_livescore_with_playwright(self):
-        """Méthode originale avec Playwright (pour environnement local)."""
-        matches = []
-        paris_tz = pytz.timezone('Europe/Paris')
-        
-        async with async_playwright() as p:
-            browser = None
-            try:
-                print("🎭 (PLAYWRIGHT) Lancement du navigateur...")
-                browser = await p.firefox.launch(
-                    headless=True,
-                    args=['--no-sandbox', '--disable-setuid-sandbox']
-                )
-                page = await browser.new_page()
-                
-                await page.goto(LIVESCORE_URL, wait_until='domcontentloaded', timeout=30000)
-                
-                # Gestion des cookies
-                try:
-                    if await page.locator("#onetrust-accept-btn-handler").is_visible(timeout=5000):
-                        await page.click("#onetrust-accept-btn-handler")
-                except:
-                    pass
-                
-                await page.wait_for_selector(".event__match--scheduled", timeout=15000)
-                
-                all_days = await page.locator(".sportName.handball > div > div").all()
-                
-                now = datetime.now(paris_tz)
-                
-                for day_container in all_days:
-                    date_text_raw = await day_container.locator(".event__round").inner_text()
-                    date_text = date_text_raw.strip().upper()
+                    # Stratégie 1: Chercher les conteneurs de match par classe
+                    match_containers = soup.find_all('div', class_=re.compile(r'event__match'))
+                    print(f"📊 (HTML) {len(match_containers)} conteneurs de match trouvés")
                     
-                    current_match_date = None
-                    today = now.date()
-
-                    if "AUJOURD'HUI" in date_text:
-                        current_match_date = today
-                    elif "DEMAIN" in date_text:
-                        current_match_date = today + timedelta(days=1)
-                    else:
-                        day_str, month_str = date_text.split('.')[:2]
-                        m_date = date(now.year, int(month_str), int(day_str))
-                        if m_date < today:
-                            m_date = m_date.replace(year=now.year + 1)
-                        current_match_date = m_date
-                        
-                    if not current_match_date: continue
-
-                    event_elements = await day_container.locator(".event__match--scheduled").all()
-                    for event_element in event_elements:
-                        time_text = await event_element.locator(".event__time").inner_text()
-                        team1 = await event_element.locator(".event__participant--home").inner_text()
-                        team2 = await event_element.locator(".event__participant--away").inner_text()
-                        event_id_full = await event_element.get_attribute("id")
-
-                        if not all([time_text, team1, team2, event_id_full]): continue
-
-                        event_id = event_id_full[4:]
-                        hour, minute = map(int, time_text.split(':'))
-                        
-                        match_time_paris = datetime.combine(current_match_date, datetime.min.time()).replace(hour=hour, minute=minute)
-                        match_time_paris = paris_tz.localize(match_time_paris)
-                        match_time_utc = match_time_paris.astimezone(timezone.utc)
-                        
-                        limit_date = datetime.now(timezone.utc) + timedelta(days=5)
-                        if now.astimezone(timezone.utc) < match_time_utc < limit_date:
-                            matches.append({
-                                "team1": team1.strip(), "team2": team2.strip(),
-                                "start_time_utc": match_time_utc, "event_id": event_id
-                            })
+                    if not match_containers:
+                        # Stratégie 2: Chercher par structure
+                        # Essayer de trouver des patterns dans le HTML
+                        all_divs = soup.find_all('div')
+                        for div in all_divs:
+                            # Chercher des divs qui contiennent des patterns de match
+                            text_content = div.get_text(strip=True)
+                            if ' vs ' in text_content or ' - ' in text_content:
+                                # Possiblement un match
+                                pass
+                    
+                    # Parser les matchs trouvés
+                    now = datetime.now(paris_tz)
+                    for idx, container in enumerate(match_containers):
+                        try:
+                            # Extraire les classes pour identifier le type
+                            classes = container.get('class', [])
                             
-                print(f"✅ (PLAYWRIGHT) {len(matches)} matchs trouvés")
-                
-            except asyncio.TimeoutError:
-                print("⚠️ (PLAYWRIGHT) Timeout lors du chargement")
-            except Exception as e:
-                print(f"❌ (PLAYWRIGHT) Erreur: {type(e).__name__}: {str(e)}")
-            finally:
-                if browser:
-                    await browser.close()
+                            # Vérifier si c'est un match programmé
+                            if 'event__match--scheduled' in ' '.join(classes):
+                                # Extraire les équipes
+                                home_elem = container.find(class_=re.compile(r'event__participant--home'))
+                                away_elem = container.find(class_=re.compile(r'event__participant--away'))
+                                time_elem = container.find(class_=re.compile(r'event__time'))
+                                
+                                if home_elem and away_elem and time_elem:
+                                    team1 = home_elem.get_text(strip=True)
+                                    team2 = away_elem.get_text(strip=True)
+                                    time_text = time_elem.get_text(strip=True)
+                                    
+                                    # Extraire l'ID du match
+                                    match_id = container.get('id', f'unknown_{idx}')
+                                    if match_id.startswith('g_'):
+                                        match_id = match_id[4:]  # Enlever le préfixe
+                                    
+                                    # Parser l'heure (format HH:MM)
+                                    if ':' in time_text:
+                                        hour, minute = map(int, time_text.split(':'))
+                                        
+                                        # Déterminer la date du match
+                                        # Chercher le conteneur parent pour la date
+                                        parent = container.find_parent('div', class_=re.compile(r'sportName'))
+                                        if parent:
+                                            date_elem = parent.find(class_=re.compile(r'event__round'))
+                                            if date_elem:
+                                                date_text = date_elem.get_text(strip=True).upper()
+                                                
+                                                if "AUJOURD'HUI" in date_text:
+                                                    match_date = now.date()
+                                                elif "DEMAIN" in date_text:
+                                                    match_date = (now + timedelta(days=1)).date()
+                                                else:
+                                                    # Parser la date DD.MM
+                                                    try:
+                                                        day_month = date_text.split()[0]
+                                                        if '.' in day_month:
+                                                            day, month = day_month.split('.')[:2]
+                                                            year = now.year
+                                                            match_date = date(year, int(month), int(day))
+                                                            # Ajuster l'année si nécessaire
+                                                            if match_date < now.date():
+                                                                match_date = match_date.replace(year=year + 1)
+                                                    except:
+                                                        continue
+                                                
+                                                # Créer le datetime complet
+                                                match_datetime = datetime.combine(match_date, datetime.min.time())
+                                                match_datetime = match_datetime.replace(hour=hour, minute=minute)
+                                                match_datetime_paris = paris_tz.localize(match_datetime)
+                                                match_datetime_utc = match_datetime_paris.astimezone(timezone.utc)
+                                                
+                                                # Vérifier si le match est dans les 5 prochains jours
+                                                limit_date = datetime.now(timezone.utc) + timedelta(days=5)
+                                                if now.astimezone(timezone.utc) < match_datetime_utc < limit_date:
+                                                    matches.append({
+                                                        "team1": team1,
+                                                        "team2": team2,
+                                                        "start_time_utc": match_datetime_utc,
+                                                        "event_id": match_id
+                                                    })
+                                                    print(f"✅ Match trouvé: {team1} vs {team2} le {match_datetime_paris}")
+                                
+                        except Exception as e:
+                            print(f"⚠️ (HTML) Erreur parsing match {idx}: {e}")
+                            continue
                     
-        # Mise en cache
-        if matches:
-            self.matches_cache = matches
-            self.cache_timestamp = datetime.now()
+                    print(f"📊 (HTML) {len(matches)} matchs dans les 5 prochains jours")
+                    
+        except Exception as e:
+            print(f"❌ (HTML) Erreur lors du scraping: {type(e).__name__}: {str(e)}")
             
         return matches
 
@@ -296,8 +244,6 @@ class EventsCog(commands.Cog):
             
             if not scraped_matches:
                 print("ℹ️ (MATCHES) Aucun match trouvé.")
-                if IS_RAILWAY:
-                    print("💡 (MATCHES) Sur Railway, le scraping JavaScript nécessite une API ou une solution headless spécifique.")
                 return
             
             print(f"🏐 (MATCHES) {len(scraped_matches)} matchs trouvés (J+5)")
@@ -356,76 +302,37 @@ class EventsCog(commands.Cog):
                 print(f"❌ (RESULTS) Erreur pour le match {match['id']}: {e}")
 
     async def get_match_result(self, event_id):
-        """Récupère le résultat d'un match spécifique."""
-        if IS_RAILWAY or not USE_PLAYWRIGHT:
-            # Méthode alternative pour Railway
-            return await self.get_match_result_api(event_id)
-        else:
-            # Méthode Playwright pour environnement local
-            return await self.get_match_result_playwright(event_id)
-
-    async def get_match_result_api(self, event_id):
-        """Méthode alternative pour récupérer les résultats (Railway)."""
+        """Récupère le résultat d'un match spécifique via parsing HTML."""
         match_url = f"https://www.livescore.in/fr/match/{event_id}/"
         
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+        
         try:
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
-            
             async with aiohttp.ClientSession() as session:
                 async with session.get(match_url, headers=headers) as response:
                     if response.status != 200:
                         return None
                     
                     html = await response.text()
-                    # Note: Parsing basique, peut nécessiter des ajustements
-                    if "Terminé" in html:
-                        # Tentative d'extraction du score via regex
-                        score_pattern = r'<span class="detailScore__wrapper">(\d+)</span>.*?<span class="detailScore__wrapper">(\d+)</span>'
-                        score_match = re.search(score_pattern, html, re.DOTALL)
-                        if score_match:
-                            return f"{score_match.group(1)}-{score_match.group(2)}"
+                    soup = BeautifulSoup(html, 'html.parser')
+                    
+                    # Chercher le statut du match
+                    status_elem = soup.find(class_=re.compile(r'fixedHeaderDuel__detailStatus'))
+                    if status_elem and "Terminé" in status_elem.get_text():
+                        # Chercher les scores
+                        score_elems = soup.find_all(class_=re.compile(r'detailScore__wrapper'))
+                        if len(score_elems) >= 2:
+                            score1 = score_elems[0].get_text(strip=True)
+                            score2 = score_elems[1].get_text(strip=True)
                             
+                            if score1.isdigit() and score2.isdigit():
+                                return f"{score1}-{score2}"
+                    
         except Exception as e:
-            print(f"❌ (RESULTS API) Erreur: {type(e).__name__}")
+            print(f"❌ (RESULTS) Erreur: {type(e).__name__}")
             
-        return None
-
-    async def get_match_result_playwright(self, event_id):
-        """Récupère le résultat via Playwright (environnement local)."""
-        match_url = f"https://www.livescore.in/fr/match/{event_id}/"
-        
-        async with async_playwright() as p:
-            browser = None
-            try:
-                browser = await p.firefox.launch(headless=True)
-                page = await browser.new_page()
-                
-                await page.goto(match_url, timeout=20000)
-                
-                try:
-                    if await page.locator("#onetrust-accept-btn-handler").is_visible(timeout=3000):
-                        await page.click("#onetrust-accept-btn-handler")
-                except:
-                    pass
-
-                status_text = await page.locator(".fixedHeaderDuel__detailStatus").inner_text()
-                if "Terminé" not in status_text:
-                    return None
-
-                score1 = await page.locator(".detailScore__wrapper span").nth(0).inner_text()
-                score2 = await page.locator(".detailScore__wrapper span").nth(2).inner_text()
-                
-                if score1.isdigit() and score2.isdigit():
-                    return f"{score1}-{score2}"
-                    
-            except Exception as e:
-                print(f"❌ (RESULTS PLAYWRIGHT) Erreur: {type(e).__name__}")
-            finally:
-                if browser:
-                    await browser.close()
-                    
         return None
 
     async def update_discord_event_with_result(self, discord_event_id, team1, team2, score):
@@ -491,5 +398,12 @@ class EventsCog(commands.Cog):
             await self.check_results_loop.coro(self)
         await ctx.send("✅ Vérification des résultats terminée!", ephemeral=True)
 
+    @commands.command(name='debughtml')
+    @commands.has_permissions(administrator=True)
+    async def debug_html_command(self, ctx):
+        """Active le mode debug HTML pour sauvegarder la page (admin uniquement)."""
+        os.environ['DEBUG_HTML'] = 'true'
+        await ctx.send("🐛 Mode debug HTML activé. Le prochain scraping sauvegardera le HTML.", ephemeral=True)
+        
 async def setup(bot):
     await bot.add_cog(EventsCog(bot))
