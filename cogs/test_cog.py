@@ -6,12 +6,11 @@ from datetime import datetime, timedelta, timezone, date
 import pytz
 import database
 import aiohttp
-from bs4 import BeautifulSoup
 import re
 import os
 
-# On récupère les URLs directement depuis la configuration pour rester cohérent
-from cogs.events_cog import LIVESCORE_URL, RSS_URL
+# On importe les nouvelles constantes pour que les tests restent synchronisés
+from cogs.events_cog import LIVESCORE_URL, RSS_URL, BROWSERLESS_API_TOKEN, BROWSERLESS_SCRAPE_API_URL
 
 class TestCog(commands.Cog):
     """Cog pour tester toutes les fonctionnalités du bot."""
@@ -53,7 +52,7 @@ class TestCog(commands.Cog):
         tests = [
             ("`!test all`", "Lance l'ensemble des tests."),
             ("`!test permissions`", "Vérifie les permissions critiques du bot."),
-            ("`!test scraping`", "Teste le scraping HTML et l'analyse du prochain match."),
+            ("`!test scraping`", "Teste le scraping via Browserless.io."),
             ("`!test db`", "Vérifie la connexion et les opérations de base."),
             ("`!test collection`", "Teste le chargement des cartes et leur affichage."),
             ("`!test pronostics`", "Teste la création d'un message de pronostic."),
@@ -136,111 +135,74 @@ class TestCog(commands.Cog):
         if not silent:
             await ctx.send(embed=embed)
 
-    # --- VERSION MISE À JOUR ---
     @test_group.command(name='scraping')
     async def test_scraping(self, ctx, silent=False):
-        """Teste le scraping HTML et parse le premier match à venir."""
+        """Teste le scraping via Browserless.io et l'analyse de la réponse."""
         if not silent:
-            msg = await ctx.send(f"🌐 **Test du scraping sur `{LIVESCORE_URL}`...**")
+            msg = await ctx.send(f"🌐 **Test du scraping avec Browserless.io sur `{LIVESCORE_URL}`...**")
             self.test_messages.append(msg)
 
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        if not BROWSERLESS_API_TOKEN:
+            self.log_test("Configuration Browserless", False, "La variable d'environnement BROWSERLESS_API_TOKEN est manquante.")
+            if not silent:
+                await ctx.send("❌ **Échec de la configuration :** Le token API de Browserless (BROWSERLESS_API_TOKEN) est introuvable dans les variables d'environnement.")
+            return
+
+        # Payload simple pour le test : on veut juste vérifier que Browserless peut trouver
+        # les conteneurs de matchs, ce qui valide que la page est chargée correctement.
+        payload = {
+            "url": LIVESCORE_URL,
+            "elements": [{"selector": "div.event__match--scheduled"}]
         }
 
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get(LIVESCORE_URL, headers=headers, timeout=20) as response:
+                async with session.post(BROWSERLESS_SCRAPE_API_URL, json=payload, timeout=45) as response:
                     status = response.status
-                    self.log_test("Connexion HTTP", status == 200, f"Status: {status}")
+                    self.log_test("API Browserless Connexion", status == 200, f"Status: {status}")
 
                     if status != 200:
-                        if not silent: await ctx.send(f"❌ **Échec de la connexion HTTP (Status: {status})**")
+                        error_text = await response.text()
+                        self.log_test("Analyse Réponse JSON", False, f"Erreur HTTP: {error_text[:100]}")
+                        if not silent:
+                            await ctx.send(f"❌ **Échec de la connexion à l'API Browserless (Status: {status})**\n`{error_text}`")
                         return
 
-                    html = await response.text()
-                    soup = BeautifulSoup(html, 'html.parser')
-                    
-            # Logique de parsing détaillée
-            parsed_matches = []
-            paris_tz = pytz.timezone('Europe/Paris')
-            now_paris = datetime.now(paris_tz)
+                    data = await response.json()
             
-            match_containers = soup.find_all('div', class_=re.compile(r'event__match--scheduled'))
-
-            if not match_containers:
-                self.log_test("Parsing HTML", False, "Le sélecteur '.event__match--scheduled' n'a rien trouvé.")
-                if not silent: await ctx.send("❌ **Échec du parsing :** Aucun conteneur de match trouvé. Le site a peut-être changé sa structure.")
+            # Vérifier la structure de la réponse de Browserless
+            if not isinstance(data, dict) or 'data' not in data or not data['data'] or 'results' not in data['data'][0]:
+                self.log_test("Analyse Réponse JSON", False, "La structure de la réponse JSON est invalide ou vide.")
+                if not silent:
+                    await ctx.send(f"❌ **Échec de l'analyse :** La réponse de Browserless est mal formée.\nContenu: ` {str(data)[:500]} `")
                 return
 
-            for container in match_containers:
-                try:
-                    team1_elem = container.find(class_=re.compile(r'event__participant--home'))
-                    team2_elem = container.find(class_=re.compile(r'event__participant--away'))
-                    time_elem = container.find(class_=re.compile(r'event__time'))
-
-                    if not (team1_elem and team2_elem and time_elem):
-                        continue
-
-                    team1 = team1_elem.get_text(strip=True)
-                    team2 = team2_elem.get_text(strip=True)
-                    time_text = time_elem.get_text(strip=True)
-                    hour, minute = map(int, time_text.split(':'))
-                    
-                    # Chercher la date parente
-                    match_date = None
-                    parent_round = container.find_previous('div', class_=re.compile(r'event__round'))
-                    if parent_round:
-                        date_text = parent_round.get_text(strip=True).upper()
-                        if "AUJOURD'HUI" in date_text:
-                            match_date = now_paris.date()
-                        elif "DEMAIN" in date_text:
-                            match_date = (now_paris + timedelta(days=1)).date()
-                        else:
-                            day_month_str = date_text.split(' ')[0]
-                            day, month = map(int, day_month_str.split('.')[:2])
-                            year = now_paris.year
-                            match_date = date(year, month, day)
-                            if match_date < now_paris.date():
-                                match_date = match_date.replace(year=year + 1)
-                    
-                    if match_date:
-                        dt = datetime.combine(match_date, datetime.min.time()).replace(hour=hour, minute=minute)
-                        parsed_matches.append({"team1": team1, "team2": team2, "datetime": paris_tz.localize(dt)})
-                
-                except (ValueError, AttributeError, IndexError) as e:
-                    # Ignore les conteneurs mal formés et continue
-                    continue
+            results = data['data'][0]['results']
+            match_count = len(results)
+            self.log_test("Analyse Réponse JSON", True, f"{match_count} conteneurs de match trouvés.")
             
-            # Traitement des résultats
-            if not parsed_matches:
-                self.log_test("Analyse des données", False, "Aucun match n'a pu être parsé.")
-                if not silent: await ctx.send("⚠️ **Scraping réussi, mais l'analyse des données a échoué.** La structure interne des matchs (date, heure, équipes) a peut-être changé.")
-            else:
-                # Trier pour trouver le prochain match
-                parsed_matches.sort(key=lambda m: m['datetime'])
-                next_match = parsed_matches[0]
-                
-                self.log_test("Analyse des données", True, f"{len(parsed_matches)} matchs parsés. Prochain : {next_match['team1']} vs {next_match['team2']}")
-                if not silent:
-                    embed = discord.Embed(
-                        title="✅ Scraping et Analyse Réussis",
-                        description=f"**{len(parsed_matches)} matchs** ont été correctement analysés sur la page.",
-                        color=discord.Color.green()
-                    )
-                    embed.add_field(
-                        name="Prochain match trouvé",
-                        value=f"**{next_match['team1']}** vs **{next_match['team2']}**\n"
-                              f"📅 Le {next_match['datetime'].strftime('%d/%m/%Y à %H:%M')}"
-                    )
-                    await ctx.send(embed=embed)
+            if not silent:
+                embed = discord.Embed(
+                    title="✅ Test de Scraping Browserless Réussi",
+                    description=f"L'API a répondu correctement et a trouvé **{match_count} matchs programmés** sur la page.",
+                    color=discord.Color.green()
+                )
+                if match_count == 0:
+                     embed.set_footer(text="Note: 0 match trouvé peut être normal s'il n'y a pas de rencontre à venir.")
+                await ctx.send(embed=embed)
 
         except asyncio.TimeoutError:
-            self.log_test("Connexion HTTP", False, "Timeout (délai dépassé)")
-            if not silent: await ctx.send("❌ **Erreur de scraping :** Le site a mis trop de temps à répondre.")
+            self.log_test("API Browserless Connexion", False, "Timeout (délai dépassé)")
+            if not silent:
+                await ctx.send("❌ **Erreur de scraping :** L'API Browserless a mis trop de temps à répondre. Le service est peut-être lent.")
+        except aiohttp.ClientConnectorError as e:
+            self.log_test("API Browserless Connexion", False, "Erreur de connexion (DNS/Réseau)")
+            if not silent:
+                await ctx.send(f"❌ **Erreur de connexion :** Impossible de contacter l'API Browserless. Problème de DNS ou de réseau.\n`{e}`")
         except Exception as e:
-            self.log_test("Scraping HTML", False, str(e))
-            if not silent: await ctx.send(f"❌ **Erreur inattendue lors du scraping :**\n`{type(e).__name__}: {e}`")
+            self.log_test("Scraping Browserless", False, str(e))
+            if not silent:
+                await ctx.send(f"❌ **Erreur inattendue lors du scraping :**\n`{type(e).__name__}: {e}`")
 
     @test_group.command(name='db')
     async def test_db(self, ctx, silent=False):
@@ -255,19 +217,19 @@ class TestCog(commands.Cog):
             # 1. Création / Lecture
             database.check_user(test_user_id)
             user_data_before = database.get_user_data(test_user_id)
-            self.log_test("DB: Lecture utilisateur", user_data_before is not None)
+            self.log_test("DB: Lecture utilisateur", user_data_before is not None, "OK" if user_data_before else "Échec")
 
             # 2. Écriture
             database.update_points(test_user_id, 50)
             user_data_after = database.get_user_data(test_user_id)
             success = user_data_after['points'] == user_data_before['points'] + 50
-            self.log_test("DB: Écriture points", success)
+            self.log_test("DB: Écriture points", success, "OK" if success else "Échec")
             
             # 3. Rétablir l'état initial
             database.update_points(test_user_id, -50)
             
             if not silent:
-                await ctx.send("✅ **Base de données fonctionnelle** (lecture et écriture testées).")
+                await ctx.send("✅ **Base de données fonctionnelle** (lecture et écriture testées avec succès).")
             
         except Exception as e:
             self.log_test("Base de données", False, str(e))
@@ -291,7 +253,8 @@ class TestCog(commands.Cog):
                 self.log_test("Fichier cards.json", True, f"{len(cards_data)} cartes chargées")
             except Exception as e:
                 self.log_test("Fichier cards.json", False, str(e))
-                if not silent: await ctx.send(f"❌ **Fichier `cards.json` illisible :** `{e}`")
+                if not silent:
+                    await ctx.send(f"❌ **Fichier `cards.json` illisible ou introuvable :** `{e}`")
                 return
             
             # Test d'affichage d'une carte
@@ -308,11 +271,12 @@ class TestCog(commands.Cog):
             if not silent:
                 msg = await ctx.send(embed=embed)
                 self.test_messages.append(msg)
-            self.log_test("Affichage carte", True)
+            self.log_test("Affichage carte", True, "L'embed de la première carte a été généré.")
             
         except Exception as e:
             self.log_test("Collection", False, str(e))
-            if not silent: await ctx.send(f"❌ **Erreur collection :** `{str(e)}`")
+            if not silent:
+                await ctx.send(f"❌ **Erreur inattendue dans le module de collection :** `{str(e)}`")
 
     @test_group.command(name='pronostics')
     async def test_pronostics(self, ctx, silent=False):
@@ -333,7 +297,7 @@ class TestCog(commands.Cog):
             ),
             color=discord.Color.blue(),
             timestamp=match_time
-        ).set_footer(text="⚠️ CECI EST UN TEST")
+        ).set_footer(text="⚠️ CECI EST UN TEST. Les réactions sont fonctionnelles.")
         
         try:
             msg = await ctx.send(embed=embed)
@@ -343,10 +307,12 @@ class TestCog(commands.Cog):
                 await msg.add_reaction(emoji)
                 await asyncio.sleep(0.3)
             self.log_test("Réactions pronostics", True, "Message créé et réactions ajoutées")
-            if not silent: await ctx.send("✅ **Message de pronostic créé avec succès.**", delete_after=10)
+            if not silent:
+                await ctx.send("✅ **Message de pronostic créé avec succès.**", delete_after=10)
         except Exception as e:
             self.log_test("Réactions pronostics", False, str(e))
-            if not silent: await ctx.send(f"❌ **Erreur lors de la création du message de test :** `{e}`")
+            if not silent:
+                await ctx.send(f"❌ **Erreur lors de la création du message de test de pronostic :** `{e}`")
 
     @test_group.command(name='events')
     async def test_events(self, ctx, silent=False):
@@ -375,15 +341,17 @@ class TestCog(commands.Cog):
             await asyncio.sleep(15)
             await event.delete()
             if not silent:
-                msg = await ctx.send("🗑️ Événement de test supprimé.")
+                msg = await ctx.send("🗑️ Événement de test supprimé.", delete_after=10)
                 self.test_messages.append(msg)
             
         except discord.Forbidden:
             self.log_test("Création événement", False, "Permissions insuffisantes")
-            if not silent: await ctx.send("❌ **Permissions insuffisantes** pour créer des événements.")
+            if not silent:
+                await ctx.send("❌ **Permissions insuffisantes** pour créer des événements. Vérifiez les rôles du bot.")
         except Exception as e:
             self.log_test("Création événement", False, str(e))
-            if not silent: await ctx.send(f"❌ **Erreur lors de la création de l'événement :** `{str(e)}`")
+            if not silent:
+                await ctx.send(f"❌ **Erreur lors de la création de l'événement :** `{str(e)}`")
 
     @test_group.command(name='rss')
     async def test_rss(self, ctx, silent=False):
@@ -393,23 +361,24 @@ class TestCog(commands.Cog):
             self.test_messages.append(msg)
         
         try:
-            # Utilisation de aiohttp pour simuler une requête asynchrone
             async with aiohttp.ClientSession() as session:
-                async with session.get(RSS_URL) as response:
+                async with session.get(RSS_URL, timeout=15) as response:
                     if response.status != 200:
                         self.log_test("Flux RSS", False, f"Erreur HTTP {response.status}")
-                        if not silent: await ctx.send(f"❌ **Erreur HTTP {response.status}** en accédant au flux RSS.")
+                        if not silent:
+                            await ctx.send(f"❌ **Erreur HTTP {response.status}** en accédant au flux RSS.")
                         return
 
                     feed_text = await response.text()
-                    # feedparser n'est pas asynchrone, on l'utilise normalement
+                    # feedparser n'est pas asynchrone, on peut l'exécuter directement
+                    import feedparser
                     feed = feedparser.parse(feed_text)
             
             if feed.bozo:
-                # bozo = 1 signifie une erreur de parsing
                 exception = feed.bozo_exception
                 self.log_test("Flux RSS", False, f"Flux invalide: {exception}")
-                if not silent: await ctx.send(f"❌ **Flux RSS invalide ou mal formé.** Erreur: `{exception}`")
+                if not silent:
+                    await ctx.send(f"❌ **Flux RSS invalide ou mal formé.** Erreur: `{exception}`")
             else:
                 count = len(feed.entries)
                 self.log_test("Flux RSS", True, f"{count} articles trouvés.")
@@ -421,14 +390,19 @@ class TestCog(commands.Cog):
                     )
                     if feed.entries:
                         entry = feed.entries[0]
-                        embed.add_field(name="Dernier article", value=f"[{entry.title}]({entry.link})")
+                        embed.add_field(name="Dernier article trouvé", value=f"[{entry.title}]({entry.link})")
                     
                     msg = await ctx.send(embed=embed)
                     self.test_messages.append(msg)
                 
+        except asyncio.TimeoutError:
+            self.log_test("Flux RSS", False, "Timeout (délai dépassé)")
+            if not silent:
+                await ctx.send("❌ **Erreur de test RSS :** Le site a mis trop de temps à répondre.")
         except Exception as e:
             self.log_test("Flux RSS", False, str(e))
-            if not silent: await ctx.send(f"❌ **Erreur lors du test RSS :** `{str(e)}`")
+            if not silent:
+                await ctx.send(f"❌ **Erreur inattendue lors du test RSS :** `{str(e)}`")
 
     @test_group.command(name='clean')
     @commands.has_permissions(manage_messages=True)
@@ -456,15 +430,15 @@ class TestCog(commands.Cog):
             timestamp=datetime.now(timezone.utc)
         )
         
-        # Diviser les résultats en plusieurs champs si nécessaire pour éviter la limite de caractères
         results_text = "\n".join(self.test_results)
+        # Diviser les résultats en plusieurs champs pour ne pas dépasser la limite de 1024 caractères par champ
         chunks = [results_text[i:i + 1024] for i in range(0, len(results_text), 1024)]
         
         for i, chunk in enumerate(chunks):
             embed.add_field(name=f"Résultats Détaillés ({i+1}/{len(chunks)})", value=chunk, inline=False)
         
         if success_count < total_count:
-            embed.set_footer(text="⚠️ Certains tests ont échoué. Vérifiez les détails.")
+            embed.set_footer(text="⚠️ Certains tests ont échoué. Vérifiez les détails ci-dessus.")
         else:
             embed.set_footer(text="🎉 Tous les tests sont passés avec succès !")
             
