@@ -2,6 +2,7 @@ discord.py==2.3.2
 python-dotenv==1.0.1
 pytz==2024.1
 feedparser==6.0.10
+playwright
 
 # Bibliothèques pour le scraping
 beautifulsoup4
