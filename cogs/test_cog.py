@@ -52,7 +52,7 @@ class TestCog(commands.Cog):
         tests = [
             ("`!test all`", "Lance l'ensemble des tests."),
             ("`!test permissions`", "Vérifie les permissions critiques du bot."),
-            ("`!test scraping`", "Teste le scraping et affiche les matchs trouvés."),
+            ("`!test scraping`", "Teste le scraping et affiche les matchs et leur HTML."),
             ("`!test db`", "Vérifie la connexion et les opérations de base."),
             ("`!test collection`", "Teste le chargement des cartes."),
             ("`!test pronostics`", "Teste la création d'un message de pronostic."),
@@ -106,10 +106,9 @@ class TestCog(commands.Cog):
         if not silent: await ctx.send(embed=embed)
         self.log_test("Permissions", all_ok, "Toutes OK" if all_ok else "Manquantes")
 
-
     @test_group.command(name='scraping')
     async def test_scraping(self, ctx, silent=False):
-        """Teste le scraping, l'analyse, et affiche les matchs trouvés."""
+        """Teste le scraping, l'analyse, et affiche le HTML des matchs trouvés."""
         if not silent:
             msg = await ctx.send(f"🌐 **Test du scraping via Browserless sur `{LIVESCORE_URL}`...**")
             self.test_messages.append(msg)
@@ -130,9 +129,10 @@ class TestCog(commands.Cog):
                         return
                     html = await response.text()
             
-            # --- Logique de parsing complète (réplique de events_cog) ---
+            # --- Logique de parsing (réplique de events_cog) ---
             soup = BeautifulSoup(html, 'html.parser')
             parsed_matches = []
+            match_containers_html = [] # Liste pour stocker les conteneurs HTML
             paris_tz = pytz.timezone('Europe/Paris')
             now_paris = datetime.now(paris_tz)
             day_containers = soup.select("div.sportName > div.event__round--static")
@@ -158,8 +158,11 @@ class TestCog(commands.Cog):
                         time_text = match_container.find(class_=re.compile(r'event__time')).get_text(strip=True)
                         hour, minute = map(int, time_text.split(':'))
                         dt = datetime.combine(match_date, datetime.min.time()).replace(hour=hour, minute=minute)
+                        
+                        # On stocke les données parsées ET le conteneur HTML
                         parsed_matches.append({"team1": team1, "team2": team2, "datetime_paris": paris_tz.localize(dt)})
-                    except: continue # Ignore les conteneurs mal formés
+                        match_containers_html.append(match_container)
+                    except: continue
             
             # --- Affichage du résultat ---
             if parsed_matches:
@@ -168,11 +171,27 @@ class TestCog(commands.Cog):
                     embed = discord.Embed(title="✅ Test de Scraping et Parsing Réussi",
                                           description=f"**{len(parsed_matches)} matchs programmés** trouvés et analysés.",
                                           color=discord.Color.green())
-                    field_value = ""
+                    
+                    # 1. Afficher les données parsées
+                    parsed_value = ""
                     for match in parsed_matches[:5]:
                         dt = match['datetime_paris']
-                        field_value += f"• **{match['team1']}** vs **{match['team2']}** - {dt.strftime('%d/%m à %H:%M')}\n"
-                    embed.add_field(name="📅 Prochains Matchs Trouvés (5 max)", value=field_value or "Aucun", inline=False)
+                        parsed_value += f"• **{match['team1']}** vs **{match['team2']}** - {dt.strftime('%d/%m à %H:%M')}\n"
+                    embed.add_field(name="📅 Prochains Matchs Trouvés (5 max)", value=parsed_value or "Aucun", inline=False)
+                    
+                    # 2. Afficher le HTML brut des conteneurs
+                    for i, container in enumerate(match_containers_html[:5]):
+                        match_data = parsed_matches[i]
+                        # Utiliser prettify() pour un affichage plus propre et lisible
+                        html_content = container.prettify(formatter="html")
+                        # Tronquer pour éviter de dépasser les limites de Discord
+                        truncated_html = (html_content[:950] + '...') if len(html_content) > 950 else html_content
+                        
+                        embed.add_field(
+                            name=f"📄 HTML Match {i+1}: {match_data['team1']} vs {match_data['team2']}",
+                            value=f"```html\n{truncated_html}\n```",
+                            inline=False
+                        )
                     await ctx.send(embed=embed)
             else:
                 self.log_test("Analyse HTML", False, "Aucun match n'a pu être parsé.")
@@ -183,13 +202,10 @@ class TestCog(commands.Cog):
             self.log_test("Scraping", False, f"{type(e).__name__}: {e}")
             if not silent: await ctx.send(f"❌ **Erreur scraping :** `{type(e).__name__}: {e}`")
     
-    # --- LES AUTRES COMMANDES DE TEST RESTENT INCHANGÉES ---
-    
     @test_group.command(name='db')
     async def test_db(self, ctx, silent=False):
         if not silent:
-            msg = await ctx.send("🗄️ **Test de la base de données...**")
-            self.test_messages.append(msg)
+            msg = await ctx.send("🗄️ **Test de la base de données...**"); self.test_messages.append(msg)
         try:
             test_user_id = self.bot.user.id; database.check_user(test_user_id)
             d_before = database.get_user_data(test_user_id); self.log_test("DB: Lecture", d_before is not None)
@@ -203,8 +219,7 @@ class TestCog(commands.Cog):
     @test_group.command(name='collection')
     async def test_collection(self, ctx, silent=False):
         if not silent:
-            msg = await ctx.send("🎴 **Test du système de collection...**")
-            self.test_messages.append(msg)
+            msg = await ctx.send("🎴 **Test du système de collection...**"); self.test_messages.append(msg)
         try:
             with open('cards.json', 'r', encoding='utf-8') as f: cards_data = json.load(f)
             if not isinstance(cards_data, list) or not cards_data: raise ValueError("JSON vide")
@@ -212,8 +227,7 @@ class TestCog(commands.Cog):
             card = cards_data[0]
             embed = discord.Embed(title=f"**{card['nom']}**", color=discord.Color.blue); embed.set_image(url=card['image_url'])
             if not silent:
-                msg = await ctx.send(embed=embed)
-                self.test_messages.append(msg)
+                msg = await ctx.send(embed=embed); self.test_messages.append(msg)
             self.log_test("Affichage carte", True)
         except Exception as e:
             self.log_test("Collection", False, str(e)); await ctx.send(f"❌ **Erreur collection :** `{str(e)}`")
@@ -221,8 +235,7 @@ class TestCog(commands.Cog):
     @test_group.command(name='pronostics')
     async def test_pronostics(self, ctx, silent=False):
         if not silent:
-            msg = await ctx.send("🎯 **Test du système de pronostics...**")
-            self.test_messages.append(msg)
+            msg = await ctx.send("🎯 **Test du système de pronostics...**"); self.test_messages.append(msg)
         embed = discord.Embed(title="🏐 [TEST] A vs B", description="Réactions:", color=discord.Color.blue())
         try:
             msg = await ctx.send(embed=embed); self.test_messages.append(msg)
@@ -235,16 +248,14 @@ class TestCog(commands.Cog):
     @test_group.command(name='events')
     async def test_events(self, ctx, silent=False):
         if not silent:
-            msg = await ctx.send("📅 **Test de création d'événement...**")
-            self.test_messages.append(msg)
+            msg = await ctx.send("📅 **Test de création d'événement...**"); self.test_messages.append(msg)
         try:
             start_time = datetime.now(timezone.utc) + timedelta(minutes=2)
             event = await ctx.guild.create_scheduled_event(name="[TEST] Event", start_time=start_time, end_time=start_time + timedelta(hours=1), location="Test")
             self.log_test("Création événement", True)
             if not silent:
                 msg = await ctx.send(f"✅ **Événement créé.** Suppression dans 15s."); self.test_messages.append(msg)
-            await asyncio.sleep(15)
-            await event.delete()
+            await asyncio.sleep(15); await event.delete()
             if not silent:
                 msg = await ctx.send("🗑️ Événement test supprimé.", delete_after=10); self.test_messages.append(msg)
         except Exception as e:
@@ -253,8 +264,7 @@ class TestCog(commands.Cog):
     @test_group.command(name='rss')
     async def test_rss(self, ctx, silent=False):
         if not silent:
-            msg = await ctx.send(f"📰 **Test du flux RSS sur `{RSS_URL}`...**")
-            self.test_messages.append(msg)
+            msg = await ctx.send(f"📰 **Test du flux RSS sur `{RSS_URL}`...**"); self.test_messages.append(msg)
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(RSS_URL, timeout=15) as response:
@@ -267,7 +277,7 @@ class TestCog(commands.Cog):
             else:
                 self.log_test("Flux RSS", True, f"{len(feed.entries)} articles."); await ctx.send(f"✅ Flux RSS OK ({len(feed.entries)} articles).")
         except Exception as e:
-            self.log_test("Flux RSS", False, str(e)); await ctx.send(f"❌ Erreur RSS : `{str(e)}`")
+            self.log_test("Flux RSS", False, str(e)); await ctx.send(f"❌ **Erreur RSS :** `{str(e)}`")
 
     @test_group.command(name='clean')
     @commands.has_permissions(manage_messages=True)
