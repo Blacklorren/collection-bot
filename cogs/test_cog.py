@@ -14,7 +14,7 @@ import feedparser
 # On importe les constantes depuis le cog d'événements pour rester synchronisé
 from cogs.events_cog import LIVESCORE_URL, RSS_URL, BROWSERLESS_API_TOKEN, BROWSERLESS_CONTENT_API_URL
 # On importe les emojis depuis le cog de pronostics pour être cohérent
-from cogs.pronostics_cog import PRONO_EMOJIS
+from cogs.pronostics_cog import PRONO_CHANNEL_ID, PRONO_EMOJIS
 
 class TestCog(commands.Cog):
     """Cog pour tester toutes les fonctionnalités du bot."""
@@ -41,53 +41,61 @@ class TestCog(commands.Cog):
     @commands.group(name='test', invoke_without_command=True)
     @commands.has_permissions(administrator=True)
     async def test_group(self, ctx):
-        embed = discord.Embed(title="🧪 Suite de Tests du Bot Handnews", description="Utilisez les sous-commandes pour tester les différents modules.", color=discord.Color.dark_blue())
+        embed = discord.Embed(title="🧪 Suite de Tests du Bot Handnews", description="Utilisez les sous-commandes.", color=discord.Color.dark_blue())
         tests = [
             ("`!test all`", "Lance l'ensemble des tests."),
             ("`!test permissions`", "Vérifie les permissions critiques."),
             ("`!test scraping`", "Teste le scraping et affiche les matchs trouvés."),
-            ("`!test pronos`", "Scrape le prochain match et lance un test de pronostic interactif."),
+            ("`!test pronos`", "Lance un test de pronostic interactif et fonctionnel dans le bon salon (30s)."),
             ("`!test savehtml`", "Sauvegarde le HTML reçu de Browserless."),
             ("`!test db`", "Vérifie la connexion et les opérations de base."),
-            # ... autres tests ...
+            ("`!test collection`", "Teste le chargement des cartes."),
+            ("`!test events`", "Teste la création d'événements Discord."),
+            ("`!test rss`", "Teste la lecture du flux RSS."),
+            ("`!test clean`", "Nettoie tous les messages générés par les tests.")
         ]
         for cmd, desc in tests:
             embed.add_field(name=cmd, value=desc, inline=False)
         await ctx.send(embed=embed)
 
     # --- TEST DE PRONOSTIC D'INTÉGRATION COMPLET ---
-    @test_group.command(name='pronos')
+   @test_group.command(name='pronos')
     async def test_pronostics_integration(self, ctx):
-        """Scrape le prochain match réel et lance un test de pronostic entièrement fonctionnel."""
-        start_msg = await ctx.send("🎯 **Lancement du test d'intégration... Étape 1/3 : Scraping du prochain match...**")
+        """Scrape le prochain match réel et lance un test fonctionnel dans le salon de pronostics."""
         
-        # --- ÉTAPE 1: SCRAPING (copie de la logique de production) ---
+        # --- VÉRIFICATION PRÉALABLE ---
+        if not PRONO_CHANNEL_ID:
+            await ctx.send("❌ **Test annulé :** `PRONO_CHANNEL_ID` n'est pas configuré dans `pronostics_cog.py`.", ephemeral=True)
+            return
+            
+        prono_channel = self.bot.get_channel(PRONO_CHANNEL_ID)
+        if not prono_channel:
+            await ctx.send(f"❌ **Test annulé :** Impossible de trouver le salon de pronostics (ID: {PRONO_CHANNEL_ID}).", ephemeral=True)
+            return
+
+        start_msg = await ctx.send(f"🎯 **Lancement du test d'intégration...** Le test va se dérouler dans le salon {prono_channel.mention}.")
+        
+        # --- ÉTAPE 1: SCRAPING ---
         parsed_matches = []
         try:
             if not BROWSERLESS_API_TOKEN:
                 await start_msg.edit(content="❌ **Erreur de configuration :** Token Browserless manquant."); return
             
-            payload = {"url": LIVESCORE_URL}
-            async with aiohttp.ClientSession() as session:
+            payload = {"url": LIVESCORE_URL}; async with aiohttp.ClientSession() as session:
                 async with session.post(BROWSERLESS_CONTENT_API_URL, json=payload, timeout=45) as response:
                     if response.status != 200:
                         await start_msg.edit(content=f"❌ **Erreur Scraping :** L'API a retourné le status {response.status}."); return
                     html = await response.text()
             
-            soup = BeautifulSoup(html, 'html.parser')
-            paris_tz = pytz.timezone('Europe/Paris'); now_paris = datetime.now(paris_tz)
-            match_containers = soup.select("div.event__match--scheduled")
-            for container in match_containers:
+            soup = BeautifulSoup(html, 'html.parser'); paris_tz = pytz.timezone('Europe/Paris'); now_paris = datetime.now(paris_tz)
+            for container in soup.select("div.event__match--scheduled"):
                 try:
-                    time_elem = container.find(class_="event__time");
-                    if not time_elem: continue
-                    time_text = time_elem.get_text(strip=True); date_part, time_part = time_text.split(' ')
+                    time_elem = container.find(class_="event__time"); time_text = time_elem.get_text(strip=True); date_part, time_part = time_text.split(' ')
                     day, month = map(int, date_part.split('.')[:2]); hour, minute = map(int, time_part.split(':'))
                     year = now_paris.year; match_date = date(year, month, day)
                     if match_date < now_paris.date(): match_date = match_date.replace(year=year + 1)
                     dt = datetime.combine(match_date, datetime.min.time()).replace(hour=hour, minute=minute)
-                    team1 = container.find(class_="event__participant--home").get_text(strip=True)
-                    team2 = container.find(class_="event__participant--away").get_text(strip=True)
+                    team1 = container.find(class_="event__participant--home").get_text(strip=True); team2 = container.find(class_="event__participant--away").get_text(strip=True)
                     parsed_matches.append({"team1": team1, "team2": team2, "datetime_paris": paris_tz.localize(dt)})
                 except: continue
         except Exception as e:
@@ -99,46 +107,30 @@ class TestCog(commands.Cog):
         target_match = parsed_matches[0]
         team1, team2, match_date_utc = target_match['team1'], target_match['team2'], target_match['datetime_paris'].astimezone(timezone.utc)
         
-        # --- ÉTAPE 2: CRÉATION DU TEST ---
-        await start_msg.edit(content=f"✅ **Match trouvé !** Étape 2/3 : Création du test pour **{team1} vs {team2}**...")
-        
-        test_message = None
-        match_id = None
-        fake_event_id = f"test_{int(datetime.now().timestamp())}"
-
+        # --- ÉTAPE 2: CRÉATION DU TEST DANS LE BON SALON ---
+        test_message = None; match_id = None; fake_event_id = f"test_{int(datetime.now().timestamp())}"
         try:
             with database.sqlite3.connect(database.DB_NAME) as con:
-                cur = con.cursor()
-                cur.execute("INSERT INTO matchs (journee_id, event_id, equipe1, equipe2, date_match) VALUES (?, ?, ?, ?, ?)", (999, fake_event_id, team1, team2, match_date_utc.isoformat()))
-                match_id = cur.lastrowid
-                con.commit()
+                cur = con.cursor(); cur.execute("INSERT INTO matchs (journee_id, event_id, equipe1, equipe2, date_match) VALUES (?, ?, ?, ?, ?)", (999, fake_event_id, team1, team2, match_date_utc.isoformat())); match_id = cur.lastrowid; con.commit()
 
             if not match_id:
-                await start_msg.edit(content="❌ **Erreur :** Impossible de créer le match de test dans la base de données."); return
+                await start_msg.edit(content="❌ **Erreur DB :** Impossible de créer le match de test."); return
 
-            embed = discord.Embed(
-                title=f"⚔️ [TEST D'INTÉGRATION] {team1} vs {team2}",
-                description="**Réagissez ci-dessous.** Le bot doit supprimer vos réactions en trop.\nCe test s'arrêtera dans 30 secondes.",
-                color=discord.Color.yellow()
-            ).set_footer(text=f"Ce test utilise un vrai match scrapé. ID de test : {match_id}")
+            embed = discord.Embed(title=f"⚔️ [TEST D'INTÉGRATION] {team1} vs {team2}", description="**Réagissez ci-dessous.** Le bot doit gérer vos réactions. Ce test s'arrêtera dans 30 secondes.", color=discord.Color.yellow()).set_footer(text=f"ID de test : {match_id}")
             
-            await start_msg.delete()
-            test_message = await ctx.send(embed=embed)
+            # On envoie le message dans le canal de pronostics
+            test_message = await prono_channel.send(embed=embed)
             
-            database.save_prono_message(match_id, test_message.id, ctx.channel.id)
+            database.save_prono_message(match_id, test_message.id, prono_channel.id)
             for emoji in PRONO_EMOJIS:
                 await test_message.add_reaction(emoji)
             
-            self.log_test("Test Pronos Intégration", True, "Scraping, DB et message OK.")
             await asyncio.sleep(30)
-
         except Exception as e:
-            self.log_test("Test Pronos Intégration", False, str(e))
             await ctx.send(f"❌ **Une erreur est survenue pendant le test :** `{e}`")
-
         finally:
             # --- ÉTAPE 3: NETTOYAGE ---
-            await ctx.send("🧹 **Fin du test, nettoyage en cours...**", delete_after=5)
+            await prono_channel.send("🧹 **Fin du test, nettoyage en cours...**", delete_after=5)
             if match_id:
                 with database.sqlite3.connect(database.DB_NAME) as con:
                     cur = con.cursor(); cur.execute("DELETE FROM prono_messages WHERE match_id = ?", (match_id,)); cur.execute("DELETE FROM pronostics WHERE match_id = ?", (match_id,)); cur.execute("DELETE FROM matchs WHERE id = ?", (match_id,)); con.commit()
