@@ -23,7 +23,7 @@ RESULTS_CHECK_INTERVAL = 1800  # Vérifier les résultats toutes les 30 minutes
 # --- NOUVELLE CONFIGURATION BROWSERLESS ---
 # Assurez-vous d'ajouter cette variable dans votre .env et sur Railway
 BROWSERLESS_API_TOKEN = os.getenv('BROWSERLESS_API_TOKEN')
-BROWSERLESS_SCRAPE_API_URL = f"https://chrome.browserless.io/scrape?token={BROWSERLESS_API_TOKEN}"
+BROWSERLESS_SCRAPE_API_URL = f"https://production-sfo.browserless.io/scrape?token={BROWSERLESS_API_TOKEN}"
 
 
 class EventsCog(commands.Cog):
