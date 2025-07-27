@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 import pytz
 import database
 import json
+from playwright.async_api import async_playwright
 
 class TestCog(commands.Cog):
     """Cog pour tester toutes les fonctionnalités du bot."""
