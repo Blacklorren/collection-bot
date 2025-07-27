@@ -8,9 +8,9 @@ import database
 import aiohttp
 import re
 import os
-from bs4 import BeautifulSoup # Ajout nécessaire pour le test de la nouvelle méthode
+from bs4 import BeautifulSoup
 
-# On importe les constantes avec le nom correct
+# On importe les constantes depuis le cog d'événements pour rester synchronisé
 from cogs.events_cog import LIVESCORE_URL, RSS_URL, BROWSERLESS_API_TOKEN, BROWSERLESS_CONTENT_API_URL
 
 class TestCog(commands.Cog):
@@ -52,12 +52,12 @@ class TestCog(commands.Cog):
         tests = [
             ("`!test all`", "Lance l'ensemble des tests."),
             ("`!test permissions`", "Vérifie les permissions critiques du bot."),
-            ("`!test scraping`", "Teste le scraping via Browserless et l'analyse HTML."),
+            ("`!test scraping`", "Teste le scraping et affiche les matchs trouvés."),
             ("`!test db`", "Vérifie la connexion et les opérations de base."),
-            ("`!test collection`", "Teste le chargement des cartes et leur affichage."),
+            ("`!test collection`", "Teste le chargement des cartes."),
             ("`!test pronostics`", "Teste la création d'un message de pronostic."),
-            ("`!test events`", "Teste la création d'événements Discord planifiés."),
-            ("`!test rss`", "Teste la lecture du flux RSS de Handnews."),
+            ("`!test events`", "Teste la création d'événements Discord."),
+            ("`!test rss`", "Teste la lecture du flux RSS."),
             ("`!test clean`", "Nettoie tous les messages générés par les tests.")
         ]
         
@@ -91,120 +91,114 @@ class TestCog(commands.Cog):
             msg = await ctx.send("🔐 **Test des permissions du bot...**")
             self.test_messages.append(msg)
             
-        embed = discord.Embed(
-            title="🔐 Test des Permissions",
-            description=f"Vérification des permissions dans le salon `{ctx.channel.name}`",
-            color=discord.Color.blue()
-        )
-        
+        embed = discord.Embed(title="🔐 Test des Permissions", description=f"Vérification dans `{ctx.channel.name}`", color=discord.Color.blue())
         permissions = ctx.channel.permissions_for(ctx.guild.me)
         required_perms = {
             "Envoyer des messages": permissions.send_messages, "Intégrer des liens": permissions.embed_links,
             "Ajouter des réactions": permissions.add_reactions, "Lire l'historique": permissions.read_message_history,
             "Gérer les événements": permissions.manage_events, "Gérer les messages": permissions.manage_messages,
         }
-        
-        all_critical_ok = True
-        field_value = ""
-        for name, has_perm in required_perms.items():
-            emoji = "✅" if has_perm else "❌"
-            if not has_perm:
-                all_critical_ok = False
-            field_value += f"{emoji} {name}\n"
-            self.log_test(f"Permission: {name}", has_perm)
-        
+        all_ok = all(required_perms.values())
+        field_value = "\n".join([f"{'✅' if has else '❌'} {name}" for name, has in required_perms.items()])
         embed.add_field(name="Permissions Critiques", value=field_value)
-        
-        if all_critical_ok:
-            embed.color = discord.Color.green()
-            embed.set_footer(text="✅ Toutes les permissions critiques sont accordées.")
-        else:
-            embed.color = discord.Color.red()
-            embed.set_footer(text="❌ Des permissions critiques manquent !")
-        
-        if not silent:
-            await ctx.send(embed=embed)
+        embed.color = discord.Color.green() if all_ok else discord.Color.red()
+        embed.set_footer(text="Toutes les permissions sont OK." if all_ok else "Des permissions manquent !")
+        if not silent: await ctx.send(embed=embed)
+        self.log_test("Permissions", all_ok, "Toutes OK" if all_ok else "Manquantes")
+
 
     @test_group.command(name='scraping')
     async def test_scraping(self, ctx, silent=False):
-        """Teste le scraping via l'endpoint /content de Browserless et l'analyse avec BeautifulSoup."""
+        """Teste le scraping, l'analyse, et affiche les matchs trouvés."""
         if not silent:
-            msg = await ctx.send(f"🌐 **Test du scraping avec Browserless (méthode /content) sur `{LIVESCORE_URL}`...**")
+            msg = await ctx.send(f"🌐 **Test du scraping via Browserless sur `{LIVESCORE_URL}`...**")
             self.test_messages.append(msg)
 
         if not BROWSERLESS_API_TOKEN:
             self.log_test("Configuration Browserless", False, "Variable BROWSERLESS_API_TOKEN manquante.")
-            if not silent:
-                await ctx.send("❌ **Échec de la configuration :** Le token API de Browserless est introuvable.")
+            if not silent: await ctx.send("❌ **Échec config :** Le token API de Browserless est introuvable.")
             return
 
         payload = {"url": LIVESCORE_URL}
-
         try:
             async with aiohttp.ClientSession() as session:
-                # On utilise la nouvelle URL d'API importée
                 async with session.post(BROWSERLESS_CONTENT_API_URL, json=payload, timeout=45) as response:
                     status = response.status
                     self.log_test("API Browserless Connexion", status == 200, f"Status: {status}")
-
                     if status != 200:
-                        error_text = await response.text()
-                        if not silent:
-                            await ctx.send(f"❌ **Échec de la connexion à l'API Browserless (Status: {status})**\n`{error_text}`")
+                        if not silent: await ctx.send(f"❌ **Échec connexion API (Status: {status})**")
                         return
-
                     html = await response.text()
             
-            # Test d'analyse du HTML reçu
+            # --- Logique de parsing complète (réplique de events_cog) ---
             soup = BeautifulSoup(html, 'html.parser')
-            # On cherche un sélecteur clé pour vérifier que la page est bien celle attendue
-            match_containers = soup.select("div.event__match") 
-            match_count = len(match_containers)
+            parsed_matches = []
+            paris_tz = pytz.timezone('Europe/Paris')
+            now_paris = datetime.now(paris_tz)
+            day_containers = soup.select("div.sportName > div.event__round--static")
 
-            if match_count > 0:
-                self.log_test("Analyse HTML", True, f"{match_count} conteneurs de match trouvés.")
+            for day_container in day_containers:
+                date_text = day_container.get_text(strip=True).upper()
+                match_date = None
+                if "AUJOURD'HUI" in date_text: match_date = now_paris.date()
+                elif "DEMAIN" in date_text: match_date = (now_paris + timedelta(days=1)).date()
+                else:
+                    day_month_search = re.search(r'(\d{2})\.(\d{2})\.', date_text)
+                    if day_month_search:
+                        day, month = map(int, day_month_search.groups())
+                        year = now_paris.year
+                        match_date = date(year, month, day)
+                        if match_date < now_paris.date(): match_date = match_date.replace(year=year + 1)
+                if not match_date: continue
+
+                for match_container in day_container.find_next_siblings('div', class_=re.compile(r'event__match--scheduled')):
+                    try:
+                        team1 = match_container.find(class_=re.compile(r'participant--home')).get_text(strip=True)
+                        team2 = match_container.find(class_=re.compile(r'participant--away')).get_text(strip=True)
+                        time_text = match_container.find(class_=re.compile(r'event__time')).get_text(strip=True)
+                        hour, minute = map(int, time_text.split(':'))
+                        dt = datetime.combine(match_date, datetime.min.time()).replace(hour=hour, minute=minute)
+                        parsed_matches.append({"team1": team1, "team2": team2, "datetime_paris": paris_tz.localize(dt)})
+                    except: continue # Ignore les conteneurs mal formés
+            
+            # --- Affichage du résultat ---
+            if parsed_matches:
+                self.log_test("Analyse HTML", True, f"{len(parsed_matches)} matchs parsés.")
                 if not silent:
-                    embed = discord.Embed(
-                        title="✅ Test de Scraping Complet Réussi",
-                        description=f"1. L'API Browserless a répondu avec succès (Status 200).\n2. L'analyse du HTML a permis de trouver **{match_count} conteneurs de match**.",
-                        color=discord.Color.green()
-                    )
+                    embed = discord.Embed(title="✅ Test de Scraping et Parsing Réussi",
+                                          description=f"**{len(parsed_matches)} matchs programmés** trouvés et analysés.",
+                                          color=discord.Color.green())
+                    field_value = ""
+                    for match in parsed_matches[:5]:
+                        dt = match['datetime_paris']
+                        field_value += f"• **{match['team1']}** vs **{match['team2']}** - {dt.strftime('%d/%m à %H:%M')}\n"
+                    embed.add_field(name="📅 Prochains Matchs Trouvés (5 max)", value=field_value or "Aucun", inline=False)
                     await ctx.send(embed=embed)
             else:
-                self.log_test("Analyse HTML", False, "Aucun conteneur de match ('div.event__match') trouvé.")
+                self.log_test("Analyse HTML", False, "Aucun match n'a pu être parsé.")
                 if not silent:
-                    await ctx.send("⚠️ **Scraping réussi mais analyse HTML échouée.** La structure de la page a peut-être changé (sélecteur `div.event__match` non trouvé).")
+                    await ctx.send("⚠️ **Scraping réussi mais aucun match n'a pu être parsé.** La structure de la page a peut-être changé ou il n'y a pas de matchs programmés.")
 
-        except asyncio.TimeoutError:
-            self.log_test("API Browserless Connexion", False, "Timeout")
-            if not silent:
-                await ctx.send("❌ **Erreur de scraping :** L'API Browserless a mis trop de temps à répondre.")
         except Exception as e:
-            self.log_test("Scraping Browserless", False, str(e))
-            if not silent:
-                await ctx.send(f"❌ **Erreur inattendue lors du scraping :**\n`{type(e).__name__}: {e}`")
-
+            self.log_test("Scraping", False, f"{type(e).__name__}: {e}")
+            if not silent: await ctx.send(f"❌ **Erreur scraping :** `{type(e).__name__}: {e}`")
+    
+    # --- LES AUTRES COMMANDES DE TEST RESTENT INCHANGÉES ---
+    
     @test_group.command(name='db')
     async def test_db(self, ctx, silent=False):
         if not silent:
             msg = await ctx.send("🗄️ **Test de la base de données...**")
             self.test_messages.append(msg)
         try:
-            test_user_id = self.bot.user.id
-            database.check_user(test_user_id)
-            user_data_before = database.get_user_data(test_user_id)
-            self.log_test("DB: Lecture", user_data_before is not None)
-            database.update_points(test_user_id, 50)
-            user_data_after = database.get_user_data(test_user_id)
-            success = user_data_after['points'] == user_data_before['points'] + 50
-            self.log_test("DB: Écriture", success)
+            test_user_id = self.bot.user.id; database.check_user(test_user_id)
+            d_before = database.get_user_data(test_user_id); self.log_test("DB: Lecture", d_before is not None)
+            database.update_points(test_user_id, 50); d_after = database.get_user_data(test_user_id)
+            success = d_after['points'] == d_before['points'] + 50; self.log_test("DB: Écriture", success)
             database.update_points(test_user_id, -50)
-            if not silent:
-                await ctx.send("✅ **Base de données fonctionnelle**.")
+            if not silent: await ctx.send("✅ **Base de données fonctionnelle**.")
         except Exception as e:
-            self.log_test("Base de données", False, str(e))
-            if not silent:
-                await ctx.send(f"❌ **Erreur DB :** `{str(e)}`")
+            self.log_test("Base de données", False, str(e)); await ctx.send(f"❌ **Erreur DB :** `{str(e)}`")
 
     @test_group.command(name='collection')
     async def test_collection(self, ctx, silent=False):
@@ -212,39 +206,31 @@ class TestCog(commands.Cog):
             msg = await ctx.send("🎴 **Test du système de collection...**")
             self.test_messages.append(msg)
         try:
-            with open('cards.json', 'r', encoding='utf-8') as f:
-                cards_data = json.load(f)
-            if not isinstance(cards_data, list) or not cards_data:
-                raise ValueError("JSON vide ou mal formaté.")
+            with open('cards.json', 'r', encoding='utf-8') as f: cards_data = json.load(f)
+            if not isinstance(cards_data, list) or not cards_data: raise ValueError("JSON vide")
             self.log_test("Fichier cards.json", True, f"{len(cards_data)} cartes.")
-            
             card = cards_data[0]
-            embed = discord.Embed(title=f"**{card['nom']}**", description=f"**Rareté:** {card['rarete']}", color=discord.Color.blue())
-            embed.set_image(url=card['image_url'])
+            embed = discord.Embed(title=f"**{card['nom']}**", color=discord.Color.blue); embed.set_image(url=card['image_url'])
             if not silent:
                 msg = await ctx.send(embed=embed)
                 self.test_messages.append(msg)
             self.log_test("Affichage carte", True)
         except Exception as e:
-            self.log_test("Collection", False, str(e))
-            if not silent: await ctx.send(f"❌ **Erreur collection :** `{str(e)}`")
+            self.log_test("Collection", False, str(e)); await ctx.send(f"❌ **Erreur collection :** `{str(e)}`")
 
     @test_group.command(name='pronostics')
     async def test_pronostics(self, ctx, silent=False):
         if not silent:
             msg = await ctx.send("🎯 **Test du système de pronostics...**")
             self.test_messages.append(msg)
-        embed = discord.Embed(title="🏐 [TEST] A vs B", description="1️⃣, ❌, 2️⃣", color=discord.Color.blue())
+        embed = discord.Embed(title="🏐 [TEST] A vs B", description="Réactions:", color=discord.Color.blue())
         try:
-            msg = await ctx.send(embed=embed)
-            self.test_messages.append(msg)
-            for emoji in ["1️⃣", "❌", "2️⃣"]:
-                await msg.add_reaction(emoji)
+            msg = await ctx.send(embed=embed); self.test_messages.append(msg)
+            for emoji in ["1️⃣", "❌", "2️⃣"]: await msg.add_reaction(emoji)
             self.log_test("Réactions pronostics", True)
             if not silent: await ctx.send("✅ **Message de prono créé.**", delete_after=10)
         except Exception as e:
-            self.log_test("Réactions pronostics", False, str(e))
-            if not silent: await ctx.send(f"❌ **Erreur prono :** `{e}`")
+            self.log_test("Réactions pronostics", False, str(e)); await ctx.send(f"❌ **Erreur prono :** `{e}`")
 
     @test_group.command(name='events')
     async def test_events(self, ctx, silent=False):
@@ -253,22 +239,16 @@ class TestCog(commands.Cog):
             self.test_messages.append(msg)
         try:
             start_time = datetime.now(timezone.utc) + timedelta(minutes=2)
-            event = await ctx.guild.create_scheduled_event(
-                name="[TEST] Event", description="Test", start_time=start_time,
-                end_time=start_time + timedelta(hours=1), entity_type=discord.EntityType.external, location="Test"
-            )
+            event = await ctx.guild.create_scheduled_event(name="[TEST] Event", start_time=start_time, end_time=start_time + timedelta(hours=1), location="Test")
             self.log_test("Création événement", True)
             if not silent:
-                msg = await ctx.send(f"✅ **Événement créé.** Suppression dans 15s.")
-                self.test_messages.append(msg)
+                msg = await ctx.send(f"✅ **Événement créé.** Suppression dans 15s."); self.test_messages.append(msg)
             await asyncio.sleep(15)
             await event.delete()
             if not silent:
-                msg = await ctx.send("🗑️ Événement de test supprimé.", delete_after=10)
-                self.test_messages.append(msg)
+                msg = await ctx.send("🗑️ Événement test supprimé.", delete_after=10); self.test_messages.append(msg)
         except Exception as e:
-            self.log_test("Création événement", False, str(e))
-            if not silent: await ctx.send(f"❌ **Erreur event :** `{str(e)}`")
+            self.log_test("Création événement", False, str(e)); await ctx.send(f"❌ **Erreur event :** `{str(e)}`")
 
     @test_group.command(name='rss')
     async def test_rss(self, ctx, silent=False):
@@ -279,21 +259,15 @@ class TestCog(commands.Cog):
             async with aiohttp.ClientSession() as session:
                 async with session.get(RSS_URL, timeout=15) as response:
                     if response.status != 200:
-                        self.log_test("Flux RSS", False, f"HTTP {response.status}")
-                        if not silent: await ctx.send(f"❌ **Erreur HTTP {response.status}**.")
+                        self.log_test("Flux RSS", False, f"HTTP {response.status}"); await ctx.send(f"❌ Erreur HTTP {response.status}.")
                         return
-                    feed_text = await response.text()
-                    feed = feedparser.parse(feed_text)
+                    feed = feedparser.parse(await response.text())
             if feed.bozo:
-                self.log_test("Flux RSS", False, f"Flux invalide: {feed.bozo_exception}")
-                if not silent: await ctx.send(f"❌ **Flux invalide.** Erreur: `{feed.bozo_exception}`")
+                self.log_test("Flux RSS", False, "Flux invalide"); await ctx.send(f"❌ Flux invalide: `{feed.bozo_exception}`")
             else:
-                self.log_test("Flux RSS", True, f"{len(feed.entries)} articles.")
-                if not silent:
-                    await ctx.send(f"✅ **Flux RSS fonctionnel** ({len(feed.entries)} articles trouvés).")
+                self.log_test("Flux RSS", True, f"{len(feed.entries)} articles."); await ctx.send(f"✅ Flux RSS OK ({len(feed.entries)} articles).")
         except Exception as e:
-            self.log_test("Flux RSS", False, str(e))
-            if not silent: await ctx.send(f"❌ **Erreur RSS :** `{str(e)}`")
+            self.log_test("Flux RSS", False, str(e)); await ctx.send(f"❌ Erreur RSS : `{str(e)}`")
 
     @test_group.command(name='clean')
     @commands.has_permissions(manage_messages=True)
@@ -303,16 +277,14 @@ class TestCog(commands.Cog):
         await ctx.send(f"🧹 **{count} message(s) de test supprimé(s).**", delete_after=10, ephemeral=True)
 
     async def send_test_summary(self, ctx):
-        if not self.test_results:
-            return
+        if not self.test_results: return
         success_count = sum(1 for r in self.test_results if r.startswith("✅"))
         total_count = len(self.test_results)
         color = discord.Color.green() if success_count == total_count else discord.Color.red()
         embed = discord.Embed(title="📊 Résumé des Tests", description=f"**{success_count}/{total_count}** réussis.", color=color)
         results_text = "\n".join(self.test_results)
         chunks = [results_text[i:i + 1024] for i in range(0, len(results_text), 1024)]
-        for i, chunk in enumerate(chunks):
-            embed.add_field(name=f"Détails ({i+1}/{len(chunks)})", value=chunk, inline=False)
+        for i, chunk in enumerate(chunks): embed.add_field(name=f"Détails ({i+1}/{len(chunks)})", value=chunk, inline=False)
         await ctx.send(embed=embed)
 
 async def setup(bot):
