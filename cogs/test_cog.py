@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands
 import asyncio
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, date
 import pytz
 import database
 import aiohttp
@@ -10,7 +10,7 @@ from bs4 import BeautifulSoup
 import re
 import os
 
-# On récupère l'URL directement depuis la configuration pour rester cohérent
+# On récupère les URLs directement depuis la configuration pour rester cohérent
 from cogs.events_cog import LIVESCORE_URL, RSS_URL
 
 class TestCog(commands.Cog):
@@ -53,7 +53,7 @@ class TestCog(commands.Cog):
         tests = [
             ("`!test all`", "Lance l'ensemble des tests."),
             ("`!test permissions`", "Vérifie les permissions critiques du bot."),
-            ("`!test scraping`", "Teste le scraping HTML avec `aiohttp`."),
+            ("`!test scraping`", "Teste le scraping HTML et l'analyse du prochain match."),
             ("`!test db`", "Vérifie la connexion et les opérations de base."),
             ("`!test collection`", "Teste le chargement des cartes et leur affichage."),
             ("`!test pronostics`", "Teste la création d'un message de pronostic."),
@@ -136,11 +136,12 @@ class TestCog(commands.Cog):
         if not silent:
             await ctx.send(embed=embed)
 
+    # --- VERSION MISE À JOUR ---
     @test_group.command(name='scraping')
     async def test_scraping(self, ctx, silent=False):
-        """Teste le scraping via aiohttp et BeautifulSoup sur livescore.in."""
+        """Teste le scraping HTML et parse le premier match à venir."""
         if not silent:
-            msg = await ctx.send(f"🌐 **Test du scraping HTML sur `{LIVESCORE_URL}`...**")
+            msg = await ctx.send(f"🌐 **Test du scraping sur `{LIVESCORE_URL}`...**")
             self.test_messages.append(msg)
 
         headers = {
@@ -160,22 +161,79 @@ class TestCog(commands.Cog):
                     html = await response.text()
                     soup = BeautifulSoup(html, 'html.parser')
                     
-                    # On recherche la même chose que dans events_cog
-                    match_containers = soup.find_all('div', class_=re.compile(r'event__match--scheduled'))
+            # Logique de parsing détaillée
+            parsed_matches = []
+            paris_tz = pytz.timezone('Europe/Paris')
+            now_paris = datetime.now(paris_tz)
+            
+            match_containers = soup.find_all('div', class_=re.compile(r'event__match--scheduled'))
+
+            if not match_containers:
+                self.log_test("Parsing HTML", False, "Le sélecteur '.event__match--scheduled' n'a rien trouvé.")
+                if not silent: await ctx.send("❌ **Échec du parsing :** Aucun conteneur de match trouvé. Le site a peut-être changé sa structure.")
+                return
+
+            for container in match_containers:
+                try:
+                    team1_elem = container.find(class_=re.compile(r'event__participant--home'))
+                    team2_elem = container.find(class_=re.compile(r'event__participant--away'))
+                    time_elem = container.find(class_=re.compile(r'event__time'))
+
+                    if not (team1_elem and team2_elem and time_elem):
+                        continue
+
+                    team1 = team1_elem.get_text(strip=True)
+                    team2 = team2_elem.get_text(strip=True)
+                    time_text = time_elem.get_text(strip=True)
+                    hour, minute = map(int, time_text.split(':'))
                     
-                    if match_containers:
-                        count = len(match_containers)
-                        self.log_test("Parsing HTML", True, f"{count} matchs trouvés.")
-                        if not silent:
-                            embed = discord.Embed(
-                                title="✅ Scraping HTML Fonctionnel",
-                                description=f"**{count} matchs programmés** trouvés sur la page.",
-                                color=discord.Color.green()
-                            )
-                            await ctx.send(embed=embed)
-                    else:
-                        self.log_test("Parsing HTML", False, "Aucun conteneur de match trouvé.")
-                        if not silent: await ctx.send("⚠️ **Scraping réussi, mais aucun match trouvé.** Le sélecteur CSS est peut-être obsolète.")
+                    # Chercher la date parente
+                    match_date = None
+                    parent_round = container.find_previous('div', class_=re.compile(r'event__round'))
+                    if parent_round:
+                        date_text = parent_round.get_text(strip=True).upper()
+                        if "AUJOURD'HUI" in date_text:
+                            match_date = now_paris.date()
+                        elif "DEMAIN" in date_text:
+                            match_date = (now_paris + timedelta(days=1)).date()
+                        else:
+                            day_month_str = date_text.split(' ')[0]
+                            day, month = map(int, day_month_str.split('.')[:2])
+                            year = now_paris.year
+                            match_date = date(year, month, day)
+                            if match_date < now_paris.date():
+                                match_date = match_date.replace(year=year + 1)
+                    
+                    if match_date:
+                        dt = datetime.combine(match_date, datetime.min.time()).replace(hour=hour, minute=minute)
+                        parsed_matches.append({"team1": team1, "team2": team2, "datetime": paris_tz.localize(dt)})
+                
+                except (ValueError, AttributeError, IndexError) as e:
+                    # Ignore les conteneurs mal formés et continue
+                    continue
+            
+            # Traitement des résultats
+            if not parsed_matches:
+                self.log_test("Analyse des données", False, "Aucun match n'a pu être parsé.")
+                if not silent: await ctx.send("⚠️ **Scraping réussi, mais l'analyse des données a échoué.** La structure interne des matchs (date, heure, équipes) a peut-être changé.")
+            else:
+                # Trier pour trouver le prochain match
+                parsed_matches.sort(key=lambda m: m['datetime'])
+                next_match = parsed_matches[0]
+                
+                self.log_test("Analyse des données", True, f"{len(parsed_matches)} matchs parsés. Prochain : {next_match['team1']} vs {next_match['team2']}")
+                if not silent:
+                    embed = discord.Embed(
+                        title="✅ Scraping et Analyse Réussis",
+                        description=f"**{len(parsed_matches)} matchs** ont été correctement analysés sur la page.",
+                        color=discord.Color.green()
+                    )
+                    embed.add_field(
+                        name="Prochain match trouvé",
+                        value=f"**{next_match['team1']}** vs **{next_match['team2']}**\n"
+                              f"📅 Le {next_match['datetime'].strftime('%d/%m/%Y à %H:%M')}"
+                    )
+                    await ctx.send(embed=embed)
 
         except asyncio.TimeoutError:
             self.log_test("Connexion HTTP", False, "Timeout (délai dépassé)")
@@ -183,7 +241,6 @@ class TestCog(commands.Cog):
         except Exception as e:
             self.log_test("Scraping HTML", False, str(e))
             if not silent: await ctx.send(f"❌ **Erreur inattendue lors du scraping :**\n`{type(e).__name__}: {e}`")
-
 
     @test_group.command(name='db')
     async def test_db(self, ctx, silent=False):
@@ -345,6 +402,7 @@ class TestCog(commands.Cog):
                         return
 
                     feed_text = await response.text()
+                    # feedparser n'est pas asynchrone, on l'utilise normalement
                     feed = feedparser.parse(feed_text)
             
             if feed.bozo:
