@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 import database
 import pytz
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # 1. Chargement des variables d'environnement
 load_dotenv()
