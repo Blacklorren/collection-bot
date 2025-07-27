@@ -5,8 +5,13 @@ import json
 from datetime import datetime, timedelta, timezone
 import pytz
 import database
-from playwright.async_api import async_playwright
-import feedparser # Assurez-vous que feedparser est importé pour le test RSS
+import aiohttp
+from bs4 import BeautifulSoup
+import re
+import os
+
+# On récupère l'URL directement depuis la configuration pour rester cohérent
+from cogs.events_cog import LIVESCORE_URL, RSS_URL
 
 class TestCog(commands.Cog):
     """Cog pour tester toutes les fonctionnalités du bot."""
@@ -19,6 +24,9 @@ class TestCog(commands.Cog):
     def log_test(self, test_name, success, message=""):
         """Enregistre le résultat d'un test."""
         emoji = "✅" if success else "❌"
+        # S'assure que le message n'est pas trop long pour l'affichage final
+        if len(message) > 150:
+            message = message[:147] + "..."
         result = f"{emoji} **{test_name}**: {message}"
         self.test_results.append(result)
         
@@ -27,8 +35,8 @@ class TestCog(commands.Cog):
         for msg in self.test_messages:
             try:
                 await msg.delete()
-                await asyncio.sleep(0.5)
-            except:
+                await asyncio.sleep(0.5) # Léger délai pour éviter les rate-limits
+            except (discord.NotFound, discord.Forbidden):
                 pass
         self.test_messages.clear()
 
@@ -37,21 +45,21 @@ class TestCog(commands.Cog):
     async def test_group(self, ctx):
         """Groupe de commandes de test."""
         embed = discord.Embed(
-            title="🧪 Tests du Bot Handnews",
-            description="Utilisez les sous-commandes pour tester différents composants.",
-            color=discord.Color.blue()
+            title="🧪 Suite de Tests du Bot Handnews",
+            description="Utilisez les sous-commandes pour tester les différents modules du bot.",
+            color=discord.Color.dark_blue()
         )
         
         tests = [
-            ("`!test all`", "Lance tous les tests"),
-            ("`!test permissions`", "Vérifie les permissions du bot"),
-            ("`!test api`", "Teste le scraping via Playwright"),
-            ("`!test db`", "Teste la base de données"),
-            ("`!test collection`", "Teste le système de cartes"),
-            ("`!test pronostics`", "Teste le système de pronostics"),
-            ("`!test events`", "Teste la création d'événements"),
-            ("`!test rss`", "Teste le flux RSS"),
-            ("`!test clean`", "Nettoie les messages de test")
+            ("`!test all`", "Lance l'ensemble des tests."),
+            ("`!test permissions`", "Vérifie les permissions critiques du bot."),
+            ("`!test scraping`", "Teste le scraping HTML avec `aiohttp`."),
+            ("`!test db`", "Vérifie la connexion et les opérations de base."),
+            ("`!test collection`", "Teste le chargement des cartes et leur affichage."),
+            ("`!test pronostics`", "Teste la création d'un message de pronostic."),
+            ("`!test events`", "Teste la création d'événements Discord planifiés."),
+            ("`!test rss`", "Teste la lecture du flux RSS de Handnews."),
+            ("`!test clean`", "Nettoie tous les messages générés par les tests.")
         ]
         
         for cmd, desc in tests:
@@ -64,340 +72,341 @@ class TestCog(commands.Cog):
         """Lance tous les tests disponibles."""
         self.test_results = []
         
-        await ctx.send("🧪 **Lancement de tous les tests...**")
+        # Nettoyage des anciens messages avant de commencer
+        await self.clean_test_messages()
         
-        # 1. Permissions
-        await self.test_permissions(ctx)
+        start_message = await ctx.send("🧪 **Lancement de la suite de tests complète...**")
+        self.test_messages.append(start_message)
         
-        # 2. API (maintenant Playwright)
-        await self.test_api(ctx)
+        # Exécution séquentielle pour un rapport clair
+        await self.test_permissions(ctx, silent=True)
+        await self.test_scraping(ctx, silent=True)
+        await self.test_db(ctx, silent=True)
+        await self.test_collection(ctx, silent=True)
+        await self.test_pronostics(ctx, silent=True)
+        await self.test_events(ctx, silent=True)
+        await self.test_rss(ctx, silent=True)
         
-        # 3. Base de données
-        await self.test_db(ctx)
-        
-        # 4. Collection
-        await self.test_collection(ctx)
-        
-        # 5. Pronostics
-        await self.test_pronostics(ctx)
-        
-        # 6. Events
-        await self.test_events(ctx)
-        
-        # 7. RSS
-        await self.test_rss(ctx)
-        
-        # Résumé
+        # Envoi du résumé
         await self.send_test_summary(ctx)
 
     @test_group.command(name='permissions')
-    async def test_permissions(self, ctx):
+    async def test_permissions(self, ctx, silent=False):
         """Vérifie toutes les permissions nécessaires."""
+        if not silent:
+            msg = await ctx.send("🔐 **Test des permissions du bot...**")
+            self.test_messages.append(msg)
+            
         embed = discord.Embed(
             title="🔐 Test des Permissions",
-            description="Vérification des permissions du bot",
+            description=f"Vérification des permissions dans le salon `{ctx.channel.name}`",
             color=discord.Color.blue()
         )
         
-        permissions = ctx.guild.me.guild_permissions
+        permissions = ctx.channel.permissions_for(ctx.guild.me)
         
-        # Liste complète des permissions nécessaires
         required_perms = {
-            "view_channel": ("Voir les salons", permissions.view_channel),
-            "send_messages": ("Envoyer des messages", permissions.send_messages),
-            "send_messages_in_threads": ("Messages dans les fils", permissions.send_messages_in_threads),
-            "embed_links": ("Intégrer des liens", permissions.embed_links),
-            "attach_files": ("Joindre des fichiers", permissions.attach_files),
-            "read_message_history": ("Lire l'historique", permissions.read_message_history),
-            "add_reactions": ("Ajouter des réactions", permissions.add_reactions),
-            "use_external_emojis": ("Emojis externes", permissions.use_external_emojis),
-            "manage_events": ("Gérer les événements", permissions.manage_events),
-            "manage_messages": ("Gérer les messages", permissions.manage_messages),
-            "manage_roles": ("Gérer les rôles", permissions.manage_roles),
-            "connect": ("Se connecter (vocal)", permissions.connect),
-            "speak": ("Parler (vocal)", permissions.speak),
-            "mention_everyone": ("Mentionner @everyone", permissions.mention_everyone),
-            "use_slash_commands": ("Commandes slash", permissions.use_application_commands),
+            "Envoyer des messages": permissions.send_messages,
+            "Intégrer des liens": permissions.embed_links,
+            "Ajouter des réactions": permissions.add_reactions,
+            "Lire l'historique": permissions.read_message_history,
+            "Gérer les événements": permissions.manage_events,
+            "Gérer les messages": permissions.manage_messages,
         }
-        
-        critical_perms = ["view_channel", "send_messages", "embed_links", "add_reactions", 
-                         "read_message_history", "manage_events"]
         
         all_critical_ok = True
         field_value = ""
         
-        for perm_name, (display_name, has_perm) in required_perms.items():
+        for name, has_perm in required_perms.items():
             emoji = "✅" if has_perm else "❌"
-            is_critical = perm_name in critical_perms
-            
-            if is_critical and not has_perm:
+            if not has_perm:
                 all_critical_ok = False
-                field_value += f"{emoji} **{display_name}** ⚠️ CRITIQUE\n"
-            else:
-                field_value += f"{emoji} {display_name}\n"
-            
-            self.log_test(f"Permission {display_name}", has_perm)
+            field_value += f"{emoji} {name}\n"
+            self.log_test(f"Permission: {name}", has_perm)
         
-        embed.add_field(name="Permissions", value=field_value[:1024], inline=False)
+        embed.add_field(name="Permissions Critiques", value=field_value)
         
         if all_critical_ok:
             embed.color = discord.Color.green()
-            embed.set_footer(text="✅ Toutes les permissions critiques sont accordées")
+            embed.set_footer(text="✅ Toutes les permissions critiques sont accordées.")
         else:
             embed.color = discord.Color.red()
-            embed.set_footer(text="❌ Des permissions critiques manquent")
+            embed.set_footer(text="❌ Des permissions critiques manquent !")
         
-        await ctx.send(embed=embed)
+        if not silent:
+            await ctx.send(embed=embed)
 
-    # --- VERSION CORRIGÉE DE test_api ---
-    @test_group.command(name='api')
-    async def test_api(self, ctx):
-        """Teste le scraping via Playwright sur livescore.in."""
-        await ctx.send("🔍 **Test du scraping Playwright...**")
-        url = "https://www.livescore.in/fr/handball/france/starligue/"
-        async with async_playwright() as p:
-            browser = None
-            try:
-                browser = await p.chromium.launch()
-                page = await browser.new_page()
-                await page.goto(url, timeout=30000)
-                
-                # Gérer le bouton des cookies
-                cookie_button = page.locator("#onetrust-accept-btn-handler")
-                if await cookie_button.is_visible(timeout=5000):
-                    await cookie_button.click()
+    @test_group.command(name='scraping')
+    async def test_scraping(self, ctx, silent=False):
+        """Teste le scraping via aiohttp et BeautifulSoup sur livescore.in."""
+        if not silent:
+            msg = await ctx.send(f"🌐 **Test du scraping HTML sur `{LIVESCORE_URL}`...**")
+            self.test_messages.append(msg)
 
-                # Attendre un sélecteur qui contient les matchs
-                await page.wait_for_selector(".event__match", timeout=15000)
-                
-                # Récupérer les matchs programmés
-                matches_scheduled = await page.locator(".event__match--scheduled").all()
-                
-                if matches_scheduled:
-                    match_count = len(matches_scheduled)
-                    self.log_test("Scraping Livescore", True, f"{match_count} matchs trouvés")
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        }
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(LIVESCORE_URL, headers=headers, timeout=20) as response:
+                    status = response.status
+                    self.log_test("Connexion HTTP", status == 200, f"Status: {status}")
+
+                    if status != 200:
+                        if not silent: await ctx.send(f"❌ **Échec de la connexion HTTP (Status: {status})**")
+                        return
+
+                    html = await response.text()
+                    soup = BeautifulSoup(html, 'html.parser')
                     
-                    embed = discord.Embed(
-                        title="✅ Scraping Playwright Fonctionnel",
-                        description=f"**{match_count} matchs programmés** trouvés sur [la page Starligue]({url})",
-                        color=discord.Color.green()
-                    )
+                    # On recherche la même chose que dans events_cog
+                    match_containers = soup.find_all('div', class_=re.compile(r'event__match--scheduled'))
                     
-                    # Extraire les détails du premier match pour l'exemple
-                    first_match = matches_scheduled[0]
-                    team1 = await first_match.locator(".event__participant--home").inner_text()
-                    team2 = await first_match.locator(".event__participant--away").inner_text()
-                    time = await first_match.locator(".event__time").inner_text()
-                    
-                    embed.add_field(
-                        name="Exemple de match trouvé",
-                        value=f"🕒 {time} - {team1} vs {team2}",
-                        inline=False
-                    )
-                    await ctx.send(embed=embed)
-                else:
-                    self.log_test("Scraping Livescore", False, "Aucun match programmé trouvé sur la page")
-                    await ctx.send("⚠️ Scraping Livescore : Aucun match programmé n'a été trouvé sur la page.")
-                    
-            except Exception as e:
-                self.log_test("Scraping Livescore", False, str(e))
-                await ctx.send(f"❌ Erreur Playwright : {str(e)}")
-            finally:
-                if browser:
-                    await browser.close()
-    
+                    if match_containers:
+                        count = len(match_containers)
+                        self.log_test("Parsing HTML", True, f"{count} matchs trouvés.")
+                        if not silent:
+                            embed = discord.Embed(
+                                title="✅ Scraping HTML Fonctionnel",
+                                description=f"**{count} matchs programmés** trouvés sur la page.",
+                                color=discord.Color.green()
+                            )
+                            await ctx.send(embed=embed)
+                    else:
+                        self.log_test("Parsing HTML", False, "Aucun conteneur de match trouvé.")
+                        if not silent: await ctx.send("⚠️ **Scraping réussi, mais aucun match trouvé.** Le sélecteur CSS est peut-être obsolète.")
+
+        except asyncio.TimeoutError:
+            self.log_test("Connexion HTTP", False, "Timeout (délai dépassé)")
+            if not silent: await ctx.send("❌ **Erreur de scraping :** Le site a mis trop de temps à répondre.")
+        except Exception as e:
+            self.log_test("Scraping HTML", False, str(e))
+            if not silent: await ctx.send(f"❌ **Erreur inattendue lors du scraping :**\n`{type(e).__name__}: {e}`")
+
+
     @test_group.command(name='db')
-    async def test_db(self, ctx):
+    async def test_db(self, ctx, silent=False):
         """Teste les opérations de base de données."""
-        await ctx.send("🗄️ **Test de la base de données...**")
-        
+        if not silent:
+            msg = await ctx.send("🗄️ **Test de la base de données...**")
+            self.test_messages.append(msg)
+            
         try:
             test_user_id = self.bot.user.id
+            
+            # 1. Création / Lecture
             database.check_user(test_user_id)
             user_data_before = database.get_user_data(test_user_id)
-            self.log_test("DB: Création/Lecture utilisateur", user_data_before is not None)
+            self.log_test("DB: Lecture utilisateur", user_data_before is not None)
 
-            database.update_points(test_user_id, 100)
+            # 2. Écriture
+            database.update_points(test_user_id, 50)
             user_data_after = database.get_user_data(test_user_id)
-            self.log_test("DB: Ajout points", user_data_after['points'] == user_data_before['points'] + 100)
+            success = user_data_after['points'] == user_data_before['points'] + 50
+            self.log_test("DB: Écriture points", success)
             
-            # Revenir à l'état initial
-            database.update_points(test_user_id, -100)
+            # 3. Rétablir l'état initial
+            database.update_points(test_user_id, -50)
             
-            await ctx.send("✅ **Base de données fonctionnelle** (lecture, écriture testées).")
+            if not silent:
+                await ctx.send("✅ **Base de données fonctionnelle** (lecture et écriture testées).")
             
         except Exception as e:
             self.log_test("Base de données", False, str(e))
-            await ctx.send(f"❌ Erreur DB : {str(e)}")
+            if not silent:
+                await ctx.send(f"❌ **Erreur Base de Données :** `{str(e)}`")
 
     @test_group.command(name='collection')
-    async def test_collection(self, ctx):
+    async def test_collection(self, ctx, silent=False):
         """Teste le système de collection de cartes."""
-        await ctx.send("🎴 **Test du système de collection...**")
-        
+        if not silent:
+            msg = await ctx.send("🎴 **Test du système de collection...**")
+            self.test_messages.append(msg)
+            
         try:
-            # Vérifier que cards.json existe
+            # Vérifier que cards.json existe et est valide
             try:
                 with open('cards.json', 'r', encoding='utf-8') as f:
                     cards_data = json.load(f)
-                self.log_test("Fichier cards.json", True, f"{len(cards_data)} cartes")
-            except FileNotFoundError:
-                self.log_test("Fichier cards.json", False, "Fichier manquant")
-                await ctx.send("❌ Fichier `cards.json` introuvable.")
+                if not isinstance(cards_data, list) or len(cards_data) == 0:
+                    raise ValueError("Le fichier JSON est vide ou mal formaté.")
+                self.log_test("Fichier cards.json", True, f"{len(cards_data)} cartes chargées")
+            except Exception as e:
+                self.log_test("Fichier cards.json", False, str(e))
+                if not silent: await ctx.send(f"❌ **Fichier `cards.json` illisible :** `{e}`")
                 return
             
             # Test d'affichage d'une carte
-            if cards_data:
-                card = cards_data[0]
-                embed = discord.Embed(
-                    title=f"**{card['nom']}**",
-                    description=f"**Rareté :** {card['rarete']}\n**Club :** {card['club']}",
-                    color=discord.Color.blue()
-                )
-                if 'image_url' in card:
-                    embed.set_image(url=card['image_url'])
-                embed.set_footer(text="Test d'affichage de carte")
-                
-                msg = await ctx.send("**Test d'affichage de carte :**", embed=embed)
-                self.test_messages.append(msg)
-                self.log_test("Affichage carte", True)
+            card = cards_data[0]
+            embed = discord.Embed(
+                title=f"**{card.get('nom', 'N/A')}**",
+                description=f"**Rareté :** {card.get('rarete', 'N/A')}\n**Club :** {card.get('club', 'N/A')}",
+                color=discord.Color.blue()
+            )
+            if 'image_url' in card:
+                embed.set_image(url=card['image_url'])
+            embed.set_footer(text="Test d'affichage de carte")
             
-            await ctx.send("✅ **Système de collection fonctionnel** (chargement et affichage OK).")
+            if not silent:
+                msg = await ctx.send(embed=embed)
+                self.test_messages.append(msg)
+            self.log_test("Affichage carte", True)
             
         except Exception as e:
             self.log_test("Collection", False, str(e))
-            await ctx.send(f"❌ Erreur collection : {str(e)}")
+            if not silent: await ctx.send(f"❌ **Erreur collection :** `{str(e)}`")
 
     @test_group.command(name='pronostics')
-    async def test_pronostics(self, ctx):
+    async def test_pronostics(self, ctx, silent=False):
         """Teste le système de pronostics."""
-        await ctx.send("🎯 **Test du système de pronostics...**")
-        
+        if not silent:
+            msg = await ctx.send("🎯 **Test du système de pronostics...**")
+            self.test_messages.append(msg)
+            
         match_time = datetime.now(timezone.utc) + timedelta(hours=24)
-        match_time_paris = match_time.astimezone(pytz.timezone('Europe/Paris'))
         
         embed = discord.Embed(
-            title="🏐 [TEST] Montpellier vs PSG",
+            title="🏐 [TEST] Équipe A vs Équipe B",
             description=(
-                f"**Date :** {match_time_paris.strftime('%d/%m/%Y à %H:%M')}\n"
-                f"**Journée :** TEST\n\n"
                 "Cliquez sur une réaction pour pronostiquer :\n"
-                "1️⃣ = Victoire **Montpellier**\n"
+                "1️⃣ = Victoire **Équipe A**\n"
                 "❌ = Match nul\n"
-                "2️⃣ = Victoire **PSG**"
+                "2️⃣ = Victoire **Équipe B**"
             ),
             color=discord.Color.blue(),
             timestamp=match_time
-        )
-        embed.set_footer(text="⚠️ CECI EST UN TEST")
-        
-        msg = await ctx.send(embed=embed)
-        self.test_messages.append(msg)
+        ).set_footer(text="⚠️ CECI EST UN TEST")
         
         try:
+            msg = await ctx.send(embed=embed)
+            self.test_messages.append(msg)
+            
             for emoji in ["1️⃣", "❌", "2️⃣"]:
                 await msg.add_reaction(emoji)
                 await asyncio.sleep(0.3)
-            self.log_test("Réactions pronostics", True)
-            await ctx.send("✅ **Message de pronostic créé avec succès** (réactions ajoutées).")
+            self.log_test("Réactions pronostics", True, "Message créé et réactions ajoutées")
+            if not silent: await ctx.send("✅ **Message de pronostic créé avec succès.**", delete_after=10)
         except Exception as e:
             self.log_test("Réactions pronostics", False, str(e))
-            await ctx.send(f"❌ Erreur lors de l'ajout des réactions : {e}")
+            if not silent: await ctx.send(f"❌ **Erreur lors de la création du message de test :** `{e}`")
 
     @test_group.command(name='events')
-    async def test_events(self, ctx):
+    async def test_events(self, ctx, silent=False):
         """Teste la création d'événements Discord."""
-        await ctx.send("📅 **Test de création d'événement...**")
+        if not silent:
+            msg = await ctx.send("📅 **Test de création d'événement...**")
+            self.test_messages.append(msg)
         
         try:
             start_time = datetime.now(timezone.utc) + timedelta(minutes=2)
-            end_time = start_time + timedelta(hours=2)
             
             event = await ctx.guild.create_scheduled_event(
-                name="[TEST] Match de handball (Suppression auto)",
+                name="[TEST] Événement (Suppression auto)",
                 description="Ceci est un événement de test.",
                 start_time=start_time,
-                end_time=end_time,
+                end_time=start_time + timedelta(hours=1),
                 entity_type=discord.EntityType.external,
-                location="Test Arena",
-                privacy_level=discord.PrivacyLevel.guild_only
+                location="Test Arena"
             )
             
             self.log_test("Création événement", True, f"ID: {event.id}")
-            await ctx.send(f"✅ **Événement créé** (ID: {event.id}). Il sera supprimé dans 15 secondes.")
+            if not silent:
+                msg = await ctx.send(f"✅ **Événement créé.** Il sera supprimé dans 15 secondes.")
+                self.test_messages.append(msg)
             
             await asyncio.sleep(15)
             await event.delete()
-            self.test_messages.append(await ctx.send("🗑️ Événement de test supprimé."))
+            if not silent:
+                msg = await ctx.send("🗑️ Événement de test supprimé.")
+                self.test_messages.append(msg)
             
         except discord.Forbidden:
             self.log_test("Création événement", False, "Permissions insuffisantes")
-            await ctx.send("❌ Permissions insuffisantes pour créer des événements.")
+            if not silent: await ctx.send("❌ **Permissions insuffisantes** pour créer des événements.")
         except Exception as e:
             self.log_test("Création événement", False, str(e))
-            await ctx.send(f"❌ Erreur lors de la création de l'événement : {str(e)}")
+            if not silent: await ctx.send(f"❌ **Erreur lors de la création de l'événement :** `{str(e)}`")
 
     @test_group.command(name='rss')
-    async def test_rss(self, ctx):
+    async def test_rss(self, ctx, silent=False):
         """Teste le flux RSS."""
-        await ctx.send("📰 **Test du flux RSS...**")
+        if not silent:
+            msg = await ctx.send(f"📰 **Test du flux RSS sur `{RSS_URL}`...**")
+            self.test_messages.append(msg)
         
         try:
-            feed = feedparser.parse("https://handnews.fr/feed")
+            # Utilisation de aiohttp pour simuler une requête asynchrone
+            async with aiohttp.ClientSession() as session:
+                async with session.get(RSS_URL) as response:
+                    if response.status != 200:
+                        self.log_test("Flux RSS", False, f"Erreur HTTP {response.status}")
+                        if not silent: await ctx.send(f"❌ **Erreur HTTP {response.status}** en accédant au flux RSS.")
+                        return
+
+                    feed_text = await response.text()
+                    feed = feedparser.parse(feed_text)
             
-            if not feed.bozo:
-                entry_count = len(feed.entries)
-                self.log_test("Flux RSS", True, f"{entry_count} articles")
-                
-                if feed.entries:
-                    entry = feed.entries[0]
+            if feed.bozo:
+                # bozo = 1 signifie une erreur de parsing
+                exception = feed.bozo_exception
+                self.log_test("Flux RSS", False, f"Flux invalide: {exception}")
+                if not silent: await ctx.send(f"❌ **Flux RSS invalide ou mal formé.** Erreur: `{exception}`")
+            else:
+                count = len(feed.entries)
+                self.log_test("Flux RSS", True, f"{count} articles trouvés.")
+                if not silent:
                     embed = discord.Embed(
-                        title=f"Test du dernier article RSS : {entry.title[:150]}",
-                        url=entry.link,
-                        description=(entry.summary[:200] + "..." if hasattr(entry, 'summary') and len(entry.summary) > 200 else "Pas de résumé."),
+                        title="✅ Flux RSS Fonctionnel",
+                        description=f"**{count} articles** trouvés dans le flux.",
                         color=0xe8874f
                     )
-                    embed.set_footer(text="Test RSS Handnews")
+                    if feed.entries:
+                        entry = feed.entries[0]
+                        embed.add_field(name="Dernier article", value=f"[{entry.title}]({entry.link})")
                     
                     msg = await ctx.send(embed=embed)
                     self.test_messages.append(msg)
-                    
-                await ctx.send(f"✅ **RSS fonctionnel** - {entry_count} articles trouvés.")
-            else:
-                self.log_test("Flux RSS", False, "Flux invalide ou erreur de parsing")
-                await ctx.send("❌ Flux RSS invalide ou erreur de parsing.")
                 
         except Exception as e:
             self.log_test("Flux RSS", False, str(e))
-            await ctx.send(f"❌ Erreur lors du test RSS : {str(e)}")
+            if not silent: await ctx.send(f"❌ **Erreur lors du test RSS :** `{str(e)}`")
 
     @test_group.command(name='clean')
+    @commands.has_permissions(manage_messages=True)
     async def test_clean(self, ctx):
         """Nettoie tous les messages de test."""
         count = len(self.test_messages)
         await self.clean_test_messages()
-        await ctx.send(f"🧹 **{count} messages de test supprimés**", delete_after=5)
+        await ctx.send(f"🧹 **{count} message(s) de test supprimé(s).**", delete_after=10, ephemeral=True)
 
     async def send_test_summary(self, ctx):
-        """Envoie un résumé des tests."""
+        """Envoie un résumé de tous les tests exécutés."""
+        if not self.test_results:
+            await ctx.send("Aucun test n'a été exécuté pour générer un résumé.")
+            return
+
         success_count = sum(1 for r in self.test_results if r.startswith("✅"))
         total_count = len(self.test_results)
         
-        color = discord.Color.green() if success_count == total_count else discord.Color.orange()
+        color = discord.Color.green() if success_count == total_count else (discord.Color.orange() if success_count > 0 else discord.Color.red())
+        
         embed = discord.Embed(
-            title="📊 Résumé des Tests",
-            description=f"**{success_count}/{total_count}** tests réussis.",
-            color=color
+            title="📊 Résumé de la Suite de Tests",
+            description=f"**{success_count} / {total_count}** tests réussis.",
+            color=color,
+            timestamp=datetime.now(timezone.utc)
         )
         
+        # Diviser les résultats en plusieurs champs si nécessaire pour éviter la limite de caractères
         results_text = "\n".join(self.test_results)
-        if len(results_text) > 1024:
-            results_text = results_text[:1020] + "\n..."
-            
-        embed.add_field(name="Résultats Détaillés", value=results_text, inline=False)
+        chunks = [results_text[i:i + 1024] for i in range(0, len(results_text), 1024)]
+        
+        for i, chunk in enumerate(chunks):
+            embed.add_field(name=f"Résultats Détaillés ({i+1}/{len(chunks)})", value=chunk, inline=False)
         
         if success_count < total_count:
-            embed.set_footer(text="⚠️ Certains tests ont échoué. Vérifiez les logs.")
+            embed.set_footer(text="⚠️ Certains tests ont échoué. Vérifiez les détails.")
         else:
             embed.set_footer(text="🎉 Tous les tests sont passés avec succès !")
             
