@@ -245,15 +245,26 @@ def create_or_update_journee(numero, date_debut, date_fin):
     """Crée ou met à jour une journée."""
     with sqlite3.connect(DB_NAME) as con:
         cur = con.cursor()
-        cur.execute("""
-            INSERT INTO journees (numero, date_debut, date_fin)
-            VALUES (?, ?, ?)
-            ON CONFLICT(numero) DO UPDATE SET
-                date_debut = excluded.date_debut,
-                date_fin = excluded.date_fin
-        """, (numero, date_debut, date_fin))
-        con.commit()
-        return cur.lastrowid
+        # Vérifier si la journée existe déjà
+        cur.execute("SELECT id FROM journees WHERE numero = ?", (numero,))
+        existing = cur.fetchone()
+        
+        if existing:
+            # Mise à jour
+            cur.execute("""
+                UPDATE journees 
+                SET date_debut = ?, date_fin = ?
+                WHERE numero = ?
+            """, (date_debut, date_fin, numero))
+            return existing[0]
+        else:
+            # Création
+            cur.execute("""
+                INSERT INTO journees (numero, date_debut, date_fin)
+                VALUES (?, ?, ?)
+            """, (numero, date_debut, date_fin))
+            con.commit()
+            return cur.lastrowid
 
 def get_active_journee():
     """Récupère la journée active."""
@@ -331,13 +342,26 @@ def save_or_update_pronostic(user_id, match_id, pronostic):
     check_user(user_id)
     with sqlite3.connect(DB_NAME) as con:
         cur = con.cursor()
+        # Vérifier si le pronostic existe déjà
         cur.execute("""
-            INSERT INTO pronostics (user_id, match_id, pronostic)
-            VALUES (?, ?, ?)
-            ON CONFLICT(user_id, match_id) DO UPDATE SET
-                pronostic = excluded.pronostic,
-                updated_at = CURRENT_TIMESTAMP
-        """, (user_id, match_id, pronostic))
+            SELECT id FROM pronostics 
+            WHERE user_id = ? AND match_id = ?
+        """, (user_id, match_id))
+        existing = cur.fetchone()
+        
+        if existing:
+            # Mise à jour
+            cur.execute("""
+                UPDATE pronostics 
+                SET pronostic = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE user_id = ? AND match_id = ?
+            """, (pronostic, user_id, match_id))
+        else:
+            # Création
+            cur.execute("""
+                INSERT INTO pronostics (user_id, match_id, pronostic)
+                VALUES (?, ?, ?)
+            """, (user_id, match_id, pronostic))
         con.commit()
 
 def get_user_pronostic(user_id, match_id):
