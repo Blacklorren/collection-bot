@@ -8,22 +8,23 @@ import re
 import pytz
 import database
 import aiohttp
-import json # Nécessaire pour les requêtes vers Browserless
+import json
+from bs4 import BeautifulSoup # Ajout nécessaire pour l'analyse HTML
 
 # --- Configuration ---
 RSS_URL = "https://handnews.fr/feed"
 CHANNEL_ID = int(os.getenv('CHANNEL_ID')) if os.getenv('CHANNEL_ID') else None
-CHECK_INTERVAL = 1800  # 30 minutes pour RSS
+CHECK_INTERVAL = 1800
 
 # --- Configuration Livescore avec Browserless ---
 LIVESCORE_URL = "https://www.livescore.in/fr/handball/france/starligue/"
-MATCH_CHECK_INTERVAL = 3600  # Vérifier les matchs toutes les heures
-RESULTS_CHECK_INTERVAL = 1800  # Vérifier les résultats toutes les 30 minutes
+MATCH_CHECK_INTERVAL = 3600
+RESULTS_CHECK_INTERVAL = 1800
 
-# --- NOUVELLE CONFIGURATION BROWSERLESS ---
-# Assurez-vous d'ajouter cette variable dans votre .env et sur Railway
+# --- CONFIGURATION BROWSERLESS CORRIGÉE ---
 BROWSERLESS_API_TOKEN = os.getenv('BROWSERLESS_API_TOKEN')
-BROWSERLESS_SCRAPE_API_URL = f"https://production-sfo.browserless.io/scrape?token={BROWSERLESS_API_TOKEN}"
+# ON UTILISE MAINTENANT L'ENDPOINT /content QUI RETOURNE LE HTML COMPLET
+BROWSERLESS_CONTENT_API_URL = f"https://production-sfo.browserless.io/content?token={BROWSERLESS_API_TOKEN}"
 
 
 class EventsCog(commands.Cog):
@@ -34,23 +35,19 @@ class EventsCog(commands.Cog):
         self.created_matches = {}
         
         if not BROWSERLESS_API_TOKEN:
-            print("❌ (BROWSERLESS) ATTENTION: Le token BROWSERLESS_API_TOKEN n'est pas configuré. Le scraping des matchs et des résultats ne fonctionnera pas.")
+            print("❌ (BROWSERLESS) ATTENTION: Le token BROWSERLESS_API_TOKEN n'est pas configuré. Le scraping ne fonctionnera pas.")
 
-        # Démarrer les tâches
         self.check_rss_loop.start()
         self.check_matches_loop.start()
         self.check_results_loop.start()
         
     def cog_unload(self):
-        """Arrête les tâches lors du déchargement du cog."""
         self.check_rss_loop.cancel()
         self.check_matches_loop.cancel()
         self.check_results_loop.cancel()
 
-    # === GESTION RSS (CODE ORIGINAL CONSERVÉ) ===
     @tasks.loop(seconds=CHECK_INTERVAL)
     async def check_rss_loop(self):
-        """Vérifie le flux RSS pour de nouveaux articles."""
         if CHANNEL_ID is None: 
             return
             
@@ -93,7 +90,6 @@ class EventsCog(commands.Cog):
             print(f"❌ (RSS) Erreur lors de la vérification : {e}")
 
     async def send_article_to_discord(self, channel, entry):
-        """Envoie un article vers Discord."""
         try:
             embed = discord.Embed(
                 title=entry.title[:256], url=entry.link, color=0xe8874f,
@@ -123,114 +119,106 @@ class EventsCog(commands.Cog):
         except Exception as e:
             print(f"❌ (RSS) Erreur d'envoi de l'article : {e}")
 
-    # === GESTION DES MATCHS - VERSION BROWSERLESS ===
     async def scrape_livescore_matches(self):
-        """Récupère les matchs à venir via Browserless.io."""
+        """Récupère les matchs à venir via Browserless /content et les parse avec BeautifulSoup."""
         if not BROWSERLESS_API_TOKEN:
             print("❌ (BROWSERLESS) Scraping des matchs annulé, token manquant.")
             return []
 
         matches = []
         paris_tz = pytz.timezone('Europe/Paris')
-
-        # Payload pour demander à Browserless de scraper les informations nécessaires
-        payload = {
-            "url": LIVESCORE_URL,
-            "elements": [{
-                "selector": "div.event__match--scheduled", # Conteneur de chaque match programmé
-                "fields": {
-                    "matchId": {"selector": "self", "type": "attribute", "attribute": "id"},
-                    "homeTeam": {"selector": ".event__participant--home"},
-                    "awayTeam": {"selector": ".event__participant--away"},
-                    "time": {"selector": ".event__time"},
-                    # Remonter dans l'arbre HTML pour trouver la date associée
-                    "dateText": {"selector": "xpath/ancestor::div[contains(@class, 'sportName')]/div[contains(@class, 'event__round')]", "type": "text"}
-                }
-            }]
-        }
+        # La payload pour /content est beaucoup plus simple
+        payload = {"url": LIVESCORE_URL}
 
         try:
-            print("🌐 (BROWSERLESS) Lancement du scraping des matchs...")
+            print("🌐 (BROWSERLESS) Lancement du scraping via /content...")
             async with aiohttp.ClientSession() as session:
-                async with session.post(BROWSERLESS_SCRAPE_API_URL, json=payload, timeout=45) as response:
+                async with session.post(BROWSERLESS_CONTENT_API_URL, json=payload, timeout=45) as response:
                     if response.status != 200:
                         error_text = await response.text()
-                        print(f"⚠️ (BROWSERLESS) Erreur HTTP {response.status} lors du scraping des matchs: {error_text}")
+                        print(f"⚠️ (BROWSERLESS) Erreur HTTP {response.status} lors de la récupération du contenu : {error_text}")
                         return matches
-                    
-                    data = await response.json()
-                    # Naviguer dans la structure de réponse de Browserless
-                    scraped_data = data.get('data', [{}])[0].get('results', [])
-                    print(f"📊 (BROWSERLESS) {len(scraped_data)} conteneurs de match bruts trouvés.")
-                    
-                    now = datetime.now(paris_tz)
-                    for item in scraped_data:
-                        try:
-                            # Extraction sécurisée des données
-                            team1 = item.get('homeTeam', [{}])[0].get('text')
-                            team2 = item.get('awayTeam', [{}])[0].get('text')
-                            time_text = item.get('time', [{}])[0].get('text')
-                            match_id_raw = item.get('matchId', [{}])[0].get('value')
-                            date_text = item.get('dateText', [{}])[0].get('text', '').upper()
-                            
-                            if not all([team1, team2, time_text, match_id_raw, date_text]):
-                                continue
+                    # /content retourne directement le HTML de la page rendue
+                    html = await response.text()
+            
+            # On parse le HTML fiable obtenu de Browserless avec BeautifulSoup
+            soup = BeautifulSoup(html, 'html.parser')
+            print("🔍 (BS4) Parsing du HTML reçu de Browserless...")
+            
+            now = datetime.now(paris_tz)
+            
+            # On trouve les conteneurs de chaque journée pour associer correctement les dates aux matchs
+            day_containers = soup.select("div.sportName > div.event__round--static")
+            
+            for day_container in day_containers:
+                date_text = day_container.get_text(strip=True).upper()
+                match_date = None
+                
+                # Parser la date depuis l'en-tête de la journée
+                if "AUJOURD'HUI" in date_text:
+                    match_date = now.date()
+                elif "DEMAIN" in date_text:
+                    match_date = (now + timedelta(days=1)).date()
+                else:
+                    day_month_search = re.search(r'(\d{2})\.(\d{2})\.', date_text)
+                    if day_month_search:
+                        day, month = map(int, day_month_search.groups())
+                        year = now.year
+                        match_date = date(year, month, day)
+                        if match_date < now.date():
+                            match_date = match_date.replace(year=year + 1)
+                
+                if not match_date:
+                    continue
 
-                            # Nettoyage de l'ID du match
-                            match_id = match_id_raw.replace('g_4_', '')
+                # Trouver les matchs qui sont les "frères" suivants de ce conteneur de date
+                for match_container in day_container.find_next_siblings('div', class_=re.compile(r'event__match--scheduled')):
+                    try:
+                        home_elem = match_container.find(class_=re.compile(r'event__participant--home'))
+                        away_elem = match_container.find(class_=re.compile(r'event__participant--away'))
+                        time_elem = match_container.find(class_=re.compile(r'event__time'))
+                        
+                        if not all([home_elem, away_elem, time_elem]):
+                            continue
+                        
+                        team1 = home_elem.get_text(strip=True)
+                        team2 = away_elem.get_text(strip=True)
+                        time_text = time_elem.get_text(strip=True)
+                        match_id_raw = match_container.get('id', '')
 
-                            # Parser l'heure (format HH:MM)
-                            hour, minute = map(int, time_text.split(':'))
-                            
-                            # Parser la date (logique originale conservée)
-                            match_date = None
-                            if "AUJOURD'HUI" in date_text:
-                                match_date = now.date()
-                            elif "DEMAIN" in date_text:
-                                match_date = (now + timedelta(days=1)).date()
-                            else:
-                                day_month_search = re.search(r'(\d{2})\.(\d{2})\.', date_text)
-                                if day_month_search:
-                                    day, month = map(int, day_month_search.groups())
-                                    year = now.year
-                                    match_date = date(year, month, day)
-                                    # Si la date est passée, on suppose que c'est l'année prochaine
-                                    if match_date < now.date():
-                                        match_date = match_date.replace(year=year + 1)
-                            
-                            if match_date:
-                                match_datetime = datetime.combine(match_date, datetime.min.time()).replace(hour=hour, minute=minute)
-                                match_datetime_paris = paris_tz.localize(match_datetime)
-                                match_datetime_utc = match_datetime_paris.astimezone(timezone.utc)
-
-                                # Filtrer pour ne garder que les matchs dans les 5 prochains jours
-                                limit_date_utc = datetime.now(timezone.utc) + timedelta(days=5)
-                                if now.astimezone(timezone.utc) < match_datetime_utc < limit_date_utc:
-                                    matches.append({
-                                        "team1": team1,
-                                        "team2": team2,
-                                        "start_time_utc": match_datetime_utc,
-                                        "event_id": match_id
-                                    })
-                                    # print(f"✅ Match parsé: {team1} vs {team2} le {match_datetime_paris.strftime('%d/%m %H:%M')}")
-
-                        except (KeyError, IndexError, ValueError, AttributeError) as e:
-                            print(f"⚠️ (BROWSERLESS) Erreur de parsing d'un item de match: {e} - Item: {item}")
+                        if not all([team1, team2, time_text, match_id_raw]):
                             continue
 
-            print(f"📊 (BROWSERLESS) {len(matches)} matchs valides trouvés pour la création d'événements.")
+                        match_id = match_id_raw.replace('g_4_', '')
+                        hour, minute = map(int, time_text.split(':'))
+                        
+                        match_datetime = datetime.combine(match_date, datetime.min.time()).replace(hour=hour, minute=minute)
+                        match_datetime_paris = paris_tz.localize(match_datetime)
+                        match_datetime_utc = match_datetime_paris.astimezone(timezone.utc)
+
+                        limit_date_utc = datetime.now(timezone.utc) + timedelta(days=5)
+                        if now.astimezone(timezone.utc) < match_datetime_utc < limit_date_utc:
+                            matches.append({
+                                "team1": team1, "team2": team2,
+                                "start_time_utc": match_datetime_utc,
+                                "event_id": match_id
+                            })
+                    except Exception as e:
+                        print(f"⚠️ (BS4) Erreur de parsing d'un match : {e}")
+                        continue
+            
+            print(f"📊 (BS4) {len(matches)} matchs valides trouvés pour la création d'événements.")
             return matches
 
         except asyncio.TimeoutError:
-            print("❌ (BROWSERLESS) La requête de scraping des matchs a expiré (timeout).")
+            print("❌ (BROWSERLESS) La requête de contenu a expiré (timeout).")
         except Exception as e:
-            print(f"❌ (BROWSERLESS) Erreur générale lors du scraping des matchs: {type(e).__name__}: {str(e)}")
+            print(f"❌ (BROWSERLESS) Erreur générale lors de la récupération du contenu: {type(e).__name__}: {str(e)}")
         
         return []
 
     @tasks.loop(seconds=MATCH_CHECK_INTERVAL)
     async def check_matches_loop(self):
-        """Vérifie et crée les événements Discord pour les nouveaux matchs."""
         guild = self.bot.get_guild(self.bot.guild_id)
         if not guild:
             print(f"❌ (MATCHES) Serveur {self.bot.guild_id} introuvable!")
@@ -280,20 +268,18 @@ class EventsCog(commands.Cog):
                                 'date_match': match['start_time_utc'], 'journee_numero': journee_numero
                             })
                     except discord.Forbidden:
-                        print("❌ (MATCHES) Permission refusée pour créer un événement. Vérifiez les permissions du bot.")
+                        print("❌ (MATCHES) Permission refusée pour créer un événement.")
                     except Exception as ex:
                         print(f"❌ (MATCHES) Erreur lors de la création de l'événement Discord : {ex}")
-
 
             if new_matches_for_pronos and pronos_cog:
                 await pronos_cog.create_pronostic_messages_for_matches(new_matches_for_pronos)
             
         except Exception as e:
-            print(f"❌ (MATCHES) Erreur critique dans la boucle de vérification des matchs: {e}")
+            print(f"❌ (MATCHES) Erreur critique dans la boucle des matchs: {e}")
 
     @tasks.loop(seconds=RESULTS_CHECK_INTERVAL)
     async def check_results_loop(self):
-        """Vérifie et met à jour les résultats des matchs terminés."""
         print("🔍 (RESULTS) Vérification des résultats...")
         now_utc = datetime.now(timezone.utc)
         matches_to_check = database.get_matches_to_check_results(now_utc - timedelta(hours=2))
@@ -310,51 +296,42 @@ class EventsCog(commands.Cog):
                 result = await self.get_match_result(match['event_id'])
                 if result and pronos_cog:
                     print(f"✅ (RESULTS) Résultat trouvé: {match['equipe1']} {result} {match['equipe2']}")
-                    # La méthode process_match_result gère la DB et l'attribution des points
                     pronos_cog.process_match_result(match['id'], result)
                     await self.update_discord_event_with_result(
                         match['discord_event_id'], match['equipe1'], match['equipe2'], result
                     )
-                    # Petite pause pour ne pas surcharger les APIs
                     await asyncio.sleep(2)
             except Exception as e:
-                print(f"❌ (RESULTS) Erreur lors de la vérification du résultat pour le match {match['id']}: {e}")
+                print(f"❌ (RESULTS) Erreur vérification résultat pour match {match['id']}: {e}")
 
     async def get_match_result(self, event_id):
-        """Récupère le résultat d'un match spécifique via Browserless.io."""
         if not BROWSERLESS_API_TOKEN:
             return None
 
         match_url = f"https://www.livescore.in/fr/match/{event_id}/"
-        
-        # Payload pour scraper le statut et les scores
-        payload = {
-            "url": match_url,
-            "elements": [
-                {"selector": ".fixedHeaderDuel__detailStatus"},
-                {"selector": ".detailScore__wrapper > span:not(.detailScore__divider)"}
-            ]
-        }
+        payload = {"url": match_url}
         
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.post(BROWSERLESS_SCRAPE_API_URL, json=payload, timeout=30) as response:
+                async with session.post(BROWSERLESS_CONTENT_API_URL, json=payload, timeout=30) as response:
                     if response.status != 200:
                         return None
-                    
-                    data = await response.json()
-                    # Extraire les résultats du JSON retourné
-                    results = data.get('data', [{}])[0].get('results', [])
-                    if len(results) < 2: return None
+                    html = await response.text()
+            
+            soup = BeautifulSoup(html, 'html.parser')
+            
+            status_elem = soup.find(class_=re.compile(r'fixedHeaderDuel__detailStatus'))
+            if status_elem and "Terminé" in status_elem.get_text():
+                home_score_elem = soup.select_one('.detailScore__wrapper > span:first-of-type')
+                away_score_elem = soup.select_one('.detailScore__wrapper > span:last-of-type')
 
-                    status_result = results[0]
-                    score_results = results[1]
-
-                    if status_result and "Terminé" in status_result.get('text', ''):
-                        scores = [elem.get('text', '').strip() for elem in score_results]
-                        if len(scores) >= 2 and scores[0].isdigit() and scores[1].isdigit():
-                            return f"{scores[0]}-{scores[1]}"
+                if home_score_elem and away_score_elem:
+                    score1 = home_score_elem.get_text(strip=True)
+                    score2 = away_score_elem.get_text(strip=True)
                     
+                    if score1.isdigit() and score2.isdigit():
+                        return f"{score1}-{score2}"
+                        
         except asyncio.TimeoutError:
             print(f"❌ (RESULTS) Timeout pour le match {event_id}")
         except Exception as e:
@@ -363,7 +340,6 @@ class EventsCog(commands.Cog):
         return None
 
     async def update_discord_event_with_result(self, discord_event_id, team1, team2, score):
-        """Met à jour l'événement Discord avec le résultat du match."""
         try:
             guild = self.bot.get_guild(self.bot.guild_id)
             if not guild or not discord_event_id: return
@@ -374,17 +350,15 @@ class EventsCog(commands.Cog):
             new_description = f"🏐 RÉSULTAT FINAL : {score}\n\n{event.description}"
             new_name = f"[TERMINÉ] {team1} {score} {team2}"
 
-            # On ne peut modifier le nom que si l'événement n'a pas encore commencé
             if event.status == discord.EventStatus.scheduled:
                 await event.edit(name=new_name, description=new_description)
-            elif event.status == discord.EventStatus.active or event.status == discord.EventStatus.completed:
-                # Si l'event est déjà en cours ou terminé, on ne change que la description
+            elif event.status in [discord.EventStatus.active, discord.EventStatus.completed]:
                 await event.edit(description=new_description)
 
         except discord.NotFound:
-             print(f"⚠️ (RESULTS) Événement Discord {discord_event_id} non trouvé. Peut-être supprimé.")
+             print(f"⚠️ (RESULTS) Événement Discord {discord_event_id} non trouvé.")
         except Exception as e:
-            print(f"❌ (RESULTS) Erreur mise à jour événement Discord {discord_event_id}: {e}")
+            print(f"❌ (RESULTS) Erreur mise à jour événement {discord_event_id}: {e}")
 
     @check_rss_loop.before_loop
     @check_matches_loop.before_loop
@@ -392,14 +366,11 @@ class EventsCog(commands.Cog):
     async def before_loops(self):
         await self.bot.wait_until_ready()
 
-    # === COMMANDES (CODE ORIGINAL CONSERVÉ) ===
     @commands.command(name='handball')
     async def handball_command(self, ctx):
-        """Affiche les prochains matchs de handball."""
         guild = ctx.guild
         if not guild: return
         
-        # Filtre pour trouver les événements créés par le bot qui sont encore programmés
         upcoming_events = [e for e in guild.scheduled_events if e.creator == self.bot.user and e.status == discord.EventStatus.scheduled and "vs" in e.name]
         
         if not upcoming_events:
@@ -409,7 +380,7 @@ class EventsCog(commands.Cog):
         upcoming_events.sort(key=lambda e: e.start_time)
         embed = discord.Embed(title="🏐 Prochains matchs de Starligue", color=discord.Color.orange())
         
-        for event in upcoming_events[:10]: # Limite à 10 pour la lisibilité
+        for event in upcoming_events[:10]:
             time_paris = event.start_time.astimezone(pytz.timezone('Europe/Paris'))
             embed.add_field(name=event.name, value=f"📅 {time_paris.strftime('%d/%m à %H:%M')}", inline=False)
         
@@ -418,7 +389,6 @@ class EventsCog(commands.Cog):
     @commands.command(name='forcesync')
     @commands.has_permissions(administrator=True)
     async def force_sync_command(self, ctx):
-        """Force la synchronisation des matchs (admin uniquement)."""
         await ctx.send("🔄 Synchronisation forcée des matchs en cours...", ephemeral=True, delete_after=5)
         async with ctx.typing():
             await self.check_matches_loop.coro(self)
@@ -427,7 +397,6 @@ class EventsCog(commands.Cog):
     @commands.command(name='checkresults')
     @commands.has_permissions(administrator=True)
     async def check_results_command(self, ctx):
-        """Force la vérification des résultats (admin uniquement)."""
         await ctx.send("🔄 Vérification forcée des résultats en cours...", ephemeral=True, delete_after=5)
         async with ctx.typing():
             await self.check_results_loop.coro(self)
@@ -436,8 +405,6 @@ class EventsCog(commands.Cog):
     @commands.command(name='debughtml')
     @commands.has_permissions(administrator=True)
     async def debug_html_command(self, ctx):
-        """Active le mode debug HTML pour sauvegarder la page (admin uniquement)."""
-        # Note: Cette commande n'aura plus d'effet avec Browserless, mais on la laisse pour ne pas causer d'erreur
         await ctx.send("🐛 Commande dépréciée. Le scraping utilise maintenant l'API Browserless.", ephemeral=True)
         
 async def setup(bot):
