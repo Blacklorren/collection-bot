@@ -56,6 +56,9 @@ class HandnewsBot(commands.Bot):
         
         await self.load_extension('cogs.pronostics_cog')
         print("✅ Cog Pronostics chargé")
+
+        await self.load_extension('cogs.test_cog')
+        print("✅ Cog Test chargé")
         
         # Lancement de la tâche de fond pour la remise à zéro
         self.loop.create_task(self.reset_scheduler_loop())
