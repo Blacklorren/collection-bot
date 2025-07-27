@@ -52,7 +52,8 @@ class TestCog(commands.Cog):
         tests = [
             ("`!test all`", "Lance l'ensemble des tests."),
             ("`!test permissions`", "Vérifie les permissions critiques du bot."),
-            ("`!test scraping`", "Teste le scraping et affiche les matchs et leur HTML."),
+            ("`!test scraping`", "Teste le scraping et affiche les matchs trouvés."),
+            ("`!test savehtml`", "Sauvegarde le HTML reçu de Browserless dans un fichier pour le débogage."),
             ("`!test db`", "Vérifie la connexion et les opérations de base."),
             ("`!test collection`", "Teste le chargement des cartes."),
             ("`!test pronostics`", "Teste la création d'un message de pronostic."),
@@ -66,9 +67,46 @@ class TestCog(commands.Cog):
             
         await ctx.send(embed=embed)
 
+    # --- NOUVELLE COMMANDE DE DÉBOGAGE ---
+    @test_group.command(name='savehtml')
+    async def save_html_command(self, ctx):
+        """Récupère le HTML via Browserless et l'envoie sous forme de fichier."""
+        await ctx.send(f"📄 **Récupération du HTML depuis `{LIVESCORE_URL}` via Browserless...**")
+        
+        if not BROWSERLESS_API_TOKEN:
+            await ctx.send("❌ **Échec config :** Le token API de Browserless est introuvable.")
+            return
+
+        payload = {"url": LIVESCORE_URL}
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(BROWSERLESS_CONTENT_API_URL, json=payload, timeout=45) as response:
+                    if response.status != 200:
+                        await ctx.send(f"❌ **Échec de la connexion à l'API (Status: {response.status})**")
+                        return
+                    html = await response.text()
+            
+            # Sauvegarder le contenu dans un fichier
+            filename = "debug_page.html"
+            with open(filename, "w", encoding="utf-8") as f:
+                f.write(html)
+            
+            # Envoyer le fichier sur Discord
+            await ctx.send(
+                content="✅ **Voici le fichier HTML brut reçu de Browserless.** Ouvrez-le dans un navigateur et utilisez l'outil 'Inspecter' pour trouver les nouveaux sélecteurs.",
+                file=discord.File(filename)
+            )
+            
+            # Nettoyer le fichier après envoi
+            os.remove(filename)
+
+        except Exception as e:
+            await ctx.send(f"❌ **Erreur durant le processus :** `{type(e).__name__}: {e}`")
+    
+    # --- Les autres commandes restent identiques ---
+
     @test_group.command(name='all')
     async def test_all(self, ctx):
-        """Lance tous les tests disponibles."""
         self.test_results = []
         await self.clean_test_messages()
         start_message = await ctx.send("🧪 **Lancement de la suite de tests complète...**")
@@ -86,7 +124,6 @@ class TestCog(commands.Cog):
 
     @test_group.command(name='permissions')
     async def test_permissions(self, ctx, silent=False):
-        """Vérifie toutes les permissions nécessaires."""
         if not silent:
             msg = await ctx.send("🔐 **Test des permissions du bot...**")
             self.test_messages.append(msg)
@@ -106,102 +143,57 @@ class TestCog(commands.Cog):
         if not silent: await ctx.send(embed=embed)
         self.log_test("Permissions", all_ok, "Toutes OK" if all_ok else "Manquantes")
 
+
     @test_group.command(name='scraping')
     async def test_scraping(self, ctx, silent=False):
-        """Teste le scraping, l'analyse, et affiche le HTML des matchs trouvés."""
         if not silent:
-            msg = await ctx.send(f"🌐 **Test du scraping via Browserless sur `{LIVESCORE_URL}`...**")
-            self.test_messages.append(msg)
-
+            msg = await ctx.send(f"🌐 **Test du scraping via Browserless sur `{LIVESCORE_URL}`...**"); self.test_messages.append(msg)
         if not BROWSERLESS_API_TOKEN:
-            self.log_test("Configuration Browserless", False, "Variable BROWSERLESS_API_TOKEN manquante.")
-            if not silent: await ctx.send("❌ **Échec config :** Le token API de Browserless est introuvable.")
+            self.log_test("Configuration Browserless", False, "Token manquant."); await ctx.send("❌ **Échec config :** Token introuvable.")
             return
-
         payload = {"url": LIVESCORE_URL}
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(BROWSERLESS_CONTENT_API_URL, json=payload, timeout=45) as response:
-                    status = response.status
-                    self.log_test("API Browserless Connexion", status == 200, f"Status: {status}")
+                    status = response.status; self.log_test("API Connexion", status == 200, f"Status: {status}")
                     if status != 200:
-                        if not silent: await ctx.send(f"❌ **Échec connexion API (Status: {status})**")
-                        return
+                        if not silent: await ctx.send(f"❌ **Échec API (Status: {status})**"); return
                     html = await response.text()
             
-            # --- Logique de parsing (réplique de events_cog) ---
-            soup = BeautifulSoup(html, 'html.parser')
-            parsed_matches = []
-            match_containers_html = [] # Liste pour stocker les conteneurs HTML
-            paris_tz = pytz.timezone('Europe/Paris')
-            now_paris = datetime.now(paris_tz)
+            soup = BeautifulSoup(html, 'html.parser'); parsed_matches = []; paris_tz = pytz.timezone('Europe/Paris'); now_paris = datetime.now(paris_tz)
             day_containers = soup.select("div.sportName > div.event__round--static")
-
             for day_container in day_containers:
-                date_text = day_container.get_text(strip=True).upper()
-                match_date = None
+                date_text = day_container.get_text(strip=True).upper(); match_date = None
                 if "AUJOURD'HUI" in date_text: match_date = now_paris.date()
                 elif "DEMAIN" in date_text: match_date = (now_paris + timedelta(days=1)).date()
                 else:
                     day_month_search = re.search(r'(\d{2})\.(\d{2})\.', date_text)
                     if day_month_search:
-                        day, month = map(int, day_month_search.groups())
-                        year = now_paris.year
+                        day, month = map(int, day_month_search.groups()); year = now_paris.year
                         match_date = date(year, month, day)
                         if match_date < now_paris.date(): match_date = match_date.replace(year=year + 1)
                 if not match_date: continue
-
                 for match_container in day_container.find_next_siblings('div', class_=re.compile(r'event__match--scheduled')):
                     try:
                         team1 = match_container.find(class_=re.compile(r'participant--home')).get_text(strip=True)
                         team2 = match_container.find(class_=re.compile(r'participant--away')).get_text(strip=True)
                         time_text = match_container.find(class_=re.compile(r'event__time')).get_text(strip=True)
-                        hour, minute = map(int, time_text.split(':'))
-                        dt = datetime.combine(match_date, datetime.min.time()).replace(hour=hour, minute=minute)
-                        
-                        # On stocke les données parsées ET le conteneur HTML
+                        hour, minute = map(int, time_text.split(':')); dt = datetime.combine(match_date, datetime.min.time()).replace(hour=hour, minute=minute)
                         parsed_matches.append({"team1": team1, "team2": team2, "datetime_paris": paris_tz.localize(dt)})
-                        match_containers_html.append(match_container)
                     except: continue
             
-            # --- Affichage du résultat ---
             if parsed_matches:
-                self.log_test("Analyse HTML", True, f"{len(parsed_matches)} matchs parsés.")
+                self.log_test("Analyse HTML", True, f"{len(parsed_matches)} matchs.")
                 if not silent:
-                    embed = discord.Embed(title="✅ Test de Scraping et Parsing Réussi",
-                                          description=f"**{len(parsed_matches)} matchs programmés** trouvés et analysés.",
-                                          color=discord.Color.green())
-                    
-                    # 1. Afficher les données parsées
-                    parsed_value = ""
-                    for match in parsed_matches[:5]:
-                        dt = match['datetime_paris']
-                        parsed_value += f"• **{match['team1']}** vs **{match['team2']}** - {dt.strftime('%d/%m à %H:%M')}\n"
-                    embed.add_field(name="📅 Prochains Matchs Trouvés (5 max)", value=parsed_value or "Aucun", inline=False)
-                    
-                    # 2. Afficher le HTML brut des conteneurs
-                    for i, container in enumerate(match_containers_html[:5]):
-                        match_data = parsed_matches[i]
-                        # Utiliser prettify() pour un affichage plus propre et lisible
-                        html_content = container.prettify(formatter="html")
-                        # Tronquer pour éviter de dépasser les limites de Discord
-                        truncated_html = (html_content[:950] + '...') if len(html_content) > 950 else html_content
-                        
-                        embed.add_field(
-                            name=f"📄 HTML Match {i+1}: {match_data['team1']} vs {match_data['team2']}",
-                            value=f"```html\n{truncated_html}\n```",
-                            inline=False
-                        )
+                    embed = discord.Embed(title="✅ Test Parsing Réussi", description=f"**{len(parsed_matches)} matchs** trouvés.", color=discord.Color.green())
                     await ctx.send(embed=embed)
             else:
-                self.log_test("Analyse HTML", False, "Aucun match n'a pu être parsé.")
+                self.log_test("Analyse HTML", False, "Aucun match parsé.")
                 if not silent:
-                    await ctx.send("⚠️ **Scraping réussi mais aucun match n'a pu être parsé.** La structure de la page a peut-être changé ou il n'y a pas de matchs programmés.")
-
+                    await ctx.send("⚠️ **Scraping réussi mais aucun match n'a pu être parsé.** La structure de la page a sûrement changé.")
         except Exception as e:
-            self.log_test("Scraping", False, f"{type(e).__name__}: {e}")
-            if not silent: await ctx.send(f"❌ **Erreur scraping :** `{type(e).__name__}: {e}`")
-    
+            self.log_test("Scraping", False, f"{type(e).__name__}: {e}"); await ctx.send(f"❌ **Erreur scraping :** `{type(e).__name__}: {e}`")
+
     @test_group.command(name='db')
     async def test_db(self, ctx, silent=False):
         if not silent:
