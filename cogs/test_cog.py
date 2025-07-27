@@ -163,7 +163,29 @@ class TestCog(commands.Cog):
         await ctx.send("🔍 **Test de l'API Livescore...**")
         
         try:
-            url = "https://prod-public-api.livescore.com/v1/api/app/calendar/neCDnec2/3?locale=fr"
+            # Essayons différentes URLs possibles pour l'API
+            urls_to_try = [
+                "https://prod-public-api.livescore.com/v1/api/app/stage/soccer/france/ligue-1/3?locale=fr",
+                "https://prod-public-api.livescore.com/v1/api/app/stage/handball/france/starligue/3?locale=fr",
+                "https://api.livescore.com/v1/competitions/handball/france/starligue?locale=fr"
+            ]
+            
+            data = None
+            working_url = None
+            
+            for url in urls_to_try:
+                try:
+                    response = requests.get(url, headers=headers, timeout=10)
+                    if response.status_code == 200:
+                        data = response.json()
+                        working_url = url
+                        break
+                except:
+                    continue
+            
+            if not data:
+                # Si aucune URL ne fonctionne, essayons une approche différente
+                url = "https://www.livescore.in/fr/handball/france/starligue/"
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                 'Accept': 'application/json'
