@@ -9,6 +9,7 @@ import aiohttp
 import re
 import os
 from bs4 import BeautifulSoup
+import feedparser
 
 # L'import reste correct car la variable BROWSERLESS_CONTENT_API_URL est toujours la bonne
 from cogs.events_cog import LIVESCORE_URL, RSS_URL, BROWSERLESS_API_TOKEN, BROWSERLESS_CONTENT_API_URL
