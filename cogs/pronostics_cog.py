@@ -87,6 +87,7 @@ class PronosticsCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload):
+                    
         """Gère l'ajout de réactions pour les pronostics."""
         # Ignorer les réactions du bot
         if payload.user_id == self.bot.user.id:
@@ -99,6 +100,18 @@ class PronosticsCog(commands.Cog):
         # Vérifier si c'est un emoji de pronostic
         if str(payload.emoji) not in PRONO_EMOJIS:
             return
+
+        # Si l'emoji n'est pas un emoji de pronostic, on le supprime
+        if str(payload.emoji) not in PRONO_EMOJIS:
+            try:
+                channel = self.bot.get_channel(payload.channel_id)
+                message = await channel.fetch_message(payload.message_id)
+                # On vérifie que c'est bien un message du bot avec un embed pour ne pas agir sur n'importe quoi
+                if message.author.id == self.bot.user.id and message.embeds:
+                    await message.remove_reaction(payload.emoji, payload.member)
+            except (discord.Forbidden, discord.NotFound):
+                pass 
+            return 
         
         # Récupérer le match associé au message
         with database.sqlite3.connect(database.DB_NAME) as con:
