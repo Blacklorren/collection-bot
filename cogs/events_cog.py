@@ -106,7 +106,7 @@ class EventsCog(commands.Cog):
         paris_tz = pytz.timezone('Europe/Paris')
         
         async with async_playwright() as p:
-            browser = await p.chromium.launch()
+            browser = await p.firefox.launch()
             page = await browser.new_page()
             try:
                 await page.goto(LIVESCORE_URL, timeout=30000)
@@ -244,7 +244,7 @@ class EventsCog(commands.Cog):
         match_url = f"https://www.livescore.in/fr/match/{event_id}/"
         
         async with async_playwright() as p:
-            browser = await p.chromium.launch()
+            browser = await p.firefox.launch()
             page = await browser.new_page()
             try:
                 await page.goto(match_url, timeout=20000)
