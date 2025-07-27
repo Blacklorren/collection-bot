@@ -81,7 +81,8 @@ class TestCog(commands.Cog):
             if not BROWSERLESS_API_TOKEN:
                 await start_msg.edit(content="❌ **Erreur de configuration :** Token Browserless manquant."); return
             
-            payload = {"url": LIVESCORE_URL}; async with aiohttp.ClientSession() as session:
+            payload = {"url": LIVESCORE_URL}; 
+                async with aiohttp.ClientSession() as session:
                 async with session.post(BROWSERLESS_CONTENT_API_URL, json=payload, timeout=45) as response:
                     if response.status != 200:
                         await start_msg.edit(content=f"❌ **Erreur Scraping :** L'API a retourné le status {response.status}."); return
