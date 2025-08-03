@@ -1642,14 +1642,14 @@
     "nom": "Antonio AREIA",
     "club": "Tremblay",
     "rarete": "Commun",
-    "image_url": "https://i.imgur.com/WdPy1kp.png"
+    "image_url": "https://i.imgur.com/s3IJnB1.png"
   },
   {
     "id": 238,
     "nom": "Erekle ARSENASHVILI",
     "club": "Tremblay",
     "rarete": "Commun",
-    "image_url": "https://i.imgur.com/PWLJ8fx.png"
+    "image_url": "https://i.imgur.com/7kl0s3n.png"
   },
   {
     "id": 239,
@@ -1670,21 +1670,21 @@
     "nom": "Nicolas CLAIRE",
     "club": "Tremblay",
     "rarete": "Rare",
-    "image_url": "https://i.imgur.com/mh2MRty.png"
+    "image_url": "https://i.imgur.com/OM6JOjS.png"
   },
   {
     "id": 242,
     "nom": "Matteo FADHUILE",
     "club": "Tremblay",
     "rarete": "Épique",
-    "image_url": "https://i.imgur.com/WdPy1kp.png"
+    "image_url": "https://i.imgur.com/4Vs5htD.png"
   },
   {
     "id": 243,
     "nom": "Thibault GARAUDET",
     "club": "Tremblay",
     "rarete": "Commun",
-    "image_url": "https://i.imgur.com/cpjGpLd.png"
+    "image_url": "https://i.imgur.com/Edvm6sc.png"
   },
   {
     "id": 244,
@@ -1698,7 +1698,7 @@
     "nom": "Antoine LEGER",
     "club": "Tremblay",
     "rarete": "Peu Commun",
-    "image_url": "https://i.imgur.com/WdPy1kp.png"
+    "image_url": "https://i.imgur.com/D90yTsB.png"
   },
   {
     "id": 246,
@@ -1719,14 +1719,28 @@
     "nom": "Rubens PIERRE",
     "club": "Tremblay",
     "rarete": "Épique",
-    "image_url": "https://i.imgur.com/j7Yh64G.png"
+    "image_url": "https://i.imgur.com/kzgFqTx.png"
+  },
+     {
+    "id": 249,
+    "nom": "Jeremi PIRANI",
+    "club": "Tremblay",
+    "rarete": "Commune",
+    "image_url": "https://i.imgur.com/r376WIP.png"
+  },
+       {
+    "id": 250,
+    "nom": "Kylian RIGAULT",
+    "club": "Tremblay",
+    "rarete": "Peu Commune",
+    "image_url": "https://i.imgur.com/ffsP9NX.png"
   },
    {
-    "id": 249,
+    "id": 251,
     "nom": "Jean-pierre DUPOUX",
     "club": "Tremblay",
     "rarete": "Peu Commun",
-    "image_url": "https://i.imgur.com/WdPy1kp.png"
+    "image_url": "https://i.imgur.com/bfTZntW.png"
   }
 ]
  
