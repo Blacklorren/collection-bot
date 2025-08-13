@@ -30,8 +30,8 @@ ANSI_COLORS = {
 ANNONCE_CHANNEL_ID = 0 
 PACK_COST = 150  # Coût en points pour acheter un pack
 DAILY_BONUS = 100 # Points pour le premier message de la journée
-POINTS_PER_MESSAGE = 10 # Points par message
-MAX_DAILY_MESSAGE_POINTS = 200 # Limite de points gagnés par message par jour
+POINTS_PER_MESSAGE = 20 # Points par message
+MAX_DAILY_MESSAGE_POINTS = 300 # Limite de points gagnés par message par jour
 MESSAGE_COOLDOWN = 10 # Temps en secondes entre chaque gain de points
 
 # Configuration du système de recyclage et de Jokers
