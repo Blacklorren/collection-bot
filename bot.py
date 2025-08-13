@@ -170,7 +170,7 @@ class HandnewsBot(commands.Bot):
         
         while not self.is_closed():
             now_paris = datetime.now(pytz.timezone('Europe/Paris'))
-            target_reset_date = datetime(2025, 8, 14, 0, 0, 0, tzinfo=pytz.timezone('Europe/Paris'))
+            target_reset_date = datetime(2025, 8, 14, 23, 59, 59, tzinfo=pytz.timezone('Europe/Paris'))
 
             # Si on est le 14 août 2025 ou après, et que le reset n'a pas été fait
             if now_paris >= target_reset_date:
