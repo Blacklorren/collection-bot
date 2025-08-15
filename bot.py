@@ -7,7 +7,7 @@ import pytz
 import asyncio
 from datetime import datetime, timedelta
 
-# 1. Chargement des variables d'environnement
+# 1. Chargement des variables d'environnements
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 GUILD_ID = os.getenv('GUILD_ID')
