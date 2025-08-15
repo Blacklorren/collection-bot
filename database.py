@@ -207,7 +207,7 @@ def update_fragments(user_id, amount):
         cur.execute("UPDATE users SET fragments = fragments + ? WHERE user_id = ?", (amount, user_id))
         con.commit()
 
-ef update_on_message_activity(user_id, points_to_add, current_iso_time):
+def update_on_message_activity(user_id, points_to_add, current_iso_time):
     """
     Met à jour les points et l'heure du dernier message pour une activité normale.
     Version corrigée qui accepte le timestamp en argument.
