@@ -101,7 +101,11 @@ class CollectionCog(commands.Cog):
         print(f"[POINTS_DEBUG] Utilisateur: {user_id}, Heure Actuelle (Paris): {now_paris.isoformat()}")
 
         # --- RÉCUPÉRATION DES DONNÉES UTILISATEUR ---
-        user_data = database.get_user_data(user_id)
+        user_data_row = database.get_user_data(user_id)
+        if not user_data_row:
+            # Sécurité au cas où l'utilisateur n'existerait pas encore
+            return
+        user_data = dict(user_data_row)
         print(f"[POINTS_DEBUG] Données de la BDD: {user_data}")
 
         # --- GESTION DU MESSAGE D'ACCUEIL (ne donne pas de points) ---
