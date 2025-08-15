@@ -6,8 +6,6 @@ import random
 import datetime
 import pytz
 
-GAME_LAUNCH_DATE = datetime.datetime(2025, 8, 15, 0, 0, 0, tzinfo=pytz.timezone('Europe/Paris'))
-
 RARITY_COLORS = {
     "Commun": discord.Color.light_grey(),
     "Peu Commun": discord.Color.green(),
@@ -91,12 +89,7 @@ class CollectionCog(commands.Cog):
         """Gère le gain de points et le message d'accueil après la date de lancement."""
         if message.author.bot or message.content.startswith('!') or not message.guild:
             return
-    
-        # --- RÈGLE 1 : Gel des points avant la date de lancement ---
-        now_paris = datetime.datetime.now(pytz.timezone('Europe/Paris'))
-        if now_paris < GAME_LAUNCH_DATE:
-            return # Le jeu n'a pas encore commencé, on ne fait rien.
-            
+                      
         user_id = message.author.id
         user_data = database.get_user_data(user_id)
         
@@ -106,7 +99,7 @@ class CollectionCog(commands.Cog):
                 onboarding_message = (
                     "🎉 **Bienvenue dans le jeu de collection de cartes Handnews !** 🎉\n\n"
                     "Voici comment ça marche :\n"
-                    "1.  **Gagnez des points** en participant sur le serveur. Votre premier message de la journée vous donne 110 points ! Ensuite vous obtenez 10 points par message écrit dans une limite totale de 300 points par jour. \n"
+                    "1.  **Gagnez des points** en participant sur le serveur. Votre premier message de la journée vous donne 110 points ! Ensuite vous obtenez 20 points par message écrit dans une limite totale de 300 points par jour. \n"
                     f"2.  **Achetez des packs** de cartes avec la commande `!pack` (coût : {PACK_COST} points).\n"
                     "3.  **Ouvrez vos packs** avec `!ouvrir` pour découvrir de nouveaux joueurs de Starligue.\n"
                     "4.  **Consultez votre collection** avec `!collection`.\n"
