@@ -44,7 +44,7 @@ if not os.path.exists(LOCK_FILE):
         print("✅  (RESET) Remise à zéro réussie. Le bot va maintenant démarrer normalement.")
     else:
     print(f"ℹ️  (RESET) La remise à zéro unique a déjà été effectuée (lock trouvé à '{LOCK_FILE}'). Démarrage normal.")
-else:
+    else:
     print("ℹ️  (RESET) La remise à zéro unique a déjà été effectuée. Démarrage normal.")
 
 
