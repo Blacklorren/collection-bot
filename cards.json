@@ -633,7 +633,7 @@
     "id": 94,
     "nom": "Dylan TOSSIN",
     "club": "Dunkerque",
-    "rarete": "Peu Commune",
+    "rarete": "Peu Commun",
     "image_url": "https://i.imgur.com/lDNO3AK.png"
   },
   {
@@ -1081,7 +1081,7 @@
     "id": 158,
     "nom": "Mohab ABDELHAK",
     "club": "Nîmes",
-    "rarete": "Peu Commune",
+    "rarete": "Peu Commun",
     "image_url": "https://i.imgur.com/apXpSkG.png"
   },
   {
@@ -1725,7 +1725,7 @@
     "id": 250,
     "nom": "Kylian RIGAULT",
     "club": "Tremblay",
-    "rarete": "Peu Commune",
+    "rarete": "Peu Commun",
     "image_url": "https://i.imgur.com/ffsP9NX.png"
   },
    {
@@ -1739,7 +1739,7 @@
     "id": 252,
     "nom": "Robin Molinié",
     "club": "Aix",
-    "rarete": "Peu commune",
+    "rarete": "Peu Commun",
     "image_url": "https://i.imgur.com/BK0w3TI.png"
   }
 ]
