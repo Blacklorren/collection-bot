@@ -16,6 +16,10 @@ from cogs.events_cog import LIVESCORE_URL, RSS_URL, BROWSERLESS_API_TOKEN, BROWS
 # On importe les emojis depuis le cog de pronostics pour être cohérent
 from cogs.pronostics_cog import PRONO_CHANNEL_ID, PRONO_EMOJIS
 
+# Chemin vers le fichier de verrouillage, tel que défini dans bot.py
+DATA_DIR = '/data'
+LOCK_FILE = os.path.join(DATA_DIR, 'reset_done.lock')
+
 class TestCog(commands.Cog):
     """Cog pour tester toutes les fonctionnalités du bot."""
     
@@ -52,7 +56,8 @@ class TestCog(commands.Cog):
             ("`!test collection`", "Teste le chargement des cartes."),
             ("`!test events`", "Teste la création d'événements Discord."),
             ("`!test rss`", "Teste la lecture du flux RSS."),
-            ("`!test clean`", "Nettoie tous les messages générés par les tests.")
+            ("`!test clean`", "Nettoie tous les messages générés par les tests."),
+            ("`!wipealldata`", "**[DANGER]** Efface toutes les données utilisateurs et prépare un reset complet au redémarrage.")
         ]
         for cmd, desc in tests:
             embed.add_field(name=cmd, value=desc, inline=False)
@@ -274,6 +279,78 @@ class TestCog(commands.Cog):
         chunks = [txt[i:i + 1024] for i in range(0, len(txt), 1024)]
         for i, chunk in enumerate(chunks): embed.add_field(name=f"Détails ({i+1}/{len(chunks)})", value=chunk, inline=False)
         await ctx.send(embed=embed)
+
+    @commands.command(name='wipealldata')
+    @commands.has_permissions(administrator=True)
+    async def wipe_all_data_command(self, ctx):
+        """
+        [ADMIN] Efface TOUTES les données des utilisateurs et supprime le fichier de verrouillage.
+        ATTENTION : CETTE ACTION EST IRRÉVERSIBLE.
+        """
+        embed = discord.Embed(
+            title="⚠️ CONFIRMATION REQUISE ⚠️",
+            description=(
+                "Vous êtes sur le point de **supprimer DÉFINITIVEMENT** toutes les données des utilisateurs :\n"
+                "• Collections de cartes\n"
+                "• Points, packs et fragments\n"
+                "• Pronostics\n\n"
+                "Cette action est **IRRÉVERSIBLE**.\n"
+                "Pour confirmer, répondez `OUI, JE CONFIRME` dans les 15 secondes."
+            ),
+            color=discord.Color.red()
+        )
+        warning_msg = await ctx.send(embed=embed)
+
+        def check(message):
+            return message.author == ctx.author and message.channel == ctx.channel and message.content == "OUI, JE CONFIRME"
+
+        try:
+            # Attendre le message de confirmation
+            await self.bot.wait_for('message', timeout=15.0, check=check)
+
+            await ctx.send("... Confirmation reçue. Lancement de la suppression ...", ephemeral=True)
+            
+            # 1. Vider la base de données
+            success = database.wipe_all_user_data()
+            if not success:
+                await ctx.send("❌ Une erreur est survenue lors de la suppression des données de la base de données.", ephemeral=True)
+                return
+
+            # 2. Supprimer le fichier de verrouillage
+            lock_removed = False
+            if os.path.exists(LOCK_FILE):
+                try:
+                    os.remove(LOCK_FILE)
+                    lock_removed = True
+                except OSError as e:
+                    await ctx.send(f"❌ Erreur lors de la suppression du fichier de verrouillage : `{e}`", ephemeral=True)
+                    return
+            
+            # --- RAPPORT FINAL ---
+            final_embed = discord.Embed(
+                title="✅ Opération de Nettoyage Terminée",
+                description="Toutes les données des utilisateurs ont été effacées.",
+                color=discord.Color.green()
+            )
+            if lock_removed:
+                final_embed.add_field(
+                    name="Fichier de Verrouillage",
+                    value=f"Le fichier `{os.path.basename(LOCK_FILE)}` a été supprimé. La base de données sera réinitialisée au prochain démarrage du bot."
+                )
+            else:
+                 final_embed.add_field(
+                    name="Fichier de Verrouillage",
+                    value="Le fichier de verrouillage n'existait pas."
+                )
+            
+            final_embed.set_footer(text="Un redémarrage du bot est maintenant nécessaire pour appliquer le reset.")
+            await ctx.send(embed=final_embed)
+
+        except asyncio.TimeoutError:
+            await warning_msg.edit(content="... Délai de confirmation expiré. Opération annulée.", embed=None, delete_after=10)
+        except Exception as e:
+            await ctx.send(f"❌ Une erreur inattendue est survenue : `{e}`", ephemeral=True)
+
 
 async def setup(bot):
     await bot.add_cog(TestCog(bot))
