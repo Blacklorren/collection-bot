@@ -126,7 +126,10 @@ class CollectionCog(commands.Cog):
     
         if user_data['last_message_time']:
             last_message_time = datetime.datetime.fromisoformat(user_data['last_message_time'])
-            if (now_paris.astimezone(timezone.utc) - last_message_time.astimezone(timezone.utc)).total_seconds() < MESSAGE_COOLDOWN:
+            if last_message_time.tzinfo is None:
+                last_message_time = paris_tz.localize(last_message_time)
+            
+            if (now_paris - last_message_time).total_seconds() < MESSAGE_COOLDOWN:
                 return
     
         if user_data['daily_message_points'] >= MAX_DAILY_MESSAGE_POINTS:
