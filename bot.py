@@ -28,7 +28,7 @@ if GUILD_ID is None:
     print("Assurez-vous d'avoir un fichier .env contenant GUILD_ID=VOTRE_ID")
     exit()
 
-# --- MODIFICATION : Forcer la remise à zéro au démarrage ---
+# --- MODIFICATION : Forcer la remises à zéro au démarrage ---
 # Cette logique s'exécute AVANT l'initialisation du bot.
 if not os.path.exists(LOCK_FILE):
     print(f"ℹ️  (RESET) Le fichier '{LOCK_FILE}' est absent.")
