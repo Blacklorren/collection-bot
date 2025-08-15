@@ -120,7 +120,7 @@ class CollectionCog(commands.Cog):
                 await message.author.send(onboarding_message)
                 database.set_onboarding_received(user_id)
             except discord.errors.Forbidden:
-            return
+                return
 
         # --- VÉRIFICATION #1: BONUS QUOTIDIEN ---
         today_str = now_paris.date().isoformat()
