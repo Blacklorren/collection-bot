@@ -115,36 +115,47 @@ def wipe_all_user_data():
     """
     Vide toutes les données liées aux utilisateurs, collections, et pronostics.
     Cette fonction est conçue pour une remise à zéro complète du jeu.
+    Elle est maintenant plus robuste et ne plantera pas si une table est manquante.
     """
     print("⚠️  [DATABASE] Lancement de la procédure de remise à zéro des données...")
     try:
         with sqlite3.connect(DB_NAME) as con:
             cur = con.cursor()
-            
-            # Liste des tables à vider
-            tables_to_wipe = [
-                "users", 
-                "user_collections", 
-                "pronostics",
-                "prono_messages" 
-                # On ne vide pas 'matchs' et 'journees' pour ne pas avoir à tout recréer
-            ]
-            
-            for table in tables_to_wipe:
-                cur.execute(f"DELETE FROM {table};")
-                # Optionnel mais recommandé pour réinitialiser les auto-incréments si besoin
-                cur.execute(f"DELETE FROM sqlite_sequence WHERE name='{table}';")
-                print(f"  - Table '{table}' vidée.")
 
-            # Mettre à jour les journées pour qu'elles ne soient plus considérées comme "rappel envoyé"
-            cur.execute("UPDATE journees SET rappel_envoye = 0, is_active = 1;")
-            print("  - Statut des journées réinitialisé.")
+            # Récupérer la liste de toutes les tables existantes pour éviter les erreurs
+            cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
+            existing_tables = [row[0] for row in cur.fetchall()]
+
+            # Liste des tables à vider avec le nom corrigé
+            tables_to_wipe = [
+                "users",
+                "user_collection",  # <-- CORRECTION : 'collections' -> 'collection'
+                "pronostics",
+                "prono_messages"
+            ]
+
+            for table in tables_to_wipe:
+                if table in existing_tables:
+                    cur.execute(f"DELETE FROM {table};")
+                    # Réinitialiser les compteurs auto-incrémentés (facultatif mais propre)
+                    if 'sqlite_sequence' in existing_tables:
+                        cur.execute(f"DELETE FROM sqlite_sequence WHERE name='{table}';")
+                    print(f"  - Table '{table}' vidée.")
+                else:
+                    print(f"  - Table '{table}' non trouvée, ignorée.")
+
+            # Mettre à jour les journées si la table existe
+            if 'journees' in existing_tables:
+                cur.execute("UPDATE journees SET rappel_envoye = 0, is_active = 1;")
+                print("  - Statut des journées réinitialisé.")
 
             con.commit()
             print("✅  [DATABASE] Remise à zéro des données terminée avec succès.")
+            return True  # Indiquer que l'opération a réussi
 
     except sqlite3.Error as e:
         print(f"❌  [DATABASE] Une erreur est survenue lors de la remise à zéro : {e}")
+        return False # Indiquer que l'opération a échoué
 
 def check_user(user_id):
     """Vérifie si un utilisateur existe dans la DB, sinon le crée."""
