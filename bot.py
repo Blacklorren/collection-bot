@@ -7,6 +7,11 @@ import pytz
 import asyncio
 from datetime import datetime, timedelta
 
+# Le dossier où les données persistantes sont stockées
+DATA_DIR = '/data'
+# On définit le chemin complet pour le fichier de verrouillage
+LOCK_FILE = os.path.join(DATA_DIR, 'reset_done.lock')
+
 # 1. Chargement des variables d'environnements
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
@@ -25,8 +30,8 @@ if GUILD_ID is None:
 
 # --- MODIFICATION : Forcer la remise à zéro au démarrage ---
 # Cette logique s'exécute AVANT l'initialisation du bot.
-if not os.path.exists('reset_done.lock'):
-    print("ℹ️  (RESET) Le fichier 'reset_done.lock' est absent.")
+if not os.path.exists(LOCK_FILE):
+    print(f"ℹ️  (RESET) Le fichier '{LOCK_FILE}' est absent.")
     print("🏁  (RESET) Lancement de la remise à zéro unique de la base de données...")
     database.initialize_database()  # S'assurer que la DB et les tables existent
     
@@ -34,13 +39,11 @@ if not os.path.exists('reset_done.lock'):
     
     if success:
         # Créer le fichier "lock" UNIQUEMENT si la remise à zéro a réussi
-        with open('reset_done.lock', 'w') as f:
+        with open(LOCK_FILE, 'w') as f:
             f.write(f"Reset performed on {datetime.now().isoformat()}")
         print("✅  (RESET) Remise à zéro réussie. Le bot va maintenant démarrer normalement.")
     else:
-        # Si la remise à zéro échoue, on affiche une erreur claire et on ne crée pas le fichier.
-        # Le bot tentera à nouveau au prochain redémarrage.
-        print("❌  (RESET) La remise à zéro a ÉCHOUÉ. Le fichier .lock ne sera pas créé. Veuillez corriger l'erreur de base de données.")
+    print(f"ℹ️  (RESET) La remise à zéro unique a déjà été effectuée (lock trouvé à '{LOCK_FILE}'). Démarrage normal.")
 else:
     print("ℹ️  (RESET) La remise à zéro unique a déjà été effectuée. Démarrage normal.")
 
