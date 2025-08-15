@@ -29,21 +29,32 @@ if not os.path.exists('reset_done.lock'):
     print("ℹ️  (RESET) Le fichier 'reset_done.lock' est absent.")
     print("🏁  (RESET) Lancement de la remise à zéro unique de la base de données...")
     database.initialize_database()  # S'assurer que la DB et les tables existent
-    database.wipe_all_user_data()   # Vider les données
-    # Créer le fichier "lock" pour ne plus jamais refaire le reset
-    with open('reset_done.lock', 'w') as f:
-        f.write(f"Reset performed on {datetime.now().isoformat()}")
-    print("✅  (RESET) Remise à zéro terminée. Le bot va maintenant démarrer normalement.")
+    
+    success = database.wipe_all_user_data()   # Vider les données et vérifier le succès
+    
+    if success:
+        # Créer le fichier "lock" UNIQUEMENT si la remise à zéro a réussi
+        with open('reset_done.lock', 'w') as f:
+            f.write(f"Reset performed on {datetime.now().isoformat()}")
+        print("✅  (RESET) Remise à zéro réussie. Le bot va maintenant démarrer normalement.")
+    else:
+        # Si la remise à zéro échoue, on affiche une erreur claire et on ne crée pas le fichier.
+        # Le bot tentera à nouveau au prochain redémarrage.
+        print("❌  (RESET) La remise à zéro a ÉCHOUÉ. Le fichier .lock ne sera pas créé. Veuillez corriger l'erreur de base de données.")
 else:
     print("ℹ️  (RESET) La remise à zéro unique a déjà été effectuée. Démarrage normal.")
 
+
 # 2. Initialisation de la base de données
 try:
+    # On laisse cette initialisation ici, elle est sans danger ("IF NOT EXISTS")
+    # et nécessaire si le bot démarre après un reset déjà effectué.
     database.initialize_database()
     print("✅ Base de données initialisée avec succès")
 except Exception as e:
     print(f"Erreur lors de l'initialisation de la base de données : {e}")
     exit()
+
 
 # 3. Définition des "Intents" (les autorisations du bot)
 intents = discord.Intents.default()
