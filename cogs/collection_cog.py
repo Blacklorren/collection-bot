@@ -25,7 +25,7 @@ ANSI_COLORS = {
 # --- CONFIGURATION ---
 # Remplacez 0 par l'ID du canal où les annonces de cartes rares seront postées.
 # Pour obtenir l'ID : Clic droit sur le canal -> "Copier l'ID du salon" (Mode développeur doit être activé dans Discord)
-ANNONCE_CHANNEL_ID = 0 
+ANNONCE_CHANNEL_ID = 1405724982436167762 
 PACK_COST = 150  # Coût en points pour acheter un pack
 DAILY_BONUS = 100 # Points pour le premier message de la journée
 POINTS_PER_MESSAGE = 20 # Points par message
