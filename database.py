@@ -112,15 +112,39 @@ def initialize_database():
 # === FONCTIONS EXISTANTES POUR LE JEU DE CARTES ===
 
 def wipe_all_user_data():
-    """Supprime toutes les données des joueurs (points, cartes, fragments, etc.)."""
-    with sqlite3.connect(DB_NAME) as con:
-        cur = con.cursor()
-        print("!!! INITIATING FULL WIPE OF USER DATA !!!")
-        cur.execute("DELETE FROM users")
-        cur.execute("DELETE FROM user_cards")
-        # Les pronostics ne sont PAS supprimés
-        print("!!! WIPE COMPLETE !!!")
-        con.commit()
+    """
+    Vide toutes les données liées aux utilisateurs, collections, et pronostics.
+    Cette fonction est conçue pour une remise à zéro complète du jeu.
+    """
+    print("⚠️  [DATABASE] Lancement de la procédure de remise à zéro des données...")
+    try:
+        with sqlite3.connect(DB_NAME) as con:
+            cur = con.cursor()
+            
+            # Liste des tables à vider
+            tables_to_wipe = [
+                "users", 
+                "user_collections", 
+                "pronostics",
+                "prono_messages" 
+                # On ne vide pas 'matchs' et 'journees' pour ne pas avoir à tout recréer
+            ]
+            
+            for table in tables_to_wipe:
+                cur.execute(f"DELETE FROM {table};")
+                # Optionnel mais recommandé pour réinitialiser les auto-incréments si besoin
+                cur.execute(f"DELETE FROM sqlite_sequence WHERE name='{table}';")
+                print(f"  - Table '{table}' vidée.")
+
+            # Mettre à jour les journées pour qu'elles ne soient plus considérées comme "rappel envoyé"
+            cur.execute("UPDATE journees SET rappel_envoye = 0, is_active = 1;")
+            print("  - Statut des journées réinitialisé.")
+
+            con.commit()
+            print("✅  [DATABASE] Remise à zéro des données terminée avec succès.")
+
+    except sqlite3.Error as e:
+        print(f"❌  [DATABASE] Une erreur est survenue lors de la remise à zéro : {e}")
 
 def check_user(user_id):
     """Vérifie si un utilisateur existe dans la DB, sinon le crée."""
