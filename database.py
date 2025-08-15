@@ -138,7 +138,8 @@ def wipe_all_user_data():
             # Liste des tables à vider avec le nom corrigé
             tables_to_wipe = [
                 "users",
-                "user_collection",  # <-- CORRECTION : 'collections' -> 'collection'
+                "user_cards",
+                "points",
                 "pronostics",
                 "prono_messages"
             ]
