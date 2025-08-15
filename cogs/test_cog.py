@@ -21,7 +21,7 @@ DATA_DIR = '/data'
 LOCK_FILE = os.path.join(DATA_DIR, 'reset_done.lock')
 
 class TestCog(commands.Cog):
-    """Cog pour tester toutes les fonctionnalités du bot."""
+    """Cog pour tester toutes les fonctionnalités du bots."""
     
     def __init__(self, bot):
         self.bot = bot
