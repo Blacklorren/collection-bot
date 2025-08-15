@@ -86,18 +86,27 @@ class CollectionCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        """Gère le gain de points et le message d'accueil après la date de lancement."""
+        """Gère le gain de points avec des logs de débogage détaillés."""
+        # --- LOG DE DÉMARRAGE ---
+        print(f"\n[POINTS_DEBUG] on_message triggered by {message.author.name} in #{message.channel.name}")
+
         if message.author.bot or message.content.startswith('!') or not message.guild:
+            print(f"[POINTS_DEBUG] > Condition ignorée : Message d'un bot, commande, ou message privé.")
             return
 
+        # --- CONFIGURATION DE L'HEURE ---
         paris_tz = pytz.timezone('Europe/Paris')
         now_paris = datetime.datetime.now(paris_tz)
-                      
         user_id = message.author.id
+        print(f"[POINTS_DEBUG] Utilisateur: {user_id}, Heure Actuelle (Paris): {now_paris.isoformat()}")
+
+        # --- RÉCUPÉRATION DES DONNÉES UTILISATEUR ---
         user_data = database.get_user_data(user_id)
-        
-        # --- RÈGLE 3 : Envoyer le message d'accueil unique ---
-        if user_data['has_received_onboarding'] == 0:
+        print(f"[POINTS_DEBUG] Données de la BDD: {user_data}")
+
+        # --- GESTION DU MESSAGE D'ACCUEIL (ne donne pas de points) ---
+        if user_data.get('has_received_onboarding', 0) == 0:
+            print("[POINTS_DEBUG] > L'utilisateur n'a pas reçu le message d'accueil. Envoi en cours...")
             try:
                 onboarding_message = (
                     "🎉 **Bienvenue dans le jeu de collection de cartes Handnews !** 🎉\n\n"
@@ -105,37 +114,58 @@ class CollectionCog(commands.Cog):
                     "1.  **Gagnez des points** en participant sur le serveur. Votre premier message de la journée vous donne 110 points ! Ensuite vous obtenez 20 points par message écrit dans une limite totale de 300 points par jour. \n"
                     f"2.  **Achetez des packs** de cartes avec la commande `!pack` (coût : {PACK_COST} points).\n"
                     "3.  **Ouvrez vos packs** avec `!ouvrir` pour découvrir de nouveaux joueurs de Starligue.\n"
+
                     "4.  **Consultez votre collection** avec `!collection`.\n"
                     "5.  **Recyclez vos doublons** contre des fragments avec `!recycler` et utilisez `!creer \"Nom du Joueur\"` pour fabriquer les cartes qui vous manquent !\n\n"
                     "Bonne collection !"
                 )
                 await message.author.send(onboarding_message)
+                database.set_onboarding_received(user_id)
+                print("[POINTS_DEBUG] > Message d'accueil envoyé. Arrêt du traitement des points pour ce message.")
             except discord.errors.Forbidden:
-                print(f"Impossible d'envoyer le message d'accueil à {message.author.name}")
-            
-            # On marque le message comme envoyé pour ne plus jamais le renvoyer
-            database.set_onboarding_received(user_id)
-    
-        # --- Logique de gain de points (ne s'exécute qu'après la date de lancement) ---
-        today_str = now_paris.date().isoformat()
-    
-        if user_data['last_activity_date'] != today_str:
-            database.reset_daily_and_add_first_bonus(user_id, DAILY_BONUS, POINTS_PER_MESSAGE)
-            # Pas de notification en MP ici, le message d'accueil suffit.
+                print(f"[POINTS_DEBUG] > ÉCHEC de l'envoi du MP d'accueil à {message.author.name}")
             return
-    
+
+        # --- VÉRIFICATION #1: BONUS QUOTIDIEN ---
+        today_str = now_paris.date().isoformat()
+        print(f"[POINTS_DEBUG] [1/3] Vérification du bonus quotidien...")
+        print(f"[POINTS_DEBUG]     Aujourd'hui: '{today_str}', Dernière activité: '{user_data['last_activity_date']}'")
+        if user_data['last_activity_date'] != today_str:
+            print(f"[POINTS_DEBUG] > C'est un nouveau jour pour l'utilisateur. Attribution du bonus.")
+            # NOTE: Assurez-vous que cette fonction dans database.py a été mise à jour pour accepter `now_paris.isoformat()`
+            database.reset_daily_and_add_first_bonus(user_id, DAILY_BONUS, POINTS_PER_MESSAGE, now_paris.isoformat())
+            print(f"[POINTS_DEBUG] > SUCCÈS : Bonus quotidien attribué. Fin du traitement.")
+            return
+        
+        # --- VÉRIFICATION #2: COOLDOWN ENTRE LES MESSAGES ---
+        print(f"[POINTS_DEBUG] [2/3] Vérification du cooldown...")
         if user_data['last_message_time']:
             last_message_time = datetime.datetime.fromisoformat(user_data['last_message_time'])
+            
             if last_message_time.tzinfo is None:
                 last_message_time = paris_tz.localize(last_message_time)
             
-            if (now_paris - last_message_time).total_seconds() < MESSAGE_COOLDOWN:
+            time_diff = (now_paris - last_message_time).total_seconds()
+            print(f"[POINTS_DEBUG]     Temps écoulé: {time_diff:.2f}s. Cooldown requis: {MESSAGE_COOLDOWN}s.")
+            
+            if time_diff < MESSAGE_COOLDOWN:
+                print(f"[POINTS_DEBUG] > ÉCHEC : L'utilisateur est en cooldown. Pas de points.")
                 return
-    
+        else:
+            print("[POINTS_DEBUG]     Aucun message précédent, cooldown validé.")
+
+        # --- VÉRIFICATION #3: LIMITE DE POINTS JOURNALIERS ---
+        print(f"[POINTS_DEBUG] [3/3] Vérification de la limite journalière...")
+        print(f"[POINTS_DEBUG]     Points du jour: {user_data['daily_message_points']}, Limite: {MAX_DAILY_MESSAGE_POINTS}")
         if user_data['daily_message_points'] >= MAX_DAILY_MESSAGE_POINTS:
+            print(f"[POINTS_DEBUG] > ÉCHEC : Limite de points journaliers atteinte. Pas de points.")
             return
-    
-        database.update_on_message_activity(user_id, POINTS_PER_MESSAGE)
+
+        # --- ATTRIBUTION DES POINTS ---
+        print(f"[POINTS_DEBUG] > Tous les contrôles ont réussi. Attribution de {POINTS_PER_MESSAGE} points.")
+        # NOTE: Assurez-vous que cette fonction dans database.py a été mise à jour pour accepter `now_paris.isoformat()`
+        database.update_on_message_activity(user_id, POINTS_PER_MESSAGE, now_paris.isoformat())
+        print(f"[POINTS_DEBUG] > SUCCÈS : Points attribués à l'utilisateur {user_id}.")
 
     # === COMMANDES ===
     @commands.command(name='aide')
