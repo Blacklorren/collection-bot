@@ -207,29 +207,44 @@ def update_fragments(user_id, amount):
         cur.execute("UPDATE users SET fragments = fragments + ? WHERE user_id = ?", (amount, user_id))
         con.commit()
 
-def update_on_message_activity(user_id, points_to_add):
+ef update_on_message_activity(user_id, points_to_add, current_iso_time):
+    """
+    Met à jour les points et l'heure du dernier message pour une activité normale.
+    Version corrigée qui accepte le timestamp en argument.
+    """
     check_user(user_id)
     with sqlite3.connect(DB_NAME) as con:
         cur = con.cursor()
-        now_time = datetime.datetime.now().isoformat()
-        today_date = datetime.date.today().isoformat()
         cur.execute("""
-            UPDATE users SET points = points + ?, daily_message_points = daily_message_points + ?,
-            last_activity_date = ?, last_message_time = ? WHERE user_id = ?
-        """, (points_to_add, points_to_add, today_date, now_time, user_id))
+            UPDATE users 
+            SET 
+                points = points + ?, 
+                daily_message_points = daily_message_points + ?,
+                last_message_time = ? 
+            WHERE user_id = ?
+        """, (points_to_add, points_to_add, current_iso_time, user_id))
         con.commit()
         
-def reset_daily_and_add_first_bonus(user_id, bonus_points, message_points):
+def reset_daily_and_add_first_bonus(user_id, bonus_points, message_points, current_iso_time):
+    """
+    Réinitialise les points quotidiens et ajoute le bonus du premier message.
+    Version corrigée qui accepte le timestamp en argument.
+    """
     check_user(user_id)
     with sqlite3.connect(DB_NAME) as con:
         cur = con.cursor()
-        now_time = datetime.datetime.now().isoformat()
-        today_date = datetime.date.today().isoformat()
+        # On extrait la date de la chaîne de caractères ISO (ex: '2025-08-15')
+        today_date = current_iso_time.split('T')[0]
         total_points_to_add = bonus_points + message_points
         cur.execute("""
-            UPDATE users SET points = points + ?, daily_message_points = ?,
-            last_activity_date = ?, last_message_time = ? WHERE user_id = ?
-        """, (total_points_to_add, message_points, today_date, now_time, user_id))
+            UPDATE users 
+            SET 
+                points = points + ?, 
+                daily_message_points = ?,
+                last_activity_date = ?, 
+                last_message_time = ? 
+            WHERE user_id = ?
+        """, (total_points_to_add, message_points, today_date, current_iso_time, user_id))
         con.commit()
 
 def add_pack(user_id, amount=1):
