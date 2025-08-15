@@ -186,7 +186,7 @@ class CollectionCog(commands.Cog):
         cartes_obtenues = []
         cartes_obtenues.append(random.choice(self.cards_by_rarity["Commun"]))
         cartes_obtenues.append(random.choices(
-            population=[*self.cards_by_rarity["Commun"], *self.cards_by_rarity["Peu Commun"]],[*self.cards_by_rarity["Rare"],
+            population=[*self.cards_by_rarity["Commun"], *self.cards_by_rarity["Peu Commun"],[*self.cards_by_rarity["Rare"]],
             weights=[30]*len(self.cards_by_rarity["Commun"]) + [40]*len(self.cards_by_rarity["Peu Commun"]) + [30]*len(self.cards_by_rarity["Rare"]),
             k=1
         )[0])
