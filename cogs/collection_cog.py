@@ -140,7 +140,6 @@ class CollectionCog(commands.Cog):
             
             if time_diff < MESSAGE_COOLDOWN:
                 return
-        else:
 
         # --- VÉRIFICATION #3: LIMITE DE POINTS JOURNALIERS ---
         if user_data['daily_message_points'] >= MAX_DAILY_MESSAGE_POINTS:
