@@ -89,6 +89,9 @@ class CollectionCog(commands.Cog):
         """Gère le gain de points et le message d'accueil après la date de lancement."""
         if message.author.bot or message.content.startswith('!') or not message.guild:
             return
+
+        paris_tz = pytz.timezone('Europe/Paris')
+        now_paris = datetime.datetime.now(paris_tz)
                       
         user_id = message.author.id
         user_data = database.get_user_data(user_id)
