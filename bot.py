@@ -23,6 +23,20 @@ if GUILD_ID is None:
     print("Assurez-vous d'avoir un fichier .env contenant GUILD_ID=VOTRE_ID")
     exit()
 
+# --- MODIFICATION : Forcer la remise à zéro au démarrage ---
+# Cette logique s'exécute AVANT l'initialisation du bot.
+if not os.path.exists('reset_done.lock'):
+    print("ℹ️  (RESET) Le fichier 'reset_done.lock' est absent.")
+    print("🏁  (RESET) Lancement de la remise à zéro unique de la base de données...")
+    database.initialize_database()  # S'assurer que la DB et les tables existent
+    database.wipe_all_user_data()   # Vider les données
+    # Créer le fichier "lock" pour ne plus jamais refaire le reset
+    with open('reset_done.lock', 'w') as f:
+        f.write(f"Reset performed on {datetime.now().isoformat()}")
+    print("✅  (RESET) Remise à zéro terminée. Le bot va maintenant démarrer normalement.")
+else:
+    print("ℹ️  (RESET) La remise à zéro unique a déjà été effectuée. Démarrage normal.")
+
 # 2. Initialisation de la base de données
 try:
     database.initialize_database()
@@ -60,9 +74,7 @@ class HandnewsBot(commands.Bot):
         await self.load_extension('cogs.test_cog')
         print("✅ Cog Test chargé")
         
-        # Lancement de la tâche de fond pour la remise à zéro
-        self.loop.create_task(self.reset_scheduler_loop())
-        
+      
         print("🎮 Tous les systèmes sont opérationnels !")
 
     async def on_ready(self):
@@ -157,37 +169,7 @@ class HandnewsBot(commands.Bot):
         
         # Le système de points est géré dans collection_cog via l'event on_message
     
-    async def reset_scheduler_loop(self):
-        """Tâche unique qui vérifie s'il faut remettre le jeu à zéro."""
-        await self.wait_until_ready()
-        
-        # On utilise un fichier "lock" pour s'assurer que le reset n'arrive qu'une seule fois
-        if os.path.exists('reset_done.lock'):
-            print("ℹ️ (RESET) La remise à zéro a déjà été effectuée. La tâche ne démarrera pas.")
-            return
-
-        print("⏰ (RESET) Tâche de remise à zéro programmée pour le 14/08/2025.")
-        
-        while not self.is_closed():
-            now_paris = datetime.now(pytz.timezone('Europe/Paris'))
-            target_reset_date = datetime(2025, 8, 14, 23, 59, 59, tzinfo=pytz.timezone('Europe/Paris'))
-
-            # Si on est le 14 août 2025 ou après, et que le reset n'a pas été fait
-            if now_paris >= target_reset_date:
-                print("🏁 (RESET) Date de remise à zéro atteinte. Lancement de la procédure.")
-                
-                # Appeler la fonction de suppression de la base de données
-                database.wipe_all_user_data()
-                
-                # Créer le fichier "lock" pour ne plus jamais refaire le reset
-                with open('reset_done.lock', 'w') as f:
-                    f.write(f"Reset performed on {now_paris.isoformat()}")
-                
-                print("✅ (RESET) Remise à zéro terminée. La tâche va s'arrêter.")
-                break # Arrête la boucle, sa mission est accomplie.
-
-            # Vérifier toutes les heures jusqu'à la date fatidique
-            await asyncio.sleep(3600)
+    
 
 # 5. Commandes globales (optionnel - pour les admins)
 async def setup_global_commands(bot):
