@@ -109,7 +109,7 @@ class CollectionCog(commands.Cog):
                 onboarding_message = (
                     "🎉 **Bienvenue dans le jeu de collection de cartes Handnews !** 🎉\n\n"
                     "Voici comment ça marche :\n"
-                    "1.  **Gagnez des points** en participant sur le serveur. Votre premier message de la journée vous donne 110 points ! Ensuite vous obtenez 20 points par message écrit dans une limite totale de 300 points par jour. \n"
+                    "1.  **Gagnez des points** en participant sur le serveur. Votre premier message de la journée vous donne 120 points ! Ensuite vous obtenez 20 points par message écrit dans une limite totale de 300 points par jour. \n"
                     f"2.  **Achetez des packs** de cartes avec la commande `!pack` (coût : {PACK_COST} points).\n"
                     "3.  **Ouvrez vos packs** avec `!ouvrir` pour découvrir de nouveaux joueurs de Starligue.\n"
 
