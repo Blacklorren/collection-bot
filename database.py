@@ -1,10 +1,17 @@
 import sqlite3
 import datetime
 
-DB_NAME = '/data/collection.db' # Assurez-vous que c'est le bon chemin pour Railway
+# Le dossier où les données persistantes seront stockées
+DATA_DIR = '/data'
+
+# On garde le nom de variable DB_NAME, mais on lui assigne le chemin complet
+DB_NAME = os.path.join(DATA_DIR, 'collection.db')
+# La valeur de DB_NAME est maintenant '/data/collection.db'
 
 def initialize_database():
-    """Crée et met à jour les tables de la base de données."""
+    """Crée les tables de la base de données si elles n'existent pas."""
+    # S'assurer que le dossier /data existe (au cas où)
+    os.makedirs(DATA_DIR, exist_ok=True)
     with sqlite3.connect(DB_NAME) as con:
         cur = con.cursor()
         
