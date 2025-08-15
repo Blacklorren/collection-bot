@@ -188,7 +188,21 @@ class HandnewsBot(commands.Bot):
 # 5. Commandes globales (optionnel - pour les admins)
 async def setup_global_commands(bot):
     """Ajoute des commandes globales au bot."""
-    
+
+    @bot.command(name='sync')
+    @commands.has_permissions(administrator=True)
+    async def sync(ctx: commands.Context):
+        """Synchronise les commandes slash avec le serveur."""
+        guild = discord.Object(id=bot.guild_id)
+        bot.tree.copy_global_to(guild=guild)
+        try:
+            synced = await bot.tree.sync(guild=guild)
+            await ctx.send(f"✅ Synchronisé **{len(synced)}** commande(s) slash avec le serveur.")
+            print(f"Synced {len(synced)} commands.")
+        except Exception as e:
+            await ctx.send(f"❌ Une erreur est survenue lors de la synchronisation : {e}")
+            print(e)
+            
     @bot.command(name='status')
     @commands.has_permissions(administrator=True)
     async def status_command(ctx):
