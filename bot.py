@@ -43,8 +43,8 @@ if not os.path.exists(LOCK_FILE):
             f.write(f"Reset performed on {datetime.now().isoformat()}")
         print("✅  (RESET) Remise à zéro réussie. Le bot va maintenant démarrer normalement.")
     else:
-    print(f"ℹ️  (RESET) La remise à zéro unique a déjà été effectuée (lock trouvé à '{LOCK_FILE}'). Démarrage normal.")
-    else:
+        print(f"ℹ️  (RESET) La remise à zéro unique a déjà été effectuée (lock trouvé à '{LOCK_FILE}'). Démarrage normal.")
+else:
     print("ℹ️  (RESET) La remise à zéro unique a déjà été effectuée. Démarrage normal.")
 
 
