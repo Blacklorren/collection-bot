@@ -344,7 +344,7 @@ class CollectionCog(commands.Cog):
     
     @app_commands.command(name='addpoints', description="[Admin] Donne des points à un membre.")
     @app_commands.describe(membre="L'utilisateur à qui donner des points.", montant="Le nombre de points à ajouter.")
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @app_commands.default_permissions(manage_guild=True)
     async def add_points_command(self, interaction: discord.Interaction, membre: discord.Member, montant: int):
         if montant <= 0:
             await interaction.response.send_message("❌ Vous devez donner un nombre de points positif.", ephemeral=True)
