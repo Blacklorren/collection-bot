@@ -184,10 +184,14 @@ class CollectionCog(commands.Cog):
         database.remove_pack(user_id, 1)
         
         cartes_obtenues = []
-        cartes_obtenues.append(random.choice(self.cards_by_rarity["Commun"]))
+        cartes_obtenues.append(random.choice(
+            population=[*self.cards_by_rarity["Commun"], *self.cards_by_rarity["Peu Commun"]],
+            weights=[70]*len(self.cards_by_rarity["Commun"]) + [30]*len(self.cards_by_rarity["Peu Commun"]),
+            k=1
+        )[0])
         cartes_obtenues.append(random.choices(
             population=[*self.cards_by_rarity["Commun"], *self.cards_by_rarity["Peu Commun"], *self.cards_by_rarity["Rare"]],
-            weights=[30]*len(self.cards_by_rarity["Commun"]) + [40]*len(self.cards_by_rarity["Peu Commun"]) + [30]*len(self.cards_by_rarity["Rare"]),
+            weights=[30]*len(self.cards_by_rarity["Commun"]) + [50]*len(self.cards_by_rarity["Peu Commun"]) + [20]*len(self.cards_by_rarity["Rare"]),
             k=1
         )[0])
         cartes_obtenues.append(random.choices(
