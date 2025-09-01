@@ -240,7 +240,7 @@ class EventsCog(commands.Cog):
                             start_time=match['start_time_utc'],
                             end_time=match['start_time_utc'] + timedelta(hours=2),
                             entity_type=discord.EntityType.external,
-                            location="Starligue Handball"
+                            location="Starligue Handball",
                             privacy_level=discord.PrivacyLevel.guild_only
                         )
                         match_id = database.create_match(
