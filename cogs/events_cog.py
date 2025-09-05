@@ -162,13 +162,20 @@ class EventsCog(commands.Cog):
                     day, month = map(int, date_part.split('.')[:2])
                     hour, minute = map(int, time_part.split(':'))
                     
+                    # Déterminer la bonne année pour le match
                     year = now.year
                     match_date = date(year, month, day)
+                    # Si la date du match est déjà passée, on suppose que c'est l'année suivante
                     if match_date < now.date():
                         match_date = match_date.replace(year=year + 1)
                         
-                    match_datetime = datetime.combine(match_date, datetime.min.time()).replace(hour=hour, minute=minute)
-                    match_datetime_paris = paris_tz.localize(match_datetime)
+                    # 1. On crée l'heure sans se poser de question (ex: "20:00")
+                    match_datetime_naive = datetime.combine(match_date, datetime.min.time()).replace(hour=hour, minute=minute)
+
+                    # 2. ICI, on met une "étiquette" claire : c'est l'heure de Paris !
+                    match_datetime_paris = paris_tz.localize(match_datetime_naive)
+                    
+                    # 3. Maintenant qu'il n'y a plus de doute, on convertit pour Discord
                     match_datetime_utc = match_datetime_paris.astimezone(timezone.utc)
 
                     team1 = container.find(class_="event__participant--home").get_text(strip=True)
