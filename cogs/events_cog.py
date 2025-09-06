@@ -272,15 +272,17 @@ class EventsCog(commands.Cog):
                     html = await response.text()
             
             soup = BeautifulSoup(html, 'html.parser')
-            
-            status_elem = soup.find(class_=re.compile(r'fixedHeaderDuel__detailStatus'))
-            if status_elem and "Terminé" in status_elem.get_text():
-                home_score_elem = soup.select_one('.detailScore__wrapper > span:first-of-type')
-                away_score_elem = soup.select_one('.detailScore__wrapper > span:last-of-type')
+        
+            status_elem = soup.find('div', class_='detail-finished')
 
-                if home_score_elem and away_score_elem:
-                    score1 = home_score_elem.get_text(strip=True)
-                    score2 = away_score_elem.get_text(strip=True)
+            if status_elem:
+
+                score_elems = soup.select('div.duelParticipant__score')
+
+                if len(score_elems) >= 2:
+                    # Le premier score est l'équipe à domicile, le deuxième est l'équipe à l'extérieur
+                    score1 = score_elems[0].get_text(strip=True)
+                    score2 = score_elems[1].get_text(strip=True)
                     
                     if score1.isdigit() and score2.isdigit():
                         return f"{score1}-{score2}"
