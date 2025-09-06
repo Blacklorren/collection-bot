@@ -257,48 +257,40 @@ class EventsCog(commands.Cog):
         except Exception as e:
             print(f"❌ (MATCHES) Erreur critique dans la boucle des matchs: {e}")
 
-    async def get_match_result(self, event_id):
-        """Récupère le résultat d'un match spécifique via Browserless avec des logs de débogage détaillés."""
+        async def get_match_result(self, event_id):
+        """Récupère le résultat d'un match spécifique en cherchant explicitement le statut 'Terminé'."""
         
         print(f"\n--- [DEBUG-SCRAPER] Début du traitement pour l'event_id : {event_id} ---")
-
-        if not BROWSERLESS_API_TOKEN:
-            print("[DEBUG-SCRAPER] ❌ ERREUR: Token Browserless manquant.")
-            return None
-
         match_url = f"https://www.livescore.in/fr/match/{event_id}/"
         print(f"[DEBUG-SCRAPER] 🔗 URL cible : {match_url}")
-
         payload = {"url": match_url}
         
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(BROWSERLESS_CONTENT_API_URL, json=payload, timeout=30) as response:
                     print(f"[DEBUG-SCRAPER] STATUS HTTP: {response.status}")
-                    if response.status != 200:
-                        print(f"[DEBUG-SCRAPER] ❌ Échec du chargement de la page. L'ID '{event_id}' est peut-être incorrect.")
-                        return None
+                    if response.status != 200: return None
                     html = await response.text()
             
             soup = BeautifulSoup(html, 'html.parser')
-            
-            # Étape 1: Chercher le statut "Terminé"
-            print("[DEBUG-SCRAPER] 1. Recherche du statut 'Terminé' (div.detail-finished)...")
-            status_elem = soup.find('div', class_='detail-finished')
-            
+
+            # --- CORRECTION APPLIQUÉE : Recherche textuelle de "Terminé" ---
+            # C'est plus fiable que de se baser sur une classe qui peut changer.
+            print("[DEBUG-SCRAPER] 1. Recherche du texte 'Terminé' dans la page...")
+            status_elem = soup.find(string=re.compile(r'Terminé'))
+
             if not status_elem:
-                print("[DEBUG-SCRAPER] ❌ Statut 'Terminé' NON trouvé. Le match n'est peut-être pas fini ou la structure a changé.")
+                print("[DEBUG-SCRAPER] ❌ Statut 'Terminé' NON trouvé. Le match n'est pas fini ou la structure a changé.")
                 return None
             
             print("[DEBUG-SCRAPER] ✅ Statut 'Terminé' trouvé !")
 
-            # Étape 2: Chercher les scores
             print("[DEBUG-SCRAPER] 2. Recherche des scores (div.duelParticipant__score)...")
             score_elems = soup.select('div.duelParticipant__score')
             print(f"[DEBUG-SCRAPER] 📊 {len(score_elems)} élément(s) de score trouvés.")
 
             if len(score_elems) < 2:
-                print("[DEBUG-SCRAPER] ❌ Moins de 2 scores trouvés. Impossible de déterminer le résultat.")
+                print("[DEBUG-SCRAPER] ❌ Moins de 2 scores trouvés.")
                 return None
             
             score1 = score_elems[0].get_text(strip=True)
@@ -308,10 +300,9 @@ class EventsCog(commands.Cog):
             if score1.isdigit() and score2.isdigit():
                 final_score = f"{score1}-{score2}"
                 print(f"[DEBUG-SCRAPER] ✅ Résultat final validé : {final_score}")
-                print(f"--- [DEBUG-SCRAPER] Fin du traitement pour {event_id} ---")
                 return final_score
             else:
-                print(f"[DEBUG-SCRAPER] ❌ Les scores extraits ('{score1}', '{score2}') ne sont pas des nombres.")
+                print(f"[DEBUG-SCRAPER] ❌ Les scores extraits ne sont pas des nombres.")
                 return None
                         
         except asyncio.TimeoutError:
@@ -319,7 +310,6 @@ class EventsCog(commands.Cog):
         except Exception as e:
             print(f"❌ (RESULTS) Erreur scraping résultat pour {event_id}: {type(e).__name__}")
             
-        print(f"--- [DEBUG-SCRAPER] Fin du traitement (sans succès) pour {event_id} ---")
         return None
 
     async def update_discord_event_with_result(self, discord_event_id, team1, team2, score):
@@ -346,19 +336,20 @@ class EventsCog(commands.Cog):
     
     # --- DÉBUT DES MODIFICATIONS ---
 
-    async def _internal_check_and_process_results(self):
+async def _internal_check_and_process_results(self):
         """
         La logique de base pour vérifier et traiter les résultats.
         Cette fonction est réutilisable par la boucle et la commande manuelle.
         """
         print("🔍 (RESULTS) Lancement de la vérification des résultats...")
         now_utc = datetime.now(timezone.utc)
-        # On vérifie les matchs qui auraient dû se terminer dans les dernières 24h
-        matches_to_check = database.get_matches_to_check_results(now_utc - timedelta(hours=24))
+        
+        # --- CORRECTION APPLIQUÉE : On étend la fenêtre de recherche à 10 jours ---
+        matches_to_check = database.get_matches_to_check_results(now_utc - timedelta(days=10))
         
         if not matches_to_check:
             print("ℹ️ (RESULTS) Aucun match terminé à vérifier pour le moment.")
-            return 0 # Retourne 0 match traité
+            return 0
 
         pronos_cog = self.bot.get_cog('PronosticsCog')
         processed_count = 0
@@ -374,7 +365,7 @@ class EventsCog(commands.Cog):
                         match['discord_event_id'], match['equipe1'], match['equipe2'], result
                     )
                     processed_count += 1
-                    await asyncio.sleep(2) # Garder une pause pour ne pas surcharger les APIs
+                    await asyncio.sleep(2) 
             except Exception as e:
                 print(f"❌ (RESULTS) Erreur vérification résultat pour match {match['id']}: {e}")
         
