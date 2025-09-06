@@ -311,7 +311,7 @@ class EventsCog(commands.Cog):
             print(f"❌ (RESULTS) Erreur scraping résultat pour {event_id}: {type(e).__name__}")
             
         return None
-
+        
     async def update_discord_event_with_result(self, discord_event_id, team1, team2, score):
         """Met à jour l'événement Discord avec le résultat du match."""
         try:
