@@ -258,7 +258,7 @@ class EventsCog(commands.Cog):
             print(f"❌ (MATCHES) Erreur critique dans la boucle des matchs: {e}")
 
     async def get_match_result(self, event_id):
-        """Récupère le résultat d'un match spécifique en cherchant explicitement le statut 'Terminé'."""
+        """Récupère le résultat d'un match en ciblant spécifiquement le bloc d'en-tête."""
         
         print(f"\n--- [DEBUG-SCRAPER] Début du traitement pour l'event_id : {event_id} ---")
         match_url = f"https://www.livescore.in/fr/match/{event_id}/"
@@ -274,23 +274,33 @@ class EventsCog(commands.Cog):
             
             soup = BeautifulSoup(html, 'html.parser')
 
-            # --- CORRECTION APPLIQUÉE : Recherche textuelle de "Terminé" ---
-            # C'est plus fiable que de se baser sur une classe qui peut changer.
-            print("[DEBUG-SCRAPER] 1. Recherche du texte 'Terminé' dans la page...")
-            status_elem = soup.find(string=re.compile(r'Terminé'))
+            # 1. On isole d'abord le bloc d'en-tête du match. C'est notre zone de recherche.
+            print("[DEBUG-SCRAPER] 1. Recherche du conteneur principal (div.detailHeader)...")
+            detail_header = soup.find('div', class_='detailHeader')
 
-            if not status_elem:
-                print("[DEBUG-SCRAPER] ❌ Statut 'Terminé' NON trouvé. Le match n'est pas fini ou la structure a changé.")
+            if not detail_header:
+                print("[DEBUG-SCRAPER] ❌ Conteneur principal NON trouvé. La structure de la page a changé.")
                 return None
             
-            print("[DEBUG-SCRAPER] ✅ Statut 'Terminé' trouvé !")
+            print("[DEBUG-SCRAPER] ✅ Conteneur principal trouvé.")
 
-            print("[DEBUG-SCRAPER] 2. Recherche des scores (div.duelParticipant__score)...")
-            score_elems = soup.select('div.duelParticipant__score')
+            # 2. On cherche le mot "Terminé" UNIQUEMENT à l'intérieur de ce bloc.
+            print("[DEBUG-SCRAPER] 2. Recherche du texte 'Terminé' DANS le conteneur...")
+            status_text = detail_header.find(string=re.compile(r'Terminé'))
+
+            if not status_text:
+                print("[DEBUG-SCRAPER] ❌ Statut 'Terminé' NON trouvé dans le conteneur principal. Le match n'est pas fini.")
+                return None
+            
+            print("[DEBUG-SCRAPER] ✅ Statut 'Terminé' trouvé dans le conteneur.")
+
+            # 3. On cherche les scores UNIQUEMENT à l'intérieur de ce même bloc.
+            print("[DEBUG-SCRAPER] 3. Recherche des scores (div.duelParticipant__score) DANS le conteneur...")
+            score_elems = detail_header.select('div.duelParticipant__score')
             print(f"[DEBUG-SCRAPER] 📊 {len(score_elems)} élément(s) de score trouvés.")
 
             if len(score_elems) < 2:
-                print("[DEBUG-SCRAPER] ❌ Moins de 2 scores trouvés.")
+                print("[DEBUG-SCRAPER] ❌ Moins de 2 scores trouvés dans le conteneur.")
                 return None
             
             score1 = score_elems[0].get_text(strip=True)
