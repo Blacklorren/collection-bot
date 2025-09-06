@@ -225,12 +225,7 @@ class EventsCog(commands.Cog):
                 return
             
             print(f"🏐 (MATCHES) {len(scraped_matches)} matchs trouvés dans la période J+5")
-            
-            journee_id, journee_numero = database.determine_journee_from_matches(scraped_matches)
-            if not journee_id:
-                print("⚠️ (MATCHES) Impossible de déterminer la journée pour les matchs trouvés.")
-                return
-
+                       
             existing_event_names = {event.name for event in guild.scheduled_events}
             
             pronos_cog = self.bot.get_cog('PronosticsCog')
@@ -243,7 +238,7 @@ class EventsCog(commands.Cog):
                     try:
                         event = await guild.create_scheduled_event(
                             name=event_name,
-                            description=f"Match de Starligue - Journée {journee_numero}\n\n📊 Faites vos pronostics dans le canal dédié !",
+                            description=f"Match de Starligue\n\n📊 Faites vos pronostics dans le canal dédié !",
                             start_time=match['start_time_utc'],
                             end_time=match['start_time_utc'] + timedelta(hours=2),
                             entity_type=discord.EntityType.external,
@@ -251,12 +246,12 @@ class EventsCog(commands.Cog):
                             privacy_level=discord.PrivacyLevel.guild_only
                         )
                         match_id = database.create_match(
-                            journee_id, match['event_id'], event.id, match['team1'], match['team2'], match['start_time_utc']
+                            None, match['event_id'], event.id, match['team1'], match['team2'], match['start_time_utc']
                         )
                         if match_id:
                             new_matches_for_pronos.append({
                                 'id': match_id, 'equipe1': match['team1'], 'equipe2': match['team2'],
-                                'date_match': match['start_time_utc'], 'journee_numero': journee_numero
+                                'date_match': match['start_time_utc']
                             })
                     except discord.Forbidden:
                         print("❌ (MATCHES) Permission refusée pour créer un événement.")
