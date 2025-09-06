@@ -422,6 +422,59 @@ class PronosticsCog(commands.Cog):
         
         await ctx.send(embed=embed, ephemeral=True)
 
+    @commands.command(name='classement')
+        @commands.has_permissions(manage_guild=True)
+        async def classement_command(self, ctx):
+            """Affiche le classement provisoire de la journée de pronostics en cours."""
+            
+            # 1. Récupérer la journée active
+            journee = database.get_active_journee()
+            if not journee:
+                await ctx.send("Il n'y a aucune journée de pronostics active en ce moment.", ephemeral=True)
+                return
+                
+            # 2. Récupérer les données du classement pour cette journée
+            leaderboard = database.get_journee_leaderboard(journee['id'])
+            
+            if not leaderboard:
+                await ctx.send(f"Aucun pronostic n'a encore été enregistré pour la Journée {journee['numero']}.", ephemeral=True)
+                return
+    
+            # 3. Récupérer le nombre total de matchs de la journée pour l'affichage (ex: 5/8)
+            matchs = database.get_matchs_journee(journee['id'])
+            total_matchs = len(matchs) if matchs else 0
+                
+            # 4. Créer et formater l'embed
+            embed = discord.Embed(
+                title=f"🏆 Classement Provisoire - Journée {journee['numero']}",
+                description="Voici le classement actuel des pronostics pour la journée en cours. Les scores sont mis à jour après chaque résultat de match.",
+                color=discord.Color.gold(),
+                timestamp=datetime.now(timezone.utc)
+            )
+            
+            classement_text = ""
+            # Limiter l'affichage au top 10
+            for rank, (user_id, bons_pronos, total_points) in enumerate(leaderboard[:10], 1):
+                # Essayer de trouver le membre sur le serveur pour avoir son pseudo actuel
+                member = ctx.guild.get_member(user_id)
+                member_name = member.display_name if member else f"Utilisateur Inconnu ({user_id})"
+                
+                emoji = ""
+                if rank == 1: emoji = "🥇"
+                elif rank == 2: emoji = "🥈"
+                elif rank == 3: emoji = "🥉"
+                else: emoji = f"**#{rank}**"
+                
+                # Afficher le score sous la forme "bons pronos / total matchs (points)"
+                classement_text += f"{emoji} **{member_name}** - {bons_pronos}/{total_matchs} ({total_points} pts)\n"
+            
+            if not classement_text:
+                classement_text = "Aucun pronostic correct pour le moment."
+    
+            embed.add_field(name="Top 10 Provisoire", value=classement_text, inline=False)
+            
+            embed.set_footer(text=f"Basé sur {len(leaderboard)} participant(s).")
+
 async def setup(bot):
     """Fonction requise par discord.py pour charger le Cog."""
     await bot.add_cog(PronosticsCog(bot))
