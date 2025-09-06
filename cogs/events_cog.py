@@ -336,7 +336,7 @@ class EventsCog(commands.Cog):
     
     # --- DÉBUT DES MODIFICATIONS ---
 
-async def _internal_check_and_process_results(self):
+    async def _internal_check_and_process_results(self):
         """
         La logique de base pour vérifier et traiter les résultats.
         Cette fonction est réutilisable par la boucle et la commande manuelle.
