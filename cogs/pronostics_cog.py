@@ -258,8 +258,10 @@ class PronosticsCog(commands.Cog):
                 await channel.send(embed=embed)
                 print(f"✅ (PRONOS) Classement de la semaine publié.")
 
-    @before_loops
+    @check_pronos_closure.before_loop
+    @publish_weekly_summary.before_loop
     async def before_loops(self):
+        """Attend que le bot soit prêt avant de démarrer les boucles."""
         await self.bot.wait_until_ready()
 
     # process_match_result reste INCHANGÉ
