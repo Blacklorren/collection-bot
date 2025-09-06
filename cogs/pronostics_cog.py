@@ -322,16 +322,29 @@ class PronosticsCog(commands.Cog):
                 pronos_count[prono] += 1
             
             total = sum(pronos_count.values())
-            field_value = (
-                f"Total: {total} pronostics\n"
-                f"{EMOJI_VICTOIRE_1} {match['equipe1']}: {pronos_count['1']} "
-                f"({(pronos_count['1']/total*100):.1f}%)\n" if total > 0 else "0%\n"
-                f"{EMOJI_NUL} Nul: {pronos_count['N']} "
-                f"({(pronos_count['N']/total*100):.1f}%)\n" if total > 0 else "0%\n"
-                f"{EMOJI_VICTOIRE_2} {match['equipe2']}: {pronos_count['2']} "
-                f"({(pronos_count['2']/total*100):.1f}%)" if total > 0 else "0%"
+            
+            # --- BLOC CORRIGÉ ---
+            if total == 0:
+                field_value = "Aucun pronostic pour ce match."
+            else:
+                # Calculer les pourcentages en amont pour plus de clarté
+                p1 = (pronos_count['1'] / total) * 100
+                pN = (pronos_count['N'] / total) * 100
+                p2 = (pronos_count['2'] / total) * 100
+                
+                # Construire la chaîne de caractères complète
+                field_value = (
+                    f"Total: {total} pronostics\n"
+                    f"{EMOJI_VICTOIRE_1} {match['equipe1']}: **{pronos_count['1']}** ({p1:.1f}%)\n"
+                    f"{EMOJI_NUL} Nul: **{pronos_count['N']}** ({pN:.1f}%)\n"
+                    f"{EMOJI_VICTOIRE_2} {match['equipe2']}: **{pronos_count['2']}** ({p2:.1f}%)"
+                )
+            
+            embed.add_field(
+                name=f"{match['equipe1']} vs {match['equipe2']}",
+                value=field_value,
+                inline=False
             )
-            embed.add_field(name=f"{match['equipe1']} vs {match['equipe2']}", value=field_value, inline=False)
         
         await ctx.send(embed=embed, ephemeral=True)
 
@@ -371,6 +384,58 @@ class PronosticsCog(commands.Cog):
         
         embed.add_field(name="Top 10 Provisoire", value=classement_text, inline=False)
         await ctx.send(embed=embed)
+
+    @commands.command(name='pendingmatches')
+    @commands.has_permissions(manage_guild=True)
+    async def pending_matches_command(self, ctx):
+        """Affiche les matchs terminés qui n'ont pas encore de résultat enregistré."""
+        # On regarde les matchs des 10 derniers jours pour ne pas surcharger
+        since_date = datetime.now(timezone.utc) - timedelta(days=10)
+        
+        with database.sqlite3.connect(database.DB_NAME) as con:
+            con.row_factory = database.sqlite3.Row
+            cur = con.cursor()
+            cur.execute("""
+                SELECT id, equipe1, equipe2, date_match FROM matchs
+                WHERE resultat IS NULL AND date_match >= ?
+                ORDER BY date_match ASC
+            """, (since_date.isoformat(),))
+            matches_pending = cur.fetchall()
+
+        if not matches_pending:
+            await ctx.send("✅ Aucun match en attente de résultat dans les 10 derniers jours.", ephemeral=True)
+            return
+
+        description = "Voici les matchs dont le résultat n'a pas encore été traité. Utilisez `!setresult <ID> <score1>-<score2>`.\n\n"
+        for match in matches_pending:
+            match_time = datetime.fromisoformat(match['date_match']).astimezone(pytz.timezone('Europe/Paris'))
+            description += f"**ID: {match['id']}** - {match['equipe1']} vs {match['equipe2']} _(le {match_time.strftime('%d/%m')})_\n"
+
+        embed = discord.Embed(
+            title="⏳ Matchs en Attente de Résultat",
+            description=description,
+            color=discord.Color.orange()
+        )
+        await ctx.send(embed=embed, ephemeral=True)
+
+    @commands.command(name='setresult')
+    @commands.has_permissions(manage_guild=True)
+    async def set_result_command(self, ctx, match_id: int, score: str):
+        """[Admin] Force le résultat d'un match et attribue les points."""
+        try:
+            # On réutilise la logique existante pour traiter le résultat !
+            # C'est la meilleure façon de garantir la cohérence.
+            resultat = self.process_match_result(match_id, score)
+            
+            if resultat:
+                await ctx.send(f"✅ Résultat `{score}` enregistré pour le match ID `{match_id}`. Les points ont été attribués.", ephemeral=True)
+                # On peut maintenant lancer une vérification du classement
+                await self.classement_command.callback(self, ctx)
+            else:
+                await ctx.send(f"❌ Le format du score `{score}` est invalide. Utilisez le format `25-23`.", ephemeral=True)
+
+        except Exception as e:
+            await ctx.send(f"❌ Une erreur est survenue. L'ID de match `{match_id}` est-il correct ? Erreur: `{e}`", ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(PronosticsCog(bot))
