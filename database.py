@@ -120,6 +120,64 @@ def initialize_database():
 
 # === FONCTIONS EXISTANTES POUR LE JEU DE CARTES ===
 
+def get_week_dates(for_date):
+    """Calcule les dates de début (lundi) et de fin (dimanche) pour la semaine d'une date donnée."""
+    start_of_week = for_date - timedelta(days=for_date.weekday())
+    end_of_week = start_of_week + timedelta(days=6)
+    return start_of_week, end_of_week
+
+def get_matches_in_date_range(start_date, end_date):
+    """Récupère tous les matchs dans un intervalle de dates donné."""
+    with sqlite3.connect(DB_NAME) as con:
+        con.row_factory = sqlite3.Row
+        cur = con.cursor()
+        # On s'assure que la date de fin inclut toute la journée
+        end_date_str = (end_date + timedelta(days=1)).isoformat()
+        cur.execute("""
+            SELECT * FROM matchs 
+            WHERE date_match >= ? AND date_match < ?
+            ORDER BY date_match ASC
+        """, (start_date.isoformat(), end_date_str))
+        return cur.fetchall()
+
+def get_leaderboard_for_matches(match_ids):
+    """Calcule le classement pour une liste spécifique d'ID de matchs."""
+    if not match_ids:
+        return []
+    
+    query = f"""
+        SELECT 
+            p.user_id,
+            COUNT(p.id) AS bons_pronos,
+            SUM(p.points_gagnes) AS total_points
+        FROM pronostics p
+        JOIN matchs m ON p.match_id = m.id
+        WHERE p.pronostic = m.resultat AND p.match_id IN ({','.join('?' for _ in match_ids)})
+        GROUP BY p.user_id
+        ORDER BY total_points DESC, bons_pronos DESC;
+    """
+    with sqlite3.connect(DB_NAME) as con:
+        con.row_factory = sqlite3.Row
+        cur = con.cursor()
+        cur.execute(query, match_ids)
+        return cur.fetchall()
+
+# La fonction suivante est modifiée pour ne plus dépendre des journées
+def create_match(journee_id, event_id, discord_event_id, equipe1, equipe2, date_match):
+    """Crée un match dans la base de données. journee_id peut être None."""
+    try:
+        with sqlite3.connect(DB_NAME) as con:
+            cur = con.cursor()
+            # On utilise désormais journee_id de manière facultative
+            cur.execute("""
+                INSERT INTO matchs (journee_id, event_id, discord_event_id, equipe1, equipe2, date_match)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (journee_id, event_id, discord_event_id, equipe1, equipe2, date_match.isoformat()))
+            con.commit()
+            return cur.lastrowid
+    except sqlite3.IntegrityError:
+        return None # Le match existe déjà
+
 def wipe_all_user_data():
     """
     Vide toutes les données liées aux utilisateurs, collections, et pronostics.
