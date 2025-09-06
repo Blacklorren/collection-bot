@@ -257,41 +257,69 @@ class EventsCog(commands.Cog):
         except Exception as e:
             print(f"❌ (MATCHES) Erreur critique dans la boucle des matchs: {e}")
 
-    async def get_match_result(self, event_id):
-        """Récupère le résultat d'un match spécifique via Browserless."""
+       async def get_match_result(self, event_id):
+        """Récupère le résultat d'un match spécifique via Browserless avec des logs de débogage détaillés."""
+        
+        print(f"\n--- [DEBUG-SCRAPER] Début du traitement pour l'event_id : {event_id} ---")
+
         if not BROWSERLESS_API_TOKEN:
+            print("[DEBUG-SCRAPER] ❌ ERREUR: Token Browserless manquant.")
             return None
 
         match_url = f"https://www.livescore.in/fr/match/{event_id}/"
+        print(f"[DEBUG-SCRAPER] 🔗 URL cible : {match_url}")
+
         payload = {"url": match_url}
         
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(BROWSERLESS_CONTENT_API_URL, json=payload, timeout=30) as response:
-                    if response.status != 200: return None
+                    print(f"[DEBUG-SCRAPER] STATUS HTTP: {response.status}")
+                    if response.status != 200:
+                        print(f"[DEBUG-SCRAPER] ❌ Échec du chargement de la page. L'ID '{event_id}' est peut-être incorrect.")
+                        return None
                     html = await response.text()
             
             soup = BeautifulSoup(html, 'html.parser')
-        
+            
+            # Étape 1: Chercher le statut "Terminé"
+            print("[DEBUG-SCRAPER] 1. Recherche du statut 'Terminé' (div.detail-finished)...")
             status_elem = soup.find('div', class_='detail-finished')
+            
+            if not status_elem:
+                print("[DEBUG-SCRAPER] ❌ Statut 'Terminé' NON trouvé. Le match n'est peut-être pas fini ou la structure a changé.")
+                return None
+            
+            print("[DEBUG-SCRAPER] ✅ Statut 'Terminé' trouvé !")
 
-            if status_elem:
+            # Étape 2: Chercher les scores
+            print("[DEBUG-SCRAPER] 2. Recherche des scores (div.duelParticipant__score)...")
+            score_elems = soup.select('div.duelParticipant__score')
+            print(f"[DEBUG-SCRAPER] 📊 {len(score_elems)} élément(s) de score trouvés.")
 
-                score_elems = soup.select('div.duelParticipant__score')
+            if len(score_elems) < 2:
+                print("[DEBUG-SCRAPER] ❌ Moins de 2 scores trouvés. Impossible de déterminer le résultat.")
+                return None
+            
+            score1 = score_elems[0].get_text(strip=True)
+            score2 = score_elems[1].get_text(strip=True)
+            print(f"[DEBUG-SCRAPER] ✅ Scores extraits : Domicile='{score1}', Extérieur='{score2}'")
 
-                if len(score_elems) >= 2:
-                    # Le premier score est l'équipe à domicile, le deuxième est l'équipe à l'extérieur
-                    score1 = score_elems[0].get_text(strip=True)
-                    score2 = score_elems[1].get_text(strip=True)
-                    
-                    if score1.isdigit() and score2.isdigit():
-                        return f"{score1}-{score2}"
+            if score1.isdigit() and score2.isdigit():
+                final_score = f"{score1}-{score2}"
+                print(f"[DEBUG-SCRAPER] ✅ Résultat final validé : {final_score}")
+                print(f"--- [DEBUG-SCRAPER] Fin du traitement pour {event_id} ---")
+                return final_score
+            else:
+                print(f"[DEBUG-SCRAPER] ❌ Les scores extraits ('{score1}', '{score2}') ne sont pas des nombres.")
+                return None
                         
         except asyncio.TimeoutError:
             print(f"❌ (RESULTS) Timeout pour le match {event_id}")
         except Exception as e:
             print(f"❌ (RESULTS) Erreur scraping résultat pour {event_id}: {type(e).__name__}")
             
+        print(f"--- [DEBUG-SCRAPER] Fin du traitement (sans succès) pour {event_id} ---")
         return None
 
     async def update_discord_event_with_result(self, discord_event_id, team1, team2, score):
