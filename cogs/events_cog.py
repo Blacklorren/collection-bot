@@ -257,7 +257,7 @@ class EventsCog(commands.Cog):
         except Exception as e:
             print(f"❌ (MATCHES) Erreur critique dans la boucle des matchs: {e}")
 
-        async def get_match_result(self, event_id):
+    async def get_match_result(self, event_id):
         """Récupère le résultat d'un match spécifique en cherchant explicitement le statut 'Terminé'."""
         
         print(f"\n--- [DEBUG-SCRAPER] Début du traitement pour l'event_id : {event_id} ---")
