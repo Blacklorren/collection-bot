@@ -613,3 +613,15 @@ def determine_journee_from_matches(matches):
             new_numero = last_numero + 1
             journee_id = create_or_update_journee(new_numero, min_date, max_date)
             return journee_id, new_numero
+
+def get_matches_to_check_results(since_date):
+    """Récupère les matchs sans résultat depuis une certaine date."""
+    with sqlite3.connect(DB_NAME) as con:
+        con.row_factory = sqlite3.Row
+        cur = con.cursor()
+        cur.execute("""
+            SELECT * FROM matchs
+            WHERE resultat IS NULL AND date_match >= ?
+            ORDER BY date_match ASC
+        """, (since_date.isoformat(),))
+        return cur.fetchall()
