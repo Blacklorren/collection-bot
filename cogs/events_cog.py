@@ -162,20 +162,13 @@ class EventsCog(commands.Cog):
                     day, month = map(int, date_part.split('.')[:2])
                     hour, minute = map(int, time_part.split(':'))
                     
-                    # Déterminer la bonne année pour le match
                     year = now.year
                     match_date = date(year, month, day)
-                    # Si la date du match est déjà passée, on suppose que c'est l'année suivante
                     if match_date < now.date():
                         match_date = match_date.replace(year=year + 1)
                         
-                    # 1. On crée l'heure sans se poser de question (ex: "20:00")
                     match_datetime_naive = datetime.combine(match_date, datetime.min.time()).replace(hour=hour, minute=minute)
-
-                    # 2. ICI, on met une "étiquette" claire : c'est l'heure de Paris !
                     match_datetime_paris = paris_tz.localize(match_datetime_naive)
-                    
-                    # 3. Maintenant qu'il n'y a plus de doute, on convertit pour Discord
                     match_datetime_utc = match_datetime_paris.astimezone(timezone.utc)
 
                     team1 = container.find(class_="event__participant--home").get_text(strip=True)
@@ -264,40 +257,6 @@ class EventsCog(commands.Cog):
         except Exception as e:
             print(f"❌ (MATCHES) Erreur critique dans la boucle des matchs: {e}")
 
-    @tasks.loop(seconds=RESULTS_CHECK_INTERVAL)
-    async def check_results_loop(self):
-        """Vérifie et met à jour les résultats des matchs terminés."""
-        paris_tz = pytz.timezone('Europe/Paris')
-        now_paris = datetime.now(paris_tz)
-        
-        if not (16 <= now_paris.hour < 24):
-            print(f"ℹ️ (RESULTS) Hors des heures de match ({now_paris.strftime('%H:%M')}). Vérification ignorée.")
-            return
-
-        print("🔍 (RESULTS) Vérification des résultats (période active)...")
-        now_utc = datetime.now(timezone.utc)
-        matches_to_check = database.get_matches_to_check_results(now_utc - timedelta(hours=2))
-        
-        if not matches_to_check:
-            print("ℹ️ (RESULTS) Aucun match terminé à vérifier pour le moment.")
-            return
-
-        pronos_cog = self.bot.get_cog('PronosticsCog')
-        
-        for match_row in matches_to_check:
-            match = dict(match_row)
-            try:
-                result = await self.get_match_result(match['event_id'])
-                if result and pronos_cog:
-                    print(f"✅ (RESULTS) Résultat trouvé: {match['equipe1']} {result} {match['equipe2']}")
-                    pronos_cog.process_match_result(match['id'], result)
-                    await self.update_discord_event_with_result(
-                        match['discord_event_id'], match['equipe1'], match['equipe2'], result
-                    )
-                    await asyncio.sleep(2)
-            except Exception as e:
-                print(f"❌ (RESULTS) Erreur vérification résultat pour match {match['id']}: {e}")
-
     async def get_match_result(self, event_id):
         """Récupère le résultat d'un match spécifique via Browserless."""
         if not BROWSERLESS_API_TOKEN:
@@ -354,6 +313,57 @@ class EventsCog(commands.Cog):
              print(f"⚠️ (RESULTS) Événement Discord {discord_event_id} non trouvé.")
         except Exception as e:
             print(f"❌ (RESULTS) Erreur mise à jour événement {discord_event_id}: {e}")
+    
+    # --- DÉBUT DES MODIFICATIONS ---
+
+    async def _internal_check_and_process_results(self):
+        """
+        La logique de base pour vérifier et traiter les résultats.
+        Cette fonction est réutilisable par la boucle et la commande manuelle.
+        """
+        print("🔍 (RESULTS) Lancement de la vérification des résultats...")
+        now_utc = datetime.now(timezone.utc)
+        # On vérifie les matchs qui auraient dû se terminer dans les dernières 24h
+        matches_to_check = database.get_matches_to_check_results(now_utc - timedelta(hours=24))
+        
+        if not matches_to_check:
+            print("ℹ️ (RESULTS) Aucun match terminé à vérifier pour le moment.")
+            return 0 # Retourne 0 match traité
+
+        pronos_cog = self.bot.get_cog('PronosticsCog')
+        processed_count = 0
+        
+        for match_row in matches_to_check:
+            match = dict(match_row)
+            try:
+                result = await self.get_match_result(match['event_id'])
+                if result and pronos_cog:
+                    print(f"✅ (RESULTS) Résultat trouvé: {match['equipe1']} {result} {match['equipe2']}")
+                    pronos_cog.process_match_result(match['id'], result)
+                    await self.update_discord_event_with_result(
+                        match['discord_event_id'], match['equipe1'], match['equipe2'], result
+                    )
+                    processed_count += 1
+                    await asyncio.sleep(2) # Garder une pause pour ne pas surcharger les APIs
+            except Exception as e:
+                print(f"❌ (RESULTS) Erreur vérification résultat pour match {match['id']}: {e}")
+        
+        print(f"📊 (RESULTS) Fin de la vérification. {processed_count} match(s) traité(s).")
+        return processed_count
+
+    @tasks.loop(seconds=RESULTS_CHECK_INTERVAL)
+    async def check_results_loop(self):
+        """Vérifie et met à jour les résultats des matchs terminés PENDANT les heures de match."""
+        paris_tz = pytz.timezone('Europe/Paris')
+        now_paris = datetime.now(paris_tz)
+        
+        # La contrainte horaire ne s'applique QU'À la boucle automatique
+        if not (16 <= now_paris.hour < 24):
+            # On ne logue plus pour éviter le spam
+            # print(f"ℹ️ (RESULTS) Hors des heures de match ({now_paris.strftime('%H:%M')}). Vérification auto ignorée.")
+            return
+
+        await self._internal_check_and_process_results()
 
     @check_rss_loop.before_loop
     @check_matches_loop.before_loop
@@ -395,11 +405,12 @@ class EventsCog(commands.Cog):
     @commands.command(name='checkresults', aliases=['cr'])
     @commands.has_permissions(administrator=True)
     async def check_results_command(self, ctx):
-        """Force la vérification des résultats (admin uniquement)."""
-        await ctx.send("🔄 Vérification forcée des résultats en cours...", ephemeral=True, delete_after=5)
+        """[Admin] Force la vérification des résultats, même en dehors des heures de match."""
+        await ctx.send("🔄 Forçage de la vérification des résultats en cours...", ephemeral=True, delete_after=10)
         async with ctx.typing():
-            await self.check_results_loop.coro(self)
-        await ctx.send("✅ Vérification des résultats terminée!", ephemeral=True)
+            # On appelle directement la logique interne, en ignorant la contrainte horaire
+            count = await self._internal_check_and_process_results()
+        await ctx.send(f"✅ Vérification terminée ! **{count}** match(s) ont été traités.", ephemeral=True)
 
     @commands.command(name='debughtml')
     @commands.has_permissions(administrator=True)
