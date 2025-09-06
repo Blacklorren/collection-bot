@@ -258,7 +258,7 @@ class EventsCog(commands.Cog):
             print(f"❌ (MATCHES) Erreur critique dans la boucle des matchs: {e}")
 
     async def get_match_result(self, event_id):
-        """Récupère le résultat d'un match en ciblant spécifiquement le bloc d'en-tête."""
+        """Récupère le résultat d'un match en ciblant spécifiquement le conteneur de détail."""
         
         print(f"\n--- [DEBUG-SCRAPER] Début du traitement pour l'event_id : {event_id} ---")
         match_url = f"https://www.livescore.in/fr/match/{event_id}/"
@@ -274,29 +274,31 @@ class EventsCog(commands.Cog):
             
             soup = BeautifulSoup(html, 'html.parser')
 
-            # 1. On isole d'abord le bloc d'en-tête du match. C'est notre zone de recherche.
-            print("[DEBUG-SCRAPER] 1. Recherche du conteneur principal (div.detailHeader)...")
-            detail_header = soup.find('div', class_='detailHeader')
+            # --- CORRECTION FINALE : Utilisation du bon conteneur 'container__detail' ---
 
-            if not detail_header:
+            # 1. On isole le bon conteneur du match.
+            print("[DEBUG-SCRAPER] 1. Recherche du conteneur principal (div.container__detail)...")
+            detail_container = soup.find('div', class_='container__detail')
+
+            if not detail_container:
                 print("[DEBUG-SCRAPER] ❌ Conteneur principal NON trouvé. La structure de la page a changé.")
                 return None
             
             print("[DEBUG-SCRAPER] ✅ Conteneur principal trouvé.")
 
-            # 2. On cherche le mot "Terminé" UNIQUEMENT à l'intérieur de ce bloc.
+            # 2. On cherche le mot "Terminé" UNIQUEMENT à l'intérieur de ce conteneur.
             print("[DEBUG-SCRAPER] 2. Recherche du texte 'Terminé' DANS le conteneur...")
-            status_text = detail_header.find(string=re.compile(r'Terminé'))
+            status_text = detail_container.find(string=re.compile(r'Terminé'))
 
             if not status_text:
-                print("[DEBUG-SCRAPER] ❌ Statut 'Terminé' NON trouvé dans le conteneur principal. Le match n'est pas fini.")
+                print("[DEBUG-SCRAPER] ❌ Statut 'Terminé' NON trouvé dans le conteneur. Le match n'est pas fini.")
                 return None
             
             print("[DEBUG-SCRAPER] ✅ Statut 'Terminé' trouvé dans le conteneur.")
 
-            # 3. On cherche les scores UNIQUEMENT à l'intérieur de ce même bloc.
+            # 3. On cherche les scores UNIQUEMENT à l'intérieur de ce même conteneur.
             print("[DEBUG-SCRAPER] 3. Recherche des scores (div.duelParticipant__score) DANS le conteneur...")
-            score_elems = detail_header.select('div.duelParticipant__score')
+            score_elems = detail_container.select('div.duelParticipant__score')
             print(f"[DEBUG-SCRAPER] 📊 {len(score_elems)} élément(s) de score trouvés.")
 
             if len(score_elems) < 2:
