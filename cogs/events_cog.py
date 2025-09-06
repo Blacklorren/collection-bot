@@ -258,7 +258,7 @@ class EventsCog(commands.Cog):
             print(f"❌ (MATCHES) Erreur critique dans la boucle des matchs: {e}")
 
     async def get_match_result(self, event_id):
-        """Récupère le résultat d'un match en ciblant spécifiquement le conteneur de détail."""
+        """Récupère le résultat d'un match en utilisant les sélecteurs confirmés."""
         
         print(f"\n--- [DEBUG-SCRAPER] Début du traitement pour l'event_id : {event_id} ---")
         match_url = f"https://www.livescore.in/fr/match/{event_id}/"
@@ -274,48 +274,42 @@ class EventsCog(commands.Cog):
             
             soup = BeautifulSoup(html, 'html.parser')
 
-            # --- CORRECTION FINALE : Utilisation du bon conteneur 'container__detail' ---
+            # --- CORRECTION FINALE : Utilisation des classes exactes ---
 
-            # 1. On isole le bon conteneur du match.
-            print("[DEBUG-SCRAPER] 1. Recherche du conteneur principal (div.container__detail)...")
-            detail_container = soup.find('div', class_='container__detail')
+            # 1. On cherche d'abord le statut "Terminé". Il doit exister pour continuer.
+            # On cible précisément le span avec la classe que vous aviez identifiée.
+            print("[DEBUG-SCRAPER] 1. Recherche du statut (span.fixedHeaderDuel__detailStatus)...")
+            status_elem = soup.find('span', class_='fixedHeaderDuel__detailStatus')
 
-            if not detail_container:
-                print("[DEBUG-SCRAPER] ❌ Conteneur principal NON trouvé. La structure de la page a changé.")
+            if not status_elem or "Terminé" not in status_elem.get_text():
+                print("[DEBUG-SCRAPER] ❌ Statut 'Terminé' NON trouvé. Le match n'est pas fini.")
                 return None
             
-            print("[DEBUG-SCRAPER] ✅ Conteneur principal trouvé.")
+            print("[DEBUG-SCRAPER] ✅ Statut 'Terminé' trouvé !")
 
-            # 2. On cherche le mot "Terminé" UNIQUEMENT à l'intérieur de ce conteneur.
-            print("[DEBUG-SCRAPER] 2. Recherche du texte 'Terminé' DANS le conteneur...")
-            status_text = detail_container.find(string=re.compile(r'Terminé'))
-
-            if not status_text:
-                print("[DEBUG-SCRAPER] ❌ Statut 'Terminé' NON trouvé dans le conteneur. Le match n'est pas fini.")
-                return None
+            # 2. Si le match est terminé, on cherche le conteneur des scores.
+            print("[DEBUG-SCRAPER] 2. Recherche du conteneur de score (div.detailScore__wrapper)...")
+            score_wrapper = soup.find('div', class_='detailScore__wrapper')
             
-            print("[DEBUG-SCRAPER] ✅ Statut 'Terminé' trouvé dans le conteneur.")
-
-            # 3. On cherche les scores UNIQUEMENT à l'intérieur de ce même conteneur.
-            print("[DEBUG-SCRAPER] 3. Recherche des scores (div.duelParticipant__score) DANS le conteneur...")
-            score_elems = detail_container.select('div.duelParticipant__score')
-            print(f"[DEBUG-SCRAPER] 📊 {len(score_elems)} élément(s) de score trouvés.")
-
-            if len(score_elems) < 2:
-                print("[DEBUG-SCRAPER] ❌ Moins de 2 scores trouvés dans le conteneur.")
+            if not score_wrapper:
+                print("[DEBUG-SCRAPER] ❌ Conteneur de score NON trouvé.")
                 return None
+                
+            print("[DEBUG-SCRAPER] ✅ Conteneur de score trouvé.")
+
+            # 3. On extrait les scores de ce conteneur.
+            scores = [span.get_text(strip=True) for span in score_wrapper.find_all('span') if span.get_text(strip=True).isdigit()]
+            print(f"[DEBUG-SCRAPER] 📊 {len(scores)} score(s) numérique(s) extrait(s) : {scores}")
             
-            score1 = score_elems[0].get_text(strip=True)
-            score2 = score_elems[1].get_text(strip=True)
-            print(f"[DEBUG-SCRAPER] ✅ Scores extraits : Domicile='{score1}', Extérieur='{score2}'")
-
-            if score1.isdigit() and score2.isdigit():
-                final_score = f"{score1}-{score2}"
-                print(f"[DEBUG-SCRAPER] ✅ Résultat final validé : {final_score}")
-                return final_score
-            else:
-                print(f"[DEBUG-SCRAPER] ❌ Les scores extraits ne sont pas des nombres.")
+            if len(scores) < 2:
+                print("[DEBUG-SCRAPER] ❌ Moins de 2 scores numériques trouvés.")
                 return None
+
+            score1 = scores[0]
+            score2 = scores[1]
+            final_score = f"{score1}-{score2}"
+            print(f"[DEBUG-SCRAPER] ✅ Résultat final validé : {final_score}")
+            return final_score
                         
         except asyncio.TimeoutError:
             print(f"❌ (RESULTS) Timeout pour le match {event_id}")
