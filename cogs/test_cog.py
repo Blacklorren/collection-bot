@@ -148,20 +148,25 @@ class TestCog(commands.Cog):
     # --- LES AUTRES COMMANDES RESTENT INCHANGÉES ---
     
     @test_group.command(name='savehtml')
-    async def save_html_command(self, ctx):
-        await ctx.send(f"📄 **Récupération du HTML depuis `{LIVESCORE_URL}`...**")
+    async def save_html_command(self, ctx, url: str):
+        """[Admin] Récupère et sauvegarde le HTML d'une URL spécifique via Browserless."""
+        await ctx.send(f"📄 **Récupération du HTML depuis `{url}`...**")
         if not BROWSERLESS_API_TOKEN:
             await ctx.send("❌ **Échec config :** Token Browserless manquant."); return
-        payload = {"url": LIVESCORE_URL}
+        
+        # L'URL est maintenant un argument de la commande
+        payload = {"url": url}
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(BROWSERLESS_CONTENT_API_URL, json=payload, timeout=45) as response:
                     if response.status != 200:
                         await ctx.send(f"❌ **Échec de l'API (Status: {response.status})**"); return
                     html = await response.text()
+            
             filename = "debug_page.html"
             with open(filename, "w", encoding="utf-8") as f: f.write(html)
-            await ctx.send(content="✅ **Voici le fichier HTML brut reçu.**", file=discord.File(filename))
+            
+            await ctx.send(content="✅ **Voici le fichier HTML brut que le bot a reçu.** Analysez-le pour corriger le scraping.", file=discord.File(filename))
             os.remove(filename)
         except Exception as e:
             await ctx.send(f"❌ **Erreur :** `{type(e).__name__}: {e}`")
