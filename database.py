@@ -638,8 +638,7 @@ def get_user_correct_pronostics(user_id):
                 m.equipe1,
                 m.equipe2,
                 m.date_match,
-                m.resultat,
-                p.points_obtenus
+                m.resultat
             FROM pronostics p
             JOIN matchs m ON p.match_id = m.id
             WHERE p.user_id = ? AND p.pronostic = m.resultat AND m.resultat IS NOT NULL
