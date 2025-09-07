@@ -171,6 +171,8 @@ class EventsCog(commands.Cog):
                     match_datetime_paris = paris_tz.localize(match_datetime_naive)
                     match_datetime_utc = match_datetime_paris.astimezone(timezone.utc)
 
+                    match_datetime_utc = match_datetime_paris.astimezone(pytz.utc)
+                    
                     team1 = container.find(class_="event__participant--home").get_text(strip=True)
                     team2 = container.find(class_="event__participant--away").get_text(strip=True)
                     match_id_raw = container.get('id', '')
@@ -179,6 +181,7 @@ class EventsCog(commands.Cog):
                     if not all([team1, team2, match_id]):
                         continue
 
+                    now_utc = datetime.now(pytz.utc)
                     limit_date_utc = datetime.now(timezone.utc) + timedelta(days=5)
                     if now.astimezone(timezone.utc) < match_datetime_utc < limit_date_utc:
                         matches.append({
