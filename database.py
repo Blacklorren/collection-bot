@@ -633,6 +633,7 @@ def get_user_correct_pronostics(user_id):
     with sqlite3.connect(DB_NAME) as con:
         con.row_factory = sqlite3.Row
         cur = con.cursor()
+        # On retire la colonne points_obtenus qui n'existe pas
         cur.execute("""
             SELECT
                 m.equipe1,
