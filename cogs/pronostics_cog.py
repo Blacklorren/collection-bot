@@ -353,17 +353,25 @@ class PronosticsCog(commands.Cog):
     async def classement_command(self, ctx):
         """Affiche le classement provisoire de la semaine en cours."""
         start, end = database.get_week_dates(date.today())
-        matchs = database.get_matches_in_date_range(start, end)
+        all_matches_this_week = database.get_matches_in_date_range(start, end)
         
-        if not matchs:
+        if not all_matches_this_week:
             await ctx.send("Aucun match programmé pour la semaine en cours.", ephemeral=True)
             return
 
-        match_ids = [m['id'] for m in matchs]
+        # Filtrer uniquement les matchs qui ont un résultat
+        finished_matches = [m for m in all_matches_this_week if m.get('resultat') is not None]
+
+        if not finished_matches:
+            await ctx.send("Aucun match n'est encore terminé cette semaine pour établir un classement.", ephemeral=True)
+            return
+
+        # Utiliser uniquement les IDs des matchs terminés pour le classement
+        match_ids = [m['id'] for m in finished_matches]
         leaderboard = database.get_leaderboard_for_matches(match_ids)
         
         if not leaderboard:
-            await ctx.send("Aucun pronostic correct pour la semaine en cours.", ephemeral=True)
+            await ctx.send("Aucun pronostic correct pour les matchs terminés de la semaine.", ephemeral=True)
             return
 
         embed = discord.Embed(
@@ -380,10 +388,12 @@ class PronosticsCog(commands.Cog):
             member_name = member.display_name if member else f"Utilisateur Inconnu ({user_id})"
             
             emoji = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"**#{rank}**"
-            classement_text += f"{emoji} **{member_name}** - {bons_pronos}/{len(matchs)} ({total_points} pts)\n"
+            # Correction : Utiliser la longueur de la liste des matchs terminés
+            classement_text += f"{emoji} **{member_name}** - {bons_pronos}/{len(finished_matches)} ({total_points} pts)\n"
         
         embed.add_field(name="Top 10 Provisoire", value=classement_text, inline=False)
         await ctx.send(embed=embed)
+
 
     @commands.command(name='pendingmatches')
     @commands.has_permissions(manage_guild=True)
