@@ -447,7 +447,7 @@ class PronosticsCog(commands.Cog):
         except Exception as e:
             await ctx.send(f"❌ Une erreur est survenue. L'ID de match `{match_id}` est-il correct ? Erreur: `{e}`", ephemeral=True)
             
-    # --- NOUVELLE COMMANDE AJOUTÉE ---
+    # --- COMMANDE CORRIGÉE ---
     @commands.command(name='userpronos')
     @commands.has_permissions(manage_guild=True)
     async def user_pronos_command(self, ctx, membre: discord.Member):
@@ -459,7 +459,8 @@ class PronosticsCog(commands.Cog):
                 await ctx.send(f"Cet utilisateur n'a aucun pronostic correct enregistré.", ephemeral=True)
                 return
             
-            total_points = sum(p['points_obtenus'] for p in correct_pronos)
+            # On calcule le total des points en se basant sur la constante
+            total_points = len(correct_pronos) * POINTS_BON_PRONO
             
             embed = discord.Embed(
                 title=f"✅ Pronostics Corrects pour {membre.display_name}",
@@ -480,7 +481,8 @@ class PronosticsCog(commands.Cog):
 
                 description_text += (
                     f"**{prono['equipe1']} vs {prono['equipe2']}** ({match_time.strftime('%d/%m')})\n"
-                    f"↳ Résultat: {result_emoji} | Points gagnés: **{prono['points_obtenus']}**\n"
+                    # On affiche la constante de points au lieu de chercher dans la BDD
+                    f"↳ Résultat: {result_emoji} | Points gagnés: **{POINTS_BON_PRONO}**\n"
                 )
                 
             embed.add_field(name="Détails des 15 derniers pronostics corrects", value=description_text, inline=False)
