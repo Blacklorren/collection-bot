@@ -625,3 +625,24 @@ def get_matches_to_check_results(since_date):
             ORDER BY date_match ASC
         """, (since_date.isoformat(),))
         return cur.fetchall()
+
+def get_user_correct_pronostics(user_id):
+    """
+    Récupère tous les pronostics corrects d'un utilisateur avec les détails du match.
+    """
+    with sqlite3.connect(DB_NAME) as con:
+        con.row_factory = sqlite3.Row
+        cur = con.cursor()
+        cur.execute("""
+            SELECT
+                m.equipe1,
+                m.equipe2,
+                m.date_match,
+                m.resultat,
+                p.points_obtenus
+            FROM pronostics p
+            JOIN matchs m ON p.match_id = m.id
+            WHERE p.user_id = ? AND p.pronostic = m.resultat AND m.resultat IS NOT NULL
+            ORDER BY m.date_match DESC
+        """, (user_id,))
+        return cur.fetchall()
