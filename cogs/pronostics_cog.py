@@ -359,8 +359,9 @@ class PronosticsCog(commands.Cog):
             await ctx.send("Aucun match programmé pour la semaine en cours.", ephemeral=True)
             return
 
-        # Filtrer uniquement les matchs qui ont un résultat
-        finished_matches = [m for m in all_matches_this_week if m.get('resultat') is not None]
+        # --- CORRECTION APPLIQUÉE ICI ---
+        # Filtrer uniquement les matchs qui ont un résultat en utilisant la bonne syntaxe
+        finished_matches = [m for m in all_matches_this_week if m['resultat'] is not None]
 
         if not finished_matches:
             await ctx.send("Aucun match n'est encore terminé cette semaine pour établir un classement.", ephemeral=True)
@@ -393,7 +394,6 @@ class PronosticsCog(commands.Cog):
         
         embed.add_field(name="Top 10 Provisoire", value=classement_text, inline=False)
         await ctx.send(embed=embed)
-
 
     @commands.command(name='pendingmatches')
     @commands.has_permissions(manage_guild=True)
@@ -446,6 +446,50 @@ class PronosticsCog(commands.Cog):
 
         except Exception as e:
             await ctx.send(f"❌ Une erreur est survenue. L'ID de match `{match_id}` est-il correct ? Erreur: `{e}`", ephemeral=True)
+            
+    # --- NOUVELLE COMMANDE AJOUTÉE ---
+    @commands.command(name='userpronos')
+    @commands.has_permissions(manage_guild=True)
+    async def user_pronos_command(self, ctx, membre: discord.Member):
+        """[Admin] Affiche les pronostics corrects d'un utilisateur et les points gagnés."""
+        try:
+            correct_pronos = database.get_user_correct_pronostics(membre.id)
+            
+            if not correct_pronos:
+                await ctx.send(f"Cet utilisateur n'a aucun pronostic correct enregistré.", ephemeral=True)
+                return
+            
+            total_points = sum(p['points_obtenus'] for p in correct_pronos)
+            
+            embed = discord.Embed(
+                title=f"✅ Pronostics Corrects pour {membre.display_name}",
+                description=f"**Total :** {len(correct_pronos)} pronostics corrects / **{total_points}** points gagnés.",
+                color=discord.Color.green()
+            )
+            
+            description_text = ""
+            # On limite l'affichage aux 15 plus récents pour éviter de dépasser les limites de Discord
+            for prono in correct_pronos[:15]:
+                match_time = datetime.fromisoformat(prono['date_match']).astimezone(pytz.timezone('Europe/Paris'))
+                
+                # Traduire le résultat en emoji pour la lisibilité
+                result_emoji = "❓"
+                if prono['resultat'] == '1': result_emoji = EMOJI_VICTOIRE_1
+                elif prono['resultat'] == 'N': result_emoji = EMOJI_NUL
+                elif prono['resultat'] == '2': result_emoji = EMOJI_VICTOIRE_2
+
+                description_text += (
+                    f"**{prono['equipe1']} vs {prono['equipe2']}** ({match_time.strftime('%d/%m')})\n"
+                    f"↳ Résultat: {result_emoji} | Points gagnés: **{prono['points_obtenus']}**\n"
+                )
+                
+            embed.add_field(name="Détails des 15 derniers pronostics corrects", value=description_text, inline=False)
+            
+            await ctx.send(embed=embed, ephemeral=True)
+            
+        except Exception as e:
+            await ctx.send(f"❌ Une erreur est survenue lors de la récupération des pronostics : `{e}`", ephemeral=True)
+
 
 async def setup(bot):
     await bot.add_cog(PronosticsCog(bot))
