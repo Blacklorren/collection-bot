@@ -1718,7 +1718,7 @@
     "id": 249,
     "nom": "Jeremi PIRANI",
     "club": "Tremblay",
-    "rarete": "Commune",
+    "rarete": "Commun",
     "image_url": "https://i.imgur.com/r376WIP.png"
   },
        {
@@ -1743,7 +1743,7 @@
     "image_url": "https://i.imgur.com/BK0w3TI.png"
   },
       {
-    "id": 252,
+    "id": 253,
     "nom": "Ante Kuduz",
     "club": "Dijon",
     "rarete": "Rare",
