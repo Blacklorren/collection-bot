@@ -170,8 +170,6 @@ class EventsCog(commands.Cog):
                     match_datetime_naive = datetime.combine(match_date, datetime.min.time()).replace(hour=hour, minute=minute)
                     match_datetime_paris = paris_tz.localize(match_datetime_naive)
                     match_datetime_utc = match_datetime_paris.astimezone(timezone.utc)
-
-                    match_datetime_utc = match_datetime_paris.astimezone(pytz.utc)
                     
                     team1 = container.find(class_="event__participant--home").get_text(strip=True)
                     team2 = container.find(class_="event__participant--away").get_text(strip=True)
