@@ -18,10 +18,10 @@ CHECK_INTERVAL = 1800  # 30 minutes pour RSS
 
 # --- FRÉQUENCES OPTIMISÉES ---
 LIVESCORE_URL = "https://www.livescore.in/fr/handball/france/starligue/"
-# Vérification des nouveaux matchs toutes les 6 heures
-MATCH_CHECK_INTERVAL = 21600
-# Lancement de la boucle de résultats toutes les 30 minutes (avec un filtre horaire à l'intérieur)
-RESULTS_CHECK_INTERVAL = 1800
+# Vérification des nouveaux matchs toutes les 24 heures
+MATCH_CHECK_INTERVAL = 86400
+# Lancement de la boucle de résultats toutes les 2 heures (avec un filtre horaire à l'intérieur)
+RESULTS_CHECK_INTERVAL = 7200
 
 # --- Configuration Browserless ---
 BROWSERLESS_API_TOKEN = os.getenv('BROWSERLESS_API_TOKEN')
