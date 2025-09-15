@@ -615,15 +615,19 @@ def determine_journee_from_matches(matches):
             return journee_id, new_numero
 
 def get_matches_to_check_results(since_date):
-    """Récupère les matchs sans résultat depuis une certaine date."""
+    """Récupère les matchs PASSÉS sans résultat depuis une certaine date."""
     with sqlite3.connect(DB_NAME) as con:
         con.row_factory = sqlite3.Row
         cur = con.cursor()
+        # On ajoute la condition que la date du match doit être passée
+        now_utc_iso = datetime.now(timezone.utc).isoformat()
         cur.execute("""
             SELECT * FROM matchs
-            WHERE resultat IS NULL AND date_match >= ?
+            WHERE resultat IS NULL 
+            AND date_match >= ? 
+            AND date_match < ?
             ORDER BY date_match ASC
-        """, (since_date.isoformat(),))
+        """, (since_date.isoformat(), now_utc_iso))
         return cur.fetchall()
 
 def get_user_correct_pronostics(user_id):
