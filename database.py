@@ -675,7 +675,7 @@ def get_general_leaderboard(points_per_win, limit=10):
                 COUNT(p.user_id) * ? AS total_points
             FROM pronostics p
             JOIN matchs m ON p.match_id = m.id
-            WHERE p.prono = m.resultat AND m.resultat IS NOT NULL
+            WHERE p.pronostic = m.resultat AND m.resultat IS NOT NULL
             GROUP BY p.user_id
             ORDER BY total_points DESC, bons_pronos DESC
             LIMIT ?
