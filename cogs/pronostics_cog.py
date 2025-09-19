@@ -203,60 +203,75 @@ class PronosticsCog(commands.Cog):
     # NOUVELLE TÂCHE pour le résumé hebdomadaire
     @tasks.loop(hours=1)
     async def publish_weekly_summary(self):
-        """Vérifie chaque heure si on est lundi matin pour publier le classement de la semaine passée."""
+        """Vérifie chaque heure si on est lundi matin pour publier les classements."""
         now = datetime.now(pytz.timezone('Europe/Paris'))
         # On exécute le lundi à 10h du matin
         if now.weekday() == 0 and now.hour == 10:
-            print("📅 (PRONOS) Lundi 10h, génération du classement hebdomadaire...")
+            print("📅 (PRONOS) Lundi 10h, génération des classements...")
             
-            # 1. Récupérer les dates de la semaine dernière
-            today = date.today()
-            last_week_day = today - timedelta(days=7)
-            start, end = database.get_week_dates(last_week_day)
-
-            # 2. Récupérer les matchs de la semaine dernière
-            matches = database.get_matches_in_date_range(start, end)
-            if not matches:
-                print("ℹ️ (PRONOS) Aucun match la semaine dernière. Pas de classement à publier.")
-                return
-
-            all_finished = all(match['resultat'] is not None for match in matches)
-            if not all_finished:
-                print("⚠️ (PRONOS) Tous les résultats de la semaine passée ne sont pas encore disponibles.")
-                return
-
-            # 3. Calculer le classement
-            match_ids = [m['id'] for m in matches]
-            leaderboard = database.get_leaderboard_for_matches(match_ids)
-            
-            if not leaderboard:
-                print("ℹ️ (PRONOS) Aucun pronostic correct la semaine dernière.")
-                return
-
-            # 4. Créer et envoyer l'embed
+            # --- Préparation de l'embed principal ---
             embed = discord.Embed(
-                title=f"🏆 Classement de la Semaine du {start.strftime('%d/%m')} au {end.strftime('%d/%m')}",
-                description="Voici les meilleurs pronostiqueurs de la semaine passée !",
+                title="🏆 Bilan des Pronostics 🏆",
+                description="Voici le résumé des performances de la semaine passée et le classement général à jour.",
                 color=discord.Color.gold(),
                 timestamp=datetime.now(timezone.utc)
             )
+
+            # --- 1. CLASSEMENT HEBDOMADAIRE ---
+            today = date.today()
+            last_week_day = today - timedelta(days=7)
+            start, end = database.get_week_dates(last_week_day)
+            matches = database.get_matches_in_date_range(start, end)
             
-            classement_text = ""
-            for rank, row in enumerate(leaderboard[:10], 1):
-                user_id, bons_pronos, total_points = row['user_id'], row['bons_pronos'], row['total_points']
-                member = self.bot.get_user(user_id)
-                member_name = member.display_name if member else f"Utilisateur {user_id}"
+            if not matches or not all(m['resultat'] for m in matches):
+                embed.add_field(
+                    name=f"Classement de la Semaine ({start.strftime('%d/%m')} au {end.strftime('%d/%m')})",
+                    value="Aucun match terminé la semaine dernière pour établir un classement.",
+                    inline=False
+                )
+            else:
+                match_ids = [m['id'] for m in matches]
+                weekly_leaderboard = database.get_leaderboard_for_matches(match_ids)
                 
-                emoji = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"**#{rank}**"
-                classement_text += f"{emoji} **{member_name}** - {bons_pronos}/{len(matches)} ({total_points} pts)\n"
+                weekly_text = "Aucun pronostic correct la semaine dernière."
+                if weekly_leaderboard:
+                    weekly_text = ""
+                    for rank, row in enumerate(weekly_leaderboard[:10], 1):
+                        user = self.bot.get_user(row['user_id'])
+                        name = user.display_name if user else f"Utilisateur {row['user_id']}"
+                        emoji = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"**#{rank}**"
+                        weekly_text += f"{emoji} **{name}** - {row['bons_pronos']}/{len(matches)} ({row['total_points']} pts)\n"
+                
+                embed.add_field(
+                    name=f"🏆 Top 10 de la Semaine ({start.strftime('%d/%m')} - {end.strftime('%d/%m')})",
+                    value=weekly_text,
+                    inline=False
+                )
+
+            # --- 2. CLASSEMENT GÉNÉRAL ---
+            general_leaderboard = database.get_general_leaderboard(POINTS_BON_PRONO, limit=10)
             
-            embed.add_field(name="Top 10", value=classement_text, inline=False)
+            general_text = "Aucun pronostic correct enregistré pour le moment."
+            if general_leaderboard:
+                general_text = ""
+                for rank, row in enumerate(general_leaderboard, 1):
+                    user = self.bot.get_user(row['user_id'])
+                    name = user.display_name if user else f"Utilisateur {row['user_id']}"
+                    emoji = "👑" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"**#{rank}**"
+                    general_text += f"{emoji} **{name}** - {row['total_points']} pts ({row['bons_pronos']} corrects)\n"
+
+            embed.add_field(
+                name="👑 Classement Général (Top 10) 👑",
+                value=general_text,
+                inline=False
+            )
+
+            # --- Envoi final ---
             embed.set_footer(text="Handnews Pronostics - Rendez-vous la semaine prochaine !")
-            
             channel = self.bot.get_channel(ANNONCE_CHANNEL_ID)
             if channel:
                 await channel.send(embed=embed)
-                print(f"✅ (PRONOS) Classement de la semaine publié.")
+                print("✅ (PRONOS) Classements hebdomadaire et général publiés.")
 
     @check_pronos_closure.before_loop
     @publish_weekly_summary.before_loop
@@ -491,6 +506,48 @@ class PronosticsCog(commands.Cog):
             
         except Exception as e:
             await ctx.send(f"❌ Une erreur est survenue lors de la récupération des pronostics : `{e}`", ephemeral=True)
+
+    @commands.command(name='classementgeneral', aliases=['cg'])
+    @commands.has_permissions(manage_guild=True)
+    async def classement_general_command(self, ctx, limit: int = 10):
+        """[Admin] Affiche publiquement le classement général des pronostics."""
+        
+        # On limite l'affichage à 25 pour ne pas surcharger Discord.
+        if limit > 25:
+            limit = 25
+            
+        try:
+            # Supprime la commande pour garder le salon propre
+            await ctx.message.delete() 
+        except discord.Forbidden:
+            pass # Le bot n'a pas la perm, on continue quand même
+
+        leaderboard = database.get_general_leaderboard(POINTS_BON_PRONO, limit=limit)
+        
+        if not leaderboard:
+            await ctx.send("Aucun pronostic correct n'a été enregistré pour le moment.", ephemeral=True)
+            return
+
+        embed = discord.Embed(
+            title=f"👑 Classement Général des Pronostics (Top {limit}) 👑",
+            description="Classement basé sur tous les matchs terminés.",
+            color=discord.Color.dark_gold(),
+            timestamp=datetime.now(timezone.utc)
+        )
+        
+        classement_text = ""
+        for rank, row in enumerate(leaderboard, 1):
+            user_id, bons_pronos, total_points = row['user_id'], row['bons_pronos'], row['total_points']
+            member = ctx.guild.get_member(user_id)
+            member_name = member.display_name if member else f"Utilisateur Inconnu ({user_id})"
+            
+            emoji = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"**#{rank}**"
+            classement_text += f"{emoji} **{member_name}** - **{total_points}** pts ({bons_pronos} corrects)\n"
+        
+        embed.add_field(name="Classement", value=classement_text, inline=False)
+        
+        # Envoi public dans le canal où la commande a été tapée
+        await ctx.send(embed=embed)
 
 
 async def setup(bot):
