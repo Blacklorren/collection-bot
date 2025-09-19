@@ -650,3 +650,36 @@ def get_user_correct_pronostics(user_id):
             ORDER BY m.date_match DESC
         """, (user_id,))
         return cur.fetchall()
+
+def get_general_leaderboard(points_per_win, limit=10):
+    """
+    Récupère le classement général des pronostics basé sur tous les matchs terminés.
+
+    Args:
+        points_per_win (int): Le nombre de points pour un pronostic correct.
+        limit (int): Le nombre maximum de joueurs à retourner.
+
+    Returns:
+        list: Une liste de dictionnaires contenant user_id, bons_pronos, et total_points.
+    """
+    with sqlite3.connect(DB_NAME) as con:
+        con.row_factory = sqlite3.Row
+        cur = con.cursor()
+        
+        # Cette requête compte les pronostics corrects pour chaque utilisateur
+        # sur tous les matchs qui ont un résultat enregistré.
+        cur.execute("""
+            SELECT
+                p.user_id,
+                COUNT(p.user_id) AS bons_pronos,
+                COUNT(p.user_id) * ? AS total_points
+            FROM pronostics p
+            JOIN matchs m ON p.match_id = m.id
+            WHERE p.prono = m.resultat AND m.resultat IS NOT NULL
+            GROUP BY p.user_id
+            ORDER BY total_points DESC, bons_pronos DESC
+            LIMIT ?
+        """, (points_per_win, limit))
+        
+        leaderboard = cur.fetchall()
+        return [dict(row) for row in leaderboard]
