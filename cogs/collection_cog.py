@@ -527,20 +527,22 @@ class CollectionCog(commands.Cog):
         }
         return emojis.get(rarity_name, "🔹")
 
-    @app_commands.command(name='topowned', description="[Admin] Affiche les 5 cartes les plus possédées par rareté.")
+     @app_commands.command(name='topowned', description="[Admin] Affiche les 5 cartes les plus possédées par rareté.")
     @app_commands.default_permissions(manage_guild=True)
     async def top_owned_command(self, interaction: discord.Interaction):
         """Affiche les 5 cartes les plus possédées pour chaque rareté, basé sur le nombre d'utilisateurs uniques."""
         await interaction.response.defer(ephemeral=True)
 
         try:
-            # 1. Interroger la base de données pour compter le nombre de propriétaires pour chaque carte
+            # 1. Interroger la base de données pour compter le nombre de propriétaires UNIQUES pour chaque carte
             with database.sqlite3.connect(database.DB_NAME) as con:
                 con.row_factory = database.sqlite3.Row
                 cur = con.cursor()
-                # Cette requête compte combien d'utilisateurs différents possèdent chaque card_id
+                
+                # <<<--- LA CORRECTION EST ICI ---<<<
+                # On utilise COUNT(DISTINCT user_id) pour ne compter chaque utilisateur qu'une seule fois par carte.
                 cur.execute("""
-                    SELECT card_id, COUNT(user_id) as owner_count
+                    SELECT card_id, COUNT(DISTINCT user_id) as owner_count
                     FROM user_cards
                     GROUP BY card_id
                     ORDER BY owner_count DESC
@@ -551,7 +553,7 @@ class CollectionCog(commands.Cog):
                 await interaction.followup.send("Personne ne possède de cartes pour le moment.", ephemeral=True)
                 return
 
-            # 2. Organiser les résultats par rareté en utilisant les données chargées depuis cards.json
+            # 2. Organiser les résultats par rareté (le reste du code est inchangé)
             stats_by_rarity = {
                 "Commun": [], "Peu Commun": [], "Rare": [], "Épique": [], "Légendaire": []
             }
@@ -564,7 +566,6 @@ class CollectionCog(commands.Cog):
                 if card_details:
                     rarity = card_details['rarete']
                     if rarity in stats_by_rarity:
-                        # La liste est déjà triée par la requête SQL, on a juste à ajouter
                         stats_by_rarity[rarity].append((card_details['nom'], count))
 
             # 3. Construire l'embed final
@@ -578,7 +579,6 @@ class CollectionCog(commands.Cog):
                 if not cards:
                     field_value = "Aucune carte de cette rareté n'est possédée."
                 else:
-                    # Formatter le texte pour l'embed, en prenant les 5 premières
                     field_value = ""
                     for rank, (name, count) in enumerate(cards[:5], 1):
                         field_value += f"**{rank}.** {name} - `{count}` possesseur(s)\n"
