@@ -516,5 +516,84 @@ class CollectionCog(commands.Cog):
         # Cette commande est publique, donc pas de ephemeral=True
         await interaction.response.send_message(embed=embed)
 
+# Petite fonction utilitaire pour obtenir un emoji correspondant à la rareté
+    def get_rarity_emoji(self, rarity_name: str) -> str:
+        emojis = {
+            "Commun": "⬜",
+            "Peu Commun": "🟩",
+            "Rare": "🟦",
+            "Épique": "🟪",
+            "Légendaire": "🟨"
+        }
+        return emojis.get(rarity_name, "🔹")
+
+    @app_commands.command(name='topowned', description="[Admin] Affiche les 5 cartes les plus possédées par rareté.")
+    @app_commands.default_permissions(manage_guild=True)
+    async def top_owned_command(self, interaction: discord.Interaction):
+        """Affiche les 5 cartes les plus possédées pour chaque rareté, basé sur le nombre d'utilisateurs uniques."""
+        await interaction.response.defer(ephemeral=True)
+
+        try:
+            # 1. Interroger la base de données pour compter le nombre de propriétaires pour chaque carte
+            with database.sqlite3.connect(database.DB_NAME) as con:
+                con.row_factory = database.sqlite3.Row
+                cur = con.cursor()
+                # Cette requête compte combien d'utilisateurs différents possèdent chaque card_id
+                cur.execute("""
+                    SELECT card_id, COUNT(user_id) as owner_count
+                    FROM user_cards
+                    GROUP BY card_id
+                    ORDER BY owner_count DESC
+                """)
+                ownership_counts = cur.fetchall()
+
+            if not ownership_counts:
+                await interaction.followup.send("Personne ne possède de cartes pour le moment.", ephemeral=True)
+                return
+
+            # 2. Organiser les résultats par rareté en utilisant les données chargées depuis cards.json
+            stats_by_rarity = {
+                "Commun": [], "Peu Commun": [], "Rare": [], "Épique": [], "Légendaire": []
+            }
+
+            for row in ownership_counts:
+                card_id = row['card_id']
+                count = row['owner_count']
+                
+                card_details = self.card_map.get(card_id)
+                if card_details:
+                    rarity = card_details['rarete']
+                    if rarity in stats_by_rarity:
+                        # La liste est déjà triée par la requête SQL, on a juste à ajouter
+                        stats_by_rarity[rarity].append((card_details['nom'], count))
+
+            # 3. Construire l'embed final
+            embed = discord.Embed(
+                title="🏆 Top 5 des Cartes les Plus Possédées",
+                description="Ce classement est basé sur le nombre d'utilisateurs uniques possédant chaque carte actuellement.",
+                color=discord.Color.blue()
+            )
+
+            for rarity, cards in stats_by_rarity.items():
+                if not cards:
+                    field_value = "Aucune carte de cette rareté n'est possédée."
+                else:
+                    # Formatter le texte pour l'embed, en prenant les 5 premières
+                    field_value = ""
+                    for rank, (name, count) in enumerate(cards[:5], 1):
+                        field_value += f"**{rank}.** {name} - `{count}` possesseur(s)\n"
+                
+                embed.add_field(
+                    name=f"{self.get_rarity_emoji(rarity)} {rarity}",
+                    value=field_value,
+                    inline=False
+                )
+
+            await interaction.followup.send(embed=embed, ephemeral=True)
+
+        except Exception as e:
+            await interaction.followup.send(f"❌ Une erreur est survenue lors de la génération des statistiques : {e}", ephemeral=True)
+            print(f"Erreur dans /topowned : {e}")
+
 async def setup(bot):
     await bot.add_cog(CollectionCog(bot))
