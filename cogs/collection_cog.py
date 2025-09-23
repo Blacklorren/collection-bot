@@ -531,7 +531,7 @@ class CollectionCog(commands.Cog):
     @app_commands.default_permissions(manage_guild=True)
     async def top_owned_command(self, interaction: discord.Interaction):
         """Affiche les 5 cartes les plus possédées pour chaque rareté, basé sur le nombre d'utilisateurs uniques."""
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer()
 
         try:
             # 1. Interroger la base de données pour compter le nombre de propriétaires UNIQUES pour chaque carte
@@ -550,7 +550,7 @@ class CollectionCog(commands.Cog):
                 ownership_counts = cur.fetchall()
 
             if not ownership_counts:
-                await interaction.followup.send("Personne ne possède de cartes pour le moment.", ephemeral=True)
+                await interaction.followup.send("Personne ne possède de cartes pour le moment.")
                 return
 
             # 2. Organiser les résultats par rareté (le reste du code est inchangé)
@@ -589,7 +589,7 @@ class CollectionCog(commands.Cog):
                     inline=False
                 )
 
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            await interaction.followup.send(embed=embed)
 
         except Exception as e:
             await interaction.followup.send(f"❌ Une erreur est survenue lors de la génération des statistiques : {e}", ephemeral=True)
