@@ -516,7 +516,7 @@ class CollectionCog(commands.Cog):
         # Cette commande est publique, donc pas de ephemeral=True
         await interaction.response.send_message(embed=embed)
 
-# Petite fonction utilitaire pour obtenir un emoji correspondant à la rareté
+    # Petite fonction utilitaire pour obtenir un emoji correspondant à la rareté
     def get_rarity_emoji(self, rarity_name: str) -> str:
         emojis = {
             "Commun": "⬜",
@@ -527,7 +527,7 @@ class CollectionCog(commands.Cog):
         }
         return emojis.get(rarity_name, "🔹")
 
-     @app_commands.command(name='topowned', description="[Admin] Affiche les 5 cartes les plus possédées par rareté.")
+    @app_commands.command(name='topowned', description="[Admin] Affiche les 5 cartes les plus possédées par rareté.")
     @app_commands.default_permissions(manage_guild=True)
     async def top_owned_command(self, interaction: discord.Interaction):
         """Affiche les 5 cartes les plus possédées pour chaque rareté, basé sur le nombre d'utilisateurs uniques."""
