@@ -483,34 +483,38 @@ class CollectionCog(commands.Cog):
             for user_id, unique_cards in leaderboard_data 
             if user_id not in LEADERBOARD_EXCLUDED_IDS
         ]
-        top_5_filtered = filtered_leaderboard[:5]
-        
+       
         embed = discord.Embed(
             title="🏆 Top 5 des Collectionneurs 🏆",
             description="Classement basé sur le nombre de cartes uniques possédées.",
             color=discord.Color.gold()
         )
         
-        if not top_5_filtered:
+        description_text = ""
+        displayed = 0
+        for user_id, unique_cards in filtered_leaderboard:
+            if displayed >= 5:
+                break
+            member = interaction.guild.get_member(user_id)
+            if not member:
+                continue
+            displayed += 1
+
+            emoji = ""
+            if displayed == 1:
+                emoji = "🥇 "
+            elif displayed == 2:
+                emoji = "🥈 "
+            elif displayed == 3:
+                emoji = "🥉 "
+            else:
+                emoji = f"**#{displayed}** "
+
+            description_text += f"{emoji} **{member.display_name}** - {unique_cards} / {len(self.all_cards)} cartes\n"
+
+        if not description_text:
             embed.description = "Le classement est encore vide. Collectionnez des cartes pour apparaître ici !"
         else:
-            description_text = ""
-            for rank, (user_id, unique_cards) in enumerate(top_5_filtered, 1):
-                # interaction.guild est la bonne façon d'accéder au serveur
-                member = interaction.guild.get_member(user_id)
-                member_name = member.display_name if member else f"Utilisateur Inconnu"
-                
-                if not member:
-                    continue
-    
-                emoji = ""
-                if rank == 1: emoji = "🥇 "
-                elif rank == 2: emoji = "🥈 "
-                elif rank == 3: emoji = "🥉 "
-                else: emoji = f"**#{rank}** "
-                
-                description_text += f"{emoji} **{member_name}** - {unique_cards} / {len(self.all_cards)} cartes\n"
-            
             embed.description = description_text
             
         # Cette commande est publique, donc pas de ephemeral=True
