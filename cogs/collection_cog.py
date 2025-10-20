@@ -63,7 +63,12 @@ class CollectionCog(commands.Cog):
             "Épique": [c for c in self.all_cards if c['rarete'] == 'Épique'],
             "Légendaire": [c for c in self.all_cards if c['rarete'] == 'Légendaire']
         }
-
+        
+        self.cards_per_club_total = {}
+        for card in self.all_cards:
+            club = card['club']
+            self.cards_per_club_total[club] = self.cards_per_club_total.get(club, 0) + 1
+            
         self.card_map = {card['id']: card for card in self.all_cards}
 
     # === ÉVÉNEMENTS (INCHANGÉS) ===
@@ -233,11 +238,13 @@ class CollectionCog(commands.Cog):
         current_club: str = None
         current_page: int = 0
     
-        def __init__(self, author_id, user_collection_data, total_available_cards):
+        # --- MÉTHODE MODIFIÉE ---
+        def __init__(self, author_id, user_collection_data, total_available_cards, cards_per_club_total):
             super().__init__(timeout=180)
             self.author_id = author_id
             self.collection = user_collection_data
             self.total_available_cards = total_available_cards
+            self.cards_per_club_total = cards_per_club_total # On stocke le total
             
             self.cards_by_club = {}
             for card in self.collection:
@@ -246,27 +253,46 @@ class CollectionCog(commands.Cog):
                     self.cards_by_club[club] = []
                 self.cards_by_club[club].append(card)
             
+            # La création des options est maintenant gérée par la nouvelle méthode
             self.club_select.options = self.create_select_options()
-            if not self.club_select.options:
+            
+            if not self.collection:
                 self.club_select.placeholder = "Ta collection est vide !"
                 self.club_select.disabled = True
                 
             self.update_buttons_state()
     
+        # --- MÉTHODE MODIFIÉE ---
         def create_select_options(self):
-            return [
-                discord.SelectOption(label=club, description=f"{len(cards)} carte(s) possédée(s)")
-                for club, cards in sorted(self.cards_by_club.items())
-            ]
+            """Crée les options pour le menu déroulant avec la progression."""
+            options = []
+            # On itère sur tous les clubs possibles, triés par nom
+            for club, total_count in sorted(self.cards_per_club_total.items()):
+                # On récupère le nombre de cartes que l'utilisateur possède pour ce club
+                owned_count = len(self.cards_by_club.get(club, []))
+                
+                # On crée l'option avec la description de la progression
+                options.append(
+                    discord.SelectOption(
+                        label=club,
+                        description=f"{owned_count} / {total_count} carte(s) possédée(s)"
+                    )
+                )
+            return options
     
         def update_buttons_state(self):
             if self.current_club is None:
                 self.prev_button.disabled = True
                 self.next_button.disabled = True
             else:
-                cards_in_club = self.cards_by_club[self.current_club]
-                self.prev_button.disabled = self.current_page == 0
-                self.next_button.disabled = self.current_page >= len(cards_in_club) - 1
+=
+                cards_in_club = self.cards_by_club.get(self.current_club)
+                if not cards_in_club:
+                    self.prev_button.disabled = True
+                    self.next_button.disabled = True
+                else:
+                    self.prev_button.disabled = self.current_page == 0
+                    self.next_button.disabled = self.current_page >= len(cards_in_club) - 1
     
         async def generate_embed(self):
             if self.current_club is None:
@@ -288,7 +314,20 @@ class CollectionCog(commands.Cog):
                 )
                 return embed
             
-            cards_in_club = self.cards_by_club[self.current_club]
+            cards_in_club = self.cards_by_club.get(self.current_club)
+            
+            if not cards_in_club:
+
+                total_for_club = self.cards_per_club_total.get(self.current_club, 0)
+                embed = discord.Embed(
+                    title=f"**{self.current_club}**",
+                    description="Tu ne possèdes aucune carte de ce club pour le moment.",
+                    color=discord.Color.dark_grey()
+                )
+                embed.set_footer(text=f"Progression : 0 / {total_for_club}")
+
+                return embed
+
             card = cards_in_club[self.current_page]
             
             color = RARITY_COLORS.get(card['rarete'], discord.Color.default())
@@ -301,7 +340,7 @@ class CollectionCog(commands.Cog):
             embed.set_footer(text=f"Carte {self.current_page + 1} / {len(cards_in_club)}")
             return embed
     
-        @discord.ui.select(placeholder="Choisis un club pour voir les cartes...", row=0)
+        @discord.ui.select(placeholder="Choisis un club pour voir ta progression...", row=0)
         async def club_select(self, interaction: discord.Interaction, select: discord.ui.Select):
             if interaction.user.id != self.author_id:
                 await interaction.response.send_message("Tu ne peux pas interagir avec la collection de quelqu'un d'autre.", ephemeral=True)
@@ -338,11 +377,12 @@ class CollectionCog(commands.Cog):
         
         user_collection_data = [self.card_map[card_id] for card_id in unique_card_ids if card_id in self.card_map]
         
-        if not user_collection_data:
-            await interaction.response.send_message("Ta collection est vide pour le moment. Ouvre des packs pour la commencer !", ephemeral=True)
-            return
-        
-        view = self.CollectionView(user_id, user_collection_data, total_available_cards=len(self.all_cards))
+        view = self.CollectionView(
+            author_id=user_id, 
+            user_collection_data=user_collection_data, 
+            total_available_cards=len(self.all_cards),
+            cards_per_club_total=self.cards_per_club_total
+        )
         initial_embed = await view.generate_embed()
         await interaction.response.send_message(embed=initial_embed, view=view, ephemeral=True)
     
