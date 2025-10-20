@@ -285,7 +285,7 @@ class CollectionCog(commands.Cog):
                 self.prev_button.disabled = True
                 self.next_button.disabled = True
             else:
-=
+
                 cards_in_club = self.cards_by_club.get(self.current_club)
                 if not cards_in_club:
                     self.prev_button.disabled = True
