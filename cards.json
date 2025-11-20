@@ -1419,7 +1419,7 @@
     "nom": "Téo EGERMANN",
     "club": "Sélestat",
     "rarete": "Commun",
-    "image_url": "https://i.imgur.com/PWLJ8fx.png"
+    "image_url": "https://i.imgur.com/stq5fsx.png"
   },
   {
     "id": 208,
@@ -1567,13 +1567,6 @@
     "club": "Toulouse",
     "rarete": "Peu Commun",
     "image_url": "https://i.imgur.com/91Uk0mi.png"
-  },
-  {
-    "id": 229,
-    "nom": "Casper KALL",
-    "club": "Toulouse",
-    "rarete": "Peu Commun",
-    "image_url": "https://i.imgur.com/xnrMthD.png"
   },
   {
     "id": 230,
@@ -1742,6 +1735,20 @@
     "club": "Dijon",
     "rarete": "Rare",
     "image_url": "https://i.imgur.com/PsKm8hE.png"
+  },
+    {
+    "id": 254,
+    "nom": "Ernest Pineau-Rossi",
+    "club": "Toulouse",
+    "rarete": "Commun",
+    "image_url": "https://i.imgur.com/WH45wz0.png"
+  },
+      {
+    "id": 255,
+    "nom": "Achilleas Toskas",
+    "club": "Chambéry",
+    "rarete": "Commun",
+    "image_url": "https://i.imgur.com/B1AUtkb.png"
   }
 ]
- 
+
