@@ -12,7 +12,8 @@ RARITY_COLORS = {
     "Peu Commun": discord.Color.green(),
     "Rare": discord.Color.blue(),
     "Épique": discord.Color.purple(),
-    "Légendaire": discord.Color.gold()
+    "Légendaire": discord.Color.gold(),
+    "Noël": discord.Color.from_rgb(220, 20, 60)
 }
 
 ANSI_COLORS = {
@@ -20,7 +21,8 @@ ANSI_COLORS = {
     "Peu Commun": " [0;32m",    # Vert
     "Rare": " [0;34m",          # Bleu
     "Épique": " [0;35m",        # Magenta/Violet
-    "Légendaire": " [0;33m"     # Jaune/Or
+    "Légendaire": " [0;33m",     # Jaune/Or
+    "Noël": " [0;31m"
 }
 
 # --- CONFIGURATION ---
@@ -43,6 +45,7 @@ JOKER_COSTS = {
     "rare": 250,
     "epique": 800,
     "legendaire": 3000
+    "noel": 100
 }
 
 LEADERBOARD_EXCLUDED_IDS = [133711821214449665]
@@ -173,7 +176,7 @@ class CollectionCog(commands.Cog):
         else:
             await interaction.response.send_message(f"❌ {interaction.user.mention}, tu n'as pas assez de points. Il te manque **{PACK_COST - points} points**.", ephemeral=True)
 
-    @app_commands.command(name='ouvrir', description="Ouvre un pack pour recevoir de nouvelles cartes.")
+@app_commands.command(name='ouvrir', description="Ouvre un pack pour recevoir de nouvelles cartes.")
     async def open_command(self, interaction: discord.Interaction):
         user_id = interaction.user.id
         user_data = database.get_user_data(user_id)
@@ -183,54 +186,106 @@ class CollectionCog(commands.Cog):
             await interaction.response.send_message(f"Tu n'as pas de pack à ouvrir. Fais `/pack` pour en acheter un.", ephemeral=True)
             return
         
-        # Réponse initiale (éphémère) pour confirmer que la commande a été reçue.
         await interaction.response.send_message(f"🎉 C'est parti ! J'ouvre ton pack, {interaction.user.mention}...", ephemeral=True)
         
         database.remove_pack(user_id, 1)
         
+        # --- LOGIQUE DE TIRAGE ---
         cartes_obtenues = []
-        cartes_obtenues.append(random.choices(
+
+        # Préparation des slots standards
+        # Slot 1 (Commun/Peu Commun)
+        slot1 = random.choices(
             population=[*self.cards_by_rarity["Commun"], *self.cards_by_rarity["Peu Commun"]],
             weights=[70]*len(self.cards_by_rarity["Commun"]) + [30]*len(self.cards_by_rarity["Peu Commun"]),
             k=1
-        )[0])
-        cartes_obtenues.append(random.choices(
+        )[0]
+        
+        # Slot 2 (Commun/Peu Commun/Rare)
+        slot2 = random.choices(
             population=[*self.cards_by_rarity["Commun"], *self.cards_by_rarity["Peu Commun"], *self.cards_by_rarity["Rare"]],
             weights=[30]*len(self.cards_by_rarity["Commun"]) + [50]*len(self.cards_by_rarity["Peu Commun"]) + [20]*len(self.cards_by_rarity["Rare"]),
             k=1
-        )[0])
-        cartes_obtenues.append(random.choices(
+        )[0]
+
+        # Slot 3 (Rare/Épique/Légendaire)
+        slot3 = random.choices(
             population=[*self.cards_by_rarity["Rare"], *self.cards_by_rarity["Épique"], *self.cards_by_rarity["Légendaire"]],
             weights=[45]*len(self.cards_by_rarity["Rare"]) + [35]*len(self.cards_by_rarity["Épique"]) + [20]*len(self.cards_by_rarity["Légendaire"]),
             k=1
-        )[0])
+        )[0]
+
+        # --- LOGIQUE CALENDRIER DE L'AVENT ---
+        paris_tz = pytz.timezone('Europe/Paris')
+        now = datetime.datetime.now(paris_tz)
+        today_str = now.date().isoformat()
         
-        for carte in cartes_obtenues:
+        # Vérifier si on est en décembre (mois 12) et entre le 1 et le 24
+        is_advent_time = (now.month == 12 and 1 <= now.day <= 24)
+        
+        advent_card_triggered = False
+        
+        if is_advent_time:
+            # Vérifier si l'utilisateur a déjà eu son pack de l'avent aujourd'hui
+            last_advent_date = user_data['last_advent_pack_date'] # Assurez-vous d'avoir ajouté la colonne en DB
+            
+            if last_advent_date != today_str:
+                # C'est le premier pack du jour !
+                # On cherche la carte correspondante (ex: ID "noel_15" pour le 15 décembre)
+                target_id = f"noel_{now.day}"
+                advent_card = self.card_map.get(target_id)
+                
+                if advent_card:
+                    # On remplace le Slot 1 (le moins rare) par la carte de Noël
+                    slot1 = advent_card
+                    database.set_advent_pack_opened(user_id, today_str)
+                    advent_card_triggered = True
+
+        # Assemblage final
+        cartes_obtenues = [slot1, slot2, slot3]
+        
+        # --- ENREGISTREMENT ET AFFICHAGE ---
+        for i, carte in enumerate(cartes_obtenues):
             database.add_card_to_collection(user_id, carte['id'])
             
             couleur = RARITY_COLORS.get(carte['rarete'], discord.Color.default())
+            
+            # Titre spécial pour la carte de l'avent
+            titre_carte = f"**{carte['nom']}**"
+            description_carte = f"**Rareté : {carte['rarete']}**\n*Club : {carte['club']}*"
+
+            if advent_card_triggered and i == 0:
+                titre_carte = f"🎄 CALENDRIER DE L'AVENT : {carte['nom']} 🎄"
+                description_carte += "\n✨ *Carte exclusive du jour !* ✨"
+
             embed_carte = discord.Embed(
-                title=f"**{carte['nom']}**",
-                description=f"**Rareté : {carte['rarete']}**\n*Club : {carte['club']}*",
+                title=titre_carte,
+                description=description_carte,
                 color=couleur
             )
             embed_carte.set_image(url=carte['image_url'])
             
-            # Utiliser followup.send pour les messages suivants (tous éphémères)
             await interaction.followup.send(embed=embed_carte, ephemeral=True)
             
-            if carte['rarete'] in ["Épique", "Légendaire"] and ANNONCE_CHANNEL_ID != 0:
-                annonce_embed = discord.Embed(
-                    title=f"✨ Tirage Exceptionnel ! ✨",
-                    description=f"**{interaction.user.mention}** vient d'obtenir **{carte['nom']} ({carte['rarete']})** dans un pack !",
-                    color=RARITY_COLORS.get(carte['rarete'])
-                )
-                annonce_embed.set_image(url=carte['image_url'])
-                annonce_embed.set_footer(text="Félicitations !")
-                
-                channel = self.bot.get_channel(ANNONCE_CHANNEL_ID)
-                if channel:
-                    await channel.send(embed=annonce_embed)
+            # Annonce globale pour les grosses cartes (et Noël pourquoi pas ?)
+            if (carte['rarete'] in ["Épique", "Légendaire", "Noël"]) and ANNONCE_CHANNEL_ID != 0:
+                # Pour éviter le spam des cartes Noël, on peut filtrer si on veut
+                should_announce = True
+                if carte['rarete'] == "Noël" and not advent_card_triggered: 
+                    # Si c'est du craft plus tard, on annonce pas forcément, ou si
+                    pass
+
+                if should_announce:
+                    annonce_embed = discord.Embed(
+                        title=f"✨ Tirage Exceptionnel ! ✨",
+                        description=f"**{interaction.user.mention}** vient d'obtenir **{carte['nom']} ({carte['rarete']})** !",
+                        color=couleur
+                    )
+                    annonce_embed.set_image(url=carte['image_url'])
+                    
+                    channel = self.bot.get_channel(ANNONCE_CHANNEL_ID)
+                    if channel:
+                        await channel.send(embed=annonce_embed)
                     
         await interaction.followup.send(f"Tes nouvelles cartes ont été ajoutées à ta collection ! Fais `/collection` pour les voir.", ephemeral=True)
 
@@ -238,7 +293,6 @@ class CollectionCog(commands.Cog):
         current_club: str = None
         current_page: int = 0
     
-        # --- MÉTHODE MODIFIÉE ---
         def __init__(self, author_id, user_collection_data, total_available_cards, cards_per_club_total):
             super().__init__(timeout=180)
             self.author_id = author_id
@@ -262,7 +316,6 @@ class CollectionCog(commands.Cog):
                 
             self.update_buttons_state()
     
-        # --- MÉTHODE MODIFIÉE ---
         def create_select_options(self):
             """Crée les options pour le menu déroulant avec la progression."""
             options = []
@@ -271,11 +324,20 @@ class CollectionCog(commands.Cog):
                 # On récupère le nombre de cartes que l'utilisateur possède pour ce club
                 owned_count = len(self.cards_by_club.get(club, []))
                 
-                # On crée l'option avec la description de la progression
+                # Si le club est celui de Noël, on ajoute une décoration
+                label_display = club
+                emoji_display = None
+                
+                if club == "Légendes Starligue": 
+                    label_display = f"🎄 {club}"
+                    emoji_display = "🎁" 
+                
                 options.append(
                     discord.SelectOption(
-                        label=club,
-                        description=f"{owned_count} / {total_count} carte(s) possédée(s)"
+                        label=label_display,
+                        description=f"{owned_count} / {total_count} carte(s) possédée(s)",
+                        value=club, # Important : la value reste le nom brut du club
+                        emoji=emoji_display
                     )
                 )
             return options
@@ -331,9 +393,18 @@ class CollectionCog(commands.Cog):
             card = cards_in_club[self.current_page]
             
             color = RARITY_COLORS.get(card['rarete'], discord.Color.default())
+            if card['rarete'] == "Noël":
+                description_text = (
+                    f"❄️ **Édition Spéciale Calendrier de l'Avent** ❄️\n\n"
+                    f"🎅 **Club :** {card['club']}\n"
+                    f"🎄 **Rareté :** {card['rarete']}"
+                )
+            else:
+                description_text = f"**Club :** {card['club']}\n**Rareté :** {card['rarete']}"
+            
             embed = discord.Embed(
                 title=f"**{card['nom']}**",
-                description=f"**Club :** {card['club']}\n**Rareté :** {card['rarete']}",
+                description=description_text,
                 color=color
             )
             embed.set_image(url=card['image_url'])
@@ -443,7 +514,7 @@ class CollectionCog(commands.Cog):
         embed.add_field(name="Nouveau Solde", value=f"Tu possèdes maintenant **{user_data['fragments']} fragments**.")
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @app_commands.command(name='creer', description="Dépense tes fragments pour créer une carte manquante.")
+@app_commands.command(name='creer', description="Dépense tes fragments pour créer une carte manquante.")
     @app_commands.describe(nom_de_la_carte="Le nom (même partiel) du joueur que tu veux créer.")
     async def create_card_command(self, interaction: discord.Interaction, nom_de_la_carte: str):
         user_id = interaction.user.id
@@ -465,12 +536,29 @@ class CollectionCog(commands.Cog):
             await interaction.response.send_message(f"Tu possèdes déjà la carte **{target_card['nom']}**.", ephemeral=True)
             return
             
-        rarity_key = target_card['rarete'].lower().replace("é", "e")
-        if rarity_key not in JOKER_COSTS:
-             await interaction.response.send_message(f"Tu ne peux pas créer de carte de rareté '{target_card['rarete']}'. Seules les cartes Rares, Épiques ou Légendaires peuvent être créées.", ephemeral=True)
+        rarity_key = target_card['rarete'].lower().replace("é", "e").replace("ë", "e") # gère "Noël" -> "noel"
+        
+        # --- LOGIQUE SPÉCIALE NOËL ---
+        cost = 0
+        
+        if target_card['rarete'] == "Noël":
+            paris_tz = pytz.timezone('Europe/Paris')
+            now = datetime.datetime.now(paris_tz)
+            
+            # Si on est avant le 25 décembre (mois < 12 ou (mois 12 et jour < 25))
+            if now.month < 12 or (now.month == 12 and now.day < 25):
+                await interaction.response.send_message(f"❄️ Les cartes du **Calendrier de l'Avent** sont exclusives aux packs quotidiens jusqu'au 25 décembre ! Reviens plus tard.", ephemeral=True)
+                return
+            
+            # Après le 25 décembre
+            cost = 100
+        
+        elif rarity_key in JOKER_COSTS:
+            cost = JOKER_COSTS[rarity_key]
+        else:
+             await interaction.response.send_message(f"Tu ne peux pas créer de carte de rareté '{target_card['rarete']}'.", ephemeral=True)
              return
              
-        cost = JOKER_COSTS[rarity_key]
         user_data = database.get_user_data(user_id)
         user_fragments = user_data['fragments']
         
@@ -507,7 +595,10 @@ class CollectionCog(commands.Cog):
         
         creation_costs = ""
         for rarity, cost in JOKER_COSTS.items():
-            creation_costs += f"Créer une carte **{rarity.capitalize()}** : **{cost}** fragments\n"
+            if rarity == "noel":
+                creation_costs += f"Créer une carte **Noël** (après le 25/12) : **{cost}** fragments\n"
+            else:
+                creation_costs += f"Créer une carte **{rarity.capitalize()}** : **{cost}** fragments\n"
         embed.add_field(name="Coût de Création (`/creer`)", value=creation_costs, inline=False)
         
         embed.set_footer(text="Utilise /recycler pour gagner des fragments et /creer pour les dépenser.")
@@ -567,7 +658,8 @@ class CollectionCog(commands.Cog):
             "Peu Commun": "🟩",
             "Rare": "🟦",
             "Épique": "🟪",
-            "Légendaire": "🟨"
+            "Légendaire": "🟨",
+            "Noël": "🎄" 
         }
         return emojis.get(rarity_name, "🔹")
 
