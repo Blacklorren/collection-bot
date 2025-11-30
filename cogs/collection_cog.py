@@ -44,7 +44,7 @@ FRAGMENT_VALUES = {
 JOKER_COSTS = {
     "rare": 250,
     "epique": 800,
-    "legendaire": 3000
+    "legendaire": 3000,
     "noel": 100
 }
 
