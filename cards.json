@@ -1749,6 +1749,41 @@
     "club": "Chambéry",
     "rarete": "Commun",
     "image_url": "https://i.imgur.com/B1AUtkb.png"
+  },
+        {
+    "id": noel_1,
+    "nom": "Adrien DiPanda",
+    "club": "Légendes Starligue",
+    "rarete": "Nöel",
+    "image_url": "https://i.imgur.com/eUEADJk.png"
+  },
+        {
+    "id": noel_2,
+    "nom": "Anouar Ayed",
+    "club": "Légendes Starligue",
+    "rarete": "Nöel",
+    "image_url": "https://i.imgur.com/c4dHiLg.png"
+  },
+          {
+    "id": noel_3,
+    "nom": "Edin Basic",
+    "club": "Légendes Starligue",
+    "rarete": "Nöel",
+    "image_url": "https://i.imgur.com/N8iN805.png"
+  },
+            {
+    "id": noel_4,
+    "nom": "Samuel Honrubia",
+    "club": "Légendes Starligue",
+    "rarete": "Nöel",
+    "image_url": "https://i.imgur.com/9ow64r1.png"
+  },
+              {
+    "id": noel_5,
+    "nom": "Grégoire Detrez",
+    "club": "Légendes Starligue",
+    "rarete": "Nöel",
+    "image_url": "https://i.imgur.com/1uJpYb9.png"
   }
 ]
 
