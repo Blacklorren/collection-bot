@@ -356,60 +356,129 @@ class CollectionCog(commands.Cog):
                     self.prev_button.disabled = self.current_page == 0
                     self.next_button.disabled = self.current_page >= len(cards_in_club) - 1
     
-        async def generate_embed(self):
-            if self.current_club is None:
-                embed = discord.Embed(
-                    title="🗂️ Ta Collection",
-                    description="Utilise le menu déroulant pour explorer ta collection par club.",
-                    color=discord.Color.dark_green()
-                )
-                unique_user_cards = len(self.collection)
-                percentage = (unique_user_cards / self.total_available_cards) * 100 if self.total_available_cards > 0 else 0
-                filled_blocks = int(percentage / 10)
-                empty_blocks = 10 - filled_blocks
-                progress_bar = "🟩" * filled_blocks + "⬛" * empty_blocks
-                embed.add_field(
-                    name="Progression Générale",
-                    value=f"**{unique_user_cards} / {self.total_available_cards}** cartes uniques\n"
-                          f"{progress_bar} **{percentage:.2f}%**",
-                    inline=False
-                )
-                return embed
-            
-            cards_in_club = self.cards_by_club.get(self.current_club)
-            
-            if not cards_in_club:
+    def get_stars(self, rarity):
+        """Génère une ligne d'étoiles selon la rareté."""
+        mapping = {
+            "Commun": "⭐",
+            "Peu Commun": "⭐⭐",
+            "Rare": "⭐⭐⭐",
+            "Épique": "🌟🌟🌟🌟",
+            "Légendaire": "👑👑👑👑👑",
+            "Noël": "🎄🎄🎄🎄🎄"
+        }
+        return mapping.get(rarity, "⭐")
 
-                total_for_club = self.cards_per_club_total.get(self.current_club, 0)
-                embed = discord.Embed(
-                    title=f"**{self.current_club}**",
-                    description="Tu ne possèdes aucune carte de ce club pour le moment.",
-                    color=discord.Color.dark_grey()
-                )
-                embed.set_footer(text=f"Progression : 0 / {total_for_club}")
+    def get_progress_bar(self, current, total, length=10):
+        """Crée une petite barre de progression textuelle."""
+        filled = int((current / total) * length)
+        # On s'assure que si c'est la dernière, la barre est pleine
+        if current == total - 1: filled = length 
+        
+        empty = length - filled
+        return "▰" * filled + "▱" * empty
 
-                return embed
-
-            card = cards_in_club[self.current_page]
-            
-            color = RARITY_COLORS.get(card['rarete'], discord.Color.default())
-            if card['rarete'] == "Noël":
-                description_text = (
-                    f"❄️ **Édition Spéciale Calendrier de l'Avent** ❄️\n\n"
-                    f"🎅 **Club :** {card['club']}\n"
-                    f"🎄 **Rareté :** {card['rarete']}"
-                )
-            else:
-                description_text = f"**Club :** {card['club']}\n**Rareté :** {card['rarete']}"
-            
+    async def generate_embed(self):
+        # 1. PAGE D'ACCUEIL (Vue globale)
+        if self.current_club is None:
             embed = discord.Embed(
-                title=f"**{card['nom']}**",
-                description=description_text,
-                color=color
+                title="🗂️ Album de Collection",
+                description="Sélectionnez un club ci-dessous pour feuilletter votre album.",
+                color=discord.Color.dark_theme()
             )
-            embed.set_image(url=card['image_url'])
-            embed.set_footer(text=f"Carte {self.current_page + 1} / {len(cards_in_club)}")
+            
+            # Calcul des stats globales
+            unique_user_cards = len(self.collection)
+            percentage = (unique_user_cards / self.total_available_cards) * 100 if self.total_available_cards > 0 else 0
+            
+            # Barre de progression globale stylée
+            blocks = int(percentage / 5) # Barre de 20 blocs
+            bar = "█" * blocks + "░" * (20 - blocks)
+            
+            embed.add_field(
+                name="📈 Progression Totale",
+                value=f"```\n{bar} {percentage:.1f}%\n```\n**{unique_user_cards}** cartes sur **{self.total_available_cards}**",
+                inline=False
+            )
+            
+            # Petit teasing des fragments
+            user_data = database.get_user_data(self.author_id)
+            embed.set_footer(text=f"Solde de fragments : {user_data['fragments']} ♻️")
             return embed
+        
+        # 2. VUE D'UN CLUB
+        cards_in_club = self.cards_by_club.get(self.current_club)
+        
+        # Si le club est vide
+        if not cards_in_club:
+            total_for_club = self.cards_per_club_total.get(self.current_club, 0)
+            embed = discord.Embed(
+                title=f"📁 {self.current_club}",
+                description="*Ce classeur est vide... pour l'instant !*",
+                color=discord.Color.dark_grey()
+            )
+            embed.set_image(url="https://media.discordapp.net/attachments/placeholder_empty_album.png") # Optionnel : mettre une image d'album vide
+            embed.set_footer(text=f"Progression Club : 0 / {total_for_club}")
+            return embed
+
+        # 3. VUE D'UNE CARTE (Le rendu amélioré)
+        card = cards_in_club[self.current_page]
+        color = RARITY_COLORS.get(card['rarete'], discord.Color.default())
+        
+        # Détection "Noël" pour le style
+        is_xmas = card['rarete'] == "Noël"
+        
+        # Titre avec Emojis
+        emoji_club = "🎁" if is_xmas else "🤾"
+        title_prefix = "❄️" if is_xmas else "🃏"
+        
+        embed = discord.Embed(
+            title=f"{title_prefix} {card['nom']}",
+            color=color
+        )
+        
+        # Ajout de l'image
+        embed.set_image(url=card['image_url'])
+        
+        # --- MISE EN PAGE AVEC FIELDS (Plus propre) ---
+        
+        # Colonne de Gauche : Club
+        embed.add_field(
+            name=f"{emoji_club} Club", 
+            value=f"**{card['club']}**", 
+            inline=True
+        )
+        
+        # Colonne de Droite : Rareté
+        rarity_emoji = self.bot.get_cog("CollectionCog").get_rarity_emoji(card['rarete'])
+        embed.add_field(
+            name=f"{rarity_emoji} Rareté", 
+            value=f"**{card['rarete']}**", 
+            inline=True
+        )
+        
+        # Ligne du dessous : "Note" (Étoiles)
+        embed.add_field(
+            name="Niveau",
+            value=self.get_stars(card['rarete']),
+            inline=False
+        )
+
+        # Si c'est Noël, on ajoute une petite phrase d'ambiance
+        if is_xmas:
+            embed.add_field(
+                name="🎄 Édition Limitée", 
+                value="*Cette carte célèbre les fêtes de fin d'année 2025.*", 
+                inline=False
+            )
+
+        # Footer avec barre de progression interne au club
+        current_idx = self.current_page
+        total_in_hand = len(cards_in_club)
+        progress_bar = self.get_progress_bar(current_idx, total_in_hand)
+        
+        embed.set_footer(text=f"Carte {current_idx + 1}/{total_in_hand} du classeur │ {progress_bar}")
+
+        return embed
     
         @discord.ui.select(placeholder="Choisis un club pour voir ta progression...", row=0)
         async def club_select(self, interaction: discord.Interaction, select: discord.ui.Select):
