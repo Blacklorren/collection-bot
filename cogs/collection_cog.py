@@ -176,7 +176,7 @@ class CollectionCog(commands.Cog):
         else:
             await interaction.response.send_message(f"❌ {interaction.user.mention}, tu n'as pas assez de points. Il te manque **{PACK_COST - points} points**.", ephemeral=True)
 
-@app_commands.command(name='ouvrir', description="Ouvre un pack pour recevoir de nouvelles cartes.")
+    @app_commands.command(name='ouvrir', description="Ouvre un pack pour recevoir de nouvelles cartes.")
     async def open_command(self, interaction: discord.Interaction):
         user_id = interaction.user.id
         user_data = database.get_user_data(user_id)
