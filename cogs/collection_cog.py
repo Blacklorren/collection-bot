@@ -259,25 +259,35 @@ class CollectionCog(commands.Cog):
             self.prev_button.disabled = not has_cards or self.current_page == 0
             self.next_button.disabled = not has_cards or self.current_page >= len(self.cards_by_club[self.current_club]) - 1
 
-        def get_stars(self, rarity):
-            return {"Commun":"⭐", "Peu Commun":"⭐⭐", "Rare":"⭐⭐⭐", "Épique":"🌟🌟🌟🌟", "Légendaire":"👑👑👑👑👑", "Noël":"🎄🎄🎄🎄🎄"}.get(rarity, "⭐")
-
-        # FIX : Fonction locale pour éviter l'appel self.bot qui plante
         def get_emoji_safe(self, rarity):
             return {"Commun":"⬜", "Peu Commun":"🟩", "Rare":"🟦", "Épique":"🟪", "Légendaire":"🟨", "Noël":"🎄"}.get(rarity, "🔹")
 
         async def generate_embed(self):
+            # --- VUE GLOBALE ---
             if not self.current_club:
                 unique = len(self.collection)
-                pct = (unique / self.total_available_cards * 100) if self.total_available_cards > 0 else 0
-                bar = "█" * int(pct/5) + "░" * (20 - int(pct/5))
-                embed = discord.Embed(title="🗂️ Album", description="Choisis un club ci-dessous.", color=discord.Color.dark_theme())
-                embed.add_field(name="Progression Globale", value=f"```\n{bar} {pct:.1f}%\n```\n**{unique}** cartes.", inline=False)
+                total = self.total_available_cards
+                pct = (unique / total * 100) if total > 0 else 0
+                
+                # Barre harmonisée (Style footer)
+                nb_filled = int(pct / 5)
+                if pct > 0 and pct < 5: nb_filled = 1 # Au moins un bloc si on a des cartes
+                if pct >= 100: nb_filled = 20
+                
+                bar = "▰" * nb_filled + "▱" * (20 - nb_filled)
+                
+                embed = discord.Embed(title="🗂️ Album de Collection", description="Choisis un club ci-dessous pour voir tes cartes.", color=discord.Color.dark_theme())
+                embed.add_field(
+                    name="📈 Progression Globale", 
+                    value=f"```\n{bar} {pct:.1f}%\n```\nVous possédez **{unique}** / **{total}** cartes.", 
+                    inline=False
+                )
                 return embed
             
+            # --- VUE CLUB ---
             cards = self.cards_by_club.get(self.current_club)
             if not cards:
-                return discord.Embed(title=f"📁 {self.current_club}", description="Aucune carte.", color=discord.Color.dark_grey())
+                return discord.Embed(title=f"📁 {self.current_club}", description="Aucune carte dans ce classeur.", color=discord.Color.dark_grey())
 
             card = cards[self.current_page]
             is_xmas = card['rarete'] == "Noël"
@@ -286,15 +296,19 @@ class CollectionCog(commands.Cog):
             embed = discord.Embed(title=f"{'❄️' if is_xmas else '🃏'} {card['nom']}", color=color)
             embed.set_image(url=card['image_url'])
             
-            # Utilisation de la méthode sûre
             emoji = self.get_emoji_safe(card['rarete'])
             
             embed.add_field(name=f"{'🎁' if is_xmas else '🤾'} Club", value=f"**{card['club']}**", inline=True)
             embed.add_field(name=f"{emoji} Rareté", value=f"**{card['rarete']}**", inline=True)
-            embed.add_field(name="Niveau", value=self.get_stars(card['rarete']), inline=False)
+            # Suppression du champ "Niveau" (étoiles) comme demandé
             
             total = len(cards)
-            prog_bar = "▰" * int(((self.current_page+1)/total)*10) + "▱" * (10-int(((self.current_page+1)/total)*10))
+            # Barre de progression interne au club
+            prog_pct = (self.current_page + 1) / total
+            nb_filled = int(prog_pct * 10)
+            if nb_filled == 0 and total > 0: nb_filled = 1
+            
+            prog_bar = "▰" * nb_filled + "▱" * (10 - nb_filled)
             embed.set_footer(text=f"Carte {self.current_page + 1}/{total} │ {prog_bar}")
             return embed
     
