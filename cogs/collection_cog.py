@@ -425,13 +425,15 @@ class CollectionCog(commands.Cog):
     async def top_command(self, interaction: discord.Interaction):
         data = database.get_leaderboard_data()
         clean_data = [d for d in data if d[0] not in LEADERBOARD_EXCLUDED_IDS][:10]
+
+        total_cards = len(self.all_cards)
         
         desc = ""
         for i, (uid, count) in enumerate(clean_data, 1):
             m = interaction.guild.get_member(uid)
             name = m.display_name if m else "Inconnu"
             medal = "🥇" if i==1 else "🥈" if i==2 else "🥉" if i==3 else f"#{i}"
-            desc += f"{medal} **{name}** : {count} cartes\n"
+            desc += f"{medal} **{name}** : {count} / {total_cards} cartes\n"
             
         await interaction.response.send_message(embed=discord.Embed(title="🏆 Meilleurs Collectionneurs", description=desc or "Aucune donnée", color=discord.Color.gold()))
 
