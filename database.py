@@ -40,10 +40,14 @@ def initialize_database():
         except sqlite3.OperationalError: pass
         try:
             cur.execute("ALTER TABLE users ADD COLUMN has_received_onboarding INTEGER NOT NULL DEFAULT 0")
-        except sqlite3.OperationalError: pass
+        except sqlite3.OperationalError: pass 
+        try:
+            cur.execute("ALTER TABLE users ADD COLUMN last_advent_pack_date TEXT")
+        except sqlite3.OperationalError: pass    
         try:
             cur.execute("ALTER TABLE users RENAME COLUMN last_daily TO last_activity_date")
         except sqlite3.OperationalError: pass
+
             
         cur.execute('''
             CREATE TABLE IF NOT EXISTS user_cards (
@@ -650,6 +654,14 @@ def get_user_correct_pronostics(user_id):
             ORDER BY m.date_match DESC
         """, (user_id,))
         return cur.fetchall()
+
+def set_advent_pack_opened(user_id, date_str):
+    """Enregistre que l'utilisateur a ouvert son pack de l'avent pour cette date."""
+    check_user(user_id)
+    with sqlite3.connect(DB_NAME) as con:
+        cur = con.cursor()
+        cur.execute("UPDATE users SET last_advent_pack_date = ? WHERE user_id = ?", (date_str, user_id))
+        con.commit()
 
 def get_general_leaderboard(points_per_win, limit=10):
     """
