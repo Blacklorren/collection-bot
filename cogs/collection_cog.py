@@ -583,7 +583,7 @@ class CollectionCog(commands.Cog):
         embed.add_field(name="Nouveau Solde", value=f"Tu possèdes maintenant **{user_data['fragments']} fragments**.")
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-@app_commands.command(name='creer', description="Dépense tes fragments pour créer une carte manquante.")
+    @app_commands.command(name='creer', description="Dépense tes fragments pour créer une carte manquante.")
     @app_commands.describe(nom_de_la_carte="Le nom (même partiel) du joueur que tu veux créer.")
     async def create_card_command(self, interaction: discord.Interaction, nom_de_la_carte: str):
         user_id = interaction.user.id
