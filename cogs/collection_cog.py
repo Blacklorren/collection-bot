@@ -169,7 +169,10 @@ class CollectionCog(commands.Cog):
     @app_commands.command(name='ouvrir', description="Ouvrir un pack.")
     async def open_command(self, interaction: discord.Interaction):
         uid = interaction.user.id
-        user_data = database.get_user_data(uid)
+        
+        # --- MODIFICATION ICI : Conversion explicite en dictionnaire ---
+        # Cela permet d'utiliser la méthode .get() sans erreur
+        user_data = dict(database.get_user_data(uid))
         
         if user_data['packs'] <= 0:
             return await interaction.response.send_message("❌ Tu n'as pas de pack. Fais `/pack`.", ephemeral=True)
@@ -185,8 +188,10 @@ class CollectionCog(commands.Cog):
         # Gestion Noël
         is_advent = False
         now = datetime.datetime.now(pytz.timezone('Europe/Paris'))
+        # Active uniquement du 1er au 24 décembre
         if now.month == 12 and 1 <= now.day <= 24:
             today_str = now.date().isoformat()
+            # Grâce à la conversion en dict plus haut, .get() fonctionne maintenant
             if user_data.get('last_advent_pack_date') != today_str:
                 advent_card = self.card_map.get(f"noel_{now.day}")
                 if advent_card:
@@ -205,11 +210,11 @@ class CollectionCog(commands.Cog):
                 title = f"🎄 CALENDRIER : {card['nom']} 🎄"
                 desc += "\n✨ *Carte du jour !* ✨"
 
-            embed = discord.Embed(title=title, description=desc, color=RARITY_COLORS.get(card['rarete']))
+            embed = discord.Embed(title=title, description=desc, color=RARITY_COLORS.get(card['rarete'], discord.Color.default()))
             embed.set_image(url=card['image_url'])
             await interaction.followup.send(embed=embed, ephemeral=True)
 
-            # Annonce globale (sauf calendrier auto)
+            # Annonce globale (sauf calendrier auto si on ne veut pas spammer)
             if card['rarete'] in ["Épique", "Légendaire", "Noël"] and ANNONCE_CHANNEL_ID != 0:
                 if card['rarete'] == "Noël" and is_advent: continue
                 try:
