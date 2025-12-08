@@ -1805,6 +1805,20 @@
     "club": "Légendes Starligue",
     "rarete": "Noël",
     "image_url": "https://i.imgur.com/Apv59r5.png"
+  },
+      {
+    "id": "noel_9",
+    "nom": "Guillaume Saurina",
+    "club": "Légendes Starligue",
+    "rarete": "Noël",
+    "image_url": "https://i.imgur.com/cIrjYkA.png"
+  },
+        {
+    "id": "noel_10",
+    "nom": "Yann Genty",
+    "club": "Légendes Starligue",
+    "rarete": "Noël",
+    "image_url": "https://i.imgur.com/1pb8vE2.png"
   }
 ]
 
