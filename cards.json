@@ -1819,6 +1819,20 @@
     "club": "Légendes Starligue",
     "rarete": "Noël",
     "image_url": "https://i.imgur.com/1pb8vE2.png"
+  },
+          {
+    "id": "noel_11",
+    "nom": "Mladen Bojinovic",
+    "club": "Légendes Starligue",
+    "rarete": "Noël",
+    "image_url": "https://i.imgur.com/x0hqLrX.png"
+  },
+          {
+    "id": "noel_12",
+    "nom": "Luc Tobie",
+    "club": "Légendes Starligue",
+    "rarete": "Noël",
+    "image_url": "https://i.imgur.com/BQcPMA6.png"
   }
 ]
 
