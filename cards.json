@@ -1751,6 +1751,27 @@
     "image_url": "https://i.imgur.com/B1AUtkb.png"
   },
         {
+    "id": 256,
+    "nom": "Sindre Heldal",
+    "club": "Paris",
+    "rarete": "Commun",
+    "image_url": "https://i.imgur.com/yX6zCjx.png"
+  },
+        {
+    "id": 257,
+    "nom": "Mateo Maras",
+    "club": "Paris",
+    "rarete": "Peu Commun",
+    "image_url": "https://i.imgur.com/DXU7Z7M.png"
+  },
+        {
+    "id": 258,
+    "nom": "Boris Zivkovic",
+    "club": "Chambéry",
+    "rarete": "Peu Commune",
+    "image_url": "https://i.imgur.com/I5UkCwX.png"
+  },
+        {
     "id": "noel_1",
     "nom": "Adrien DiPanda",
     "club": "Légendes Starligue",
@@ -1833,6 +1854,20 @@
     "club": "Légendes Starligue",
     "rarete": "Noël",
     "image_url": "https://i.imgur.com/BQcPMA6.png"
+  },
+            {
+    "id": "noel_13",
+    "nom": "Kornel Nagy",
+    "club": "Légendes Starligue",
+    "rarete": "Noël",
+    "image_url": "https://i.imgur.com/pF0DXpo.png"
+  },
+            {
+    "id": "noel_14",
+    "nom": "William Accambray",
+    "club": "Légendes Starligue",
+    "rarete": "Noël",
+    "image_url": "https://i.imgur.com/fOZZBFc.png"
   }
 ]
 
