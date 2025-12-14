@@ -1868,6 +1868,20 @@
     "club": "Légendes Starligue",
     "rarete": "Noël",
     "image_url": "https://i.imgur.com/fOZZBFc.png"
+  },
+              {
+    "id": "noel_15",
+    "nom": "Cyril Dumoulin",
+    "club": "Légendes Starligue",
+    "rarete": "Noël",
+    "image_url": "https://i.imgur.com/zA7Sl6I.png"
+  },
+              {
+    "id": "noel_16",
+    "nom": "Sébastien Bosquet",
+    "club": "Légendes Starligue",
+    "rarete": "Noël",
+    "image_url": "https://i.imgur.com/F9KvHDk.png"
   }
 ]
 
