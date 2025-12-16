@@ -1882,6 +1882,19 @@
     "club": "Légendes Starligue",
     "rarete": "Noël",
     "image_url": "https://i.imgur.com/F9KvHDk.png"
+  },
+                {
+    "id": "noel_17",
+    "nom": "Dragan Gajic",
+    "club": "Légendes Starligue",
+    "rarete": "Noël",
+    "image_url": "https://i.imgur.com/CAdlLi1.png"
+  },              {
+    "id": "noel_18",
+    "nom": "Michael Guigou",
+    "club": "Légendes Starligue",
+    "rarete": "Noël",
+    "image_url": "https://i.imgur.com/7STg1XW.png"
   }
 ]
 
