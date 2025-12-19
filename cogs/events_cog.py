@@ -248,6 +248,7 @@ class EventsCog(commands.Cog):
                                 'id': match_id, 'equipe1': match['team1'], 'equipe2': match['team2'],
                                 'date_match': match['start_time_utc']
                             })
+                        await asyncio.sleep(5)
                     except discord.Forbidden:
                         print("❌ (MATCHES) Permission refusée pour créer un événement.")
                     except Exception as ex:
@@ -373,7 +374,7 @@ class EventsCog(commands.Cog):
                         match['discord_event_id'], match['equipe1'], match['equipe2'], result
                     )
                     processed_count += 1
-                    await asyncio.sleep(2) 
+                    await asyncio.sleep(5) 
             except Exception as e:
                 print(f"❌ (RESULTS) Erreur vérification résultat pour match {match['id']}: {e}")
         
