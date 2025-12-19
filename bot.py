@@ -353,3 +353,10 @@ async def main():
     finally:
         if not bot.is_closed():
             await bot.close()
+
+if __name__ == "__main__":
+    print("🚀 Démarrage du script...", flush=True)
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\n👋 Arrêt manuel du bot.")
