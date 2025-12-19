@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 import database
 import pytz
 import asyncio
+import logging
 from datetime import datetime, timedelta
 
 # Le dossier où les données persistantes sont stockées
@@ -279,9 +280,17 @@ async def setup_global_commands(bot):
             else:
                 await ctx.send("✅ Tous les modules ont été rechargés.", ephemeral=True)
 
-# 6. Lancement du bot
+# 6. Lancement du bot (VERSION DEBUG)
 async def main():
     """Fonction principale pour lancer le bot."""
+    
+    # 1. ACTIVER LE LOGGING DÉTAILLÉ
+    # Cela va afficher toutes les requêtes HTTP envoyées par discord.py
+    discord.utils.setup_logging(level=logging.INFO, root=False)
+    
+    # On peut aussi activer les logs HTTP spécifiques si besoin (très verbeux)
+    # logging.getLogger('discord.http').setLevel(logging.DEBUG)
+
     bot = HandnewsBot()
     
     # Ajouter les commandes globales
@@ -291,23 +300,56 @@ async def main():
         print("⏳ Attente de 5 secondes avant connexion API...")
         await asyncio.sleep(5) 
         await bot.start(TOKEN)
+        
     except discord.errors.LoginFailure:
         print("❌ Erreur de connexion : Le token fourni est invalide.")
+        
     except discord.errors.HTTPException as e:
+        # --- ANALYSE DÉTAILLÉE DE L'ERREUR ---
+        print("\n" + "="*40)
+        print(f"🛑 CRASH HTTP DÉTECTÉ (Status: {e.status})")
+        print("="*40)
+        
+        # 1. Afficher le code d'erreur interne Discord (si présent)
+        if e.code:
+            print(f"📌 Code Erreur Discord : {e.code}")
+        
+        # 2. Afficher le texte renvoyé par l'API (contient souvent la raison)
+        if e.text:
+            print(f"📄 Message API : {e.text}")
+            
+        # 3. Analyser les en-têtes pour voir le 'Retry-After'
+        if e.response is not None:
+            headers = e.response.headers
+            print("\n🔍 En-têtes de réponse (Headers) :")
+            
+            retry_after = headers.get('Retry-After')
+            cf_ray = headers.get('CF-RAY')
+            
+            if retry_after:
+                print(f"⚠️ RETRY-AFTER : {retry_after} secondes")
+            
+            if cf_ray:
+                print(f"⚠️ Cloudflare Ray ID : {cf_ray} (Preuve que ça passe par Cloudflare)")
+                
+            # Afficher tout si besoin d'investigation
+            # print(headers)
+
         if e.status == 429:
-            print("❌ ERREUR 429 (RATE LIMIT): L'IP est bannie temporairement. Arrêt forcé pour 1h.")
-            # On force un long sommeil pour empêcher le conteneur de redémarrer immédiatement
+            print("\n❌ DIAGNOSTIC : RATE LIMIT (429)")
+            print("Il y a deux types de 429 :")
+            print("1. Global Rate Limit (Bot) : Vous faites trop de requêtes.")
+            print("2. Cloudflare Ban (IP) : L'adresse IP de votre serveur est bloquée par Discord.")
+            print("   -> Si 'Message API' contient 'error code: 1015' ou HTML, c'est l'IP.")
+            
+            # On force un long sommeil pour empêcher le conteneur de redémarrer en boucle
+            print("💤 Mise en sommeil forcé pour 1h...")
             await asyncio.sleep(3600) 
         else:
-            print(f"❌ Erreur HTTP : {e}")
+            print(f"❌ Erreur HTTP Autre : {e}")
+            
     except Exception as e:
-        print(f"❌ Une erreur est survenue lors du lancement du bot : {e}")
+        print(f"❌ Une erreur inattendue est survenue : {e}")
     finally:
-        await bot.close()
-
-# Point d'entrée
-if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        print("\n👋 Arrêt du bot...")
+        if not bot.is_closed():
+            await bot.close()
