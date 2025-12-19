@@ -1889,19 +1889,22 @@
     "club": "Légendes Starligue",
     "rarete": "Noël",
     "image_url": "https://i.imgur.com/CAdlLi1.png"
-  },              {
+  },              
+  {
     "id": "noel_18",
     "nom": "Michael Guigou",
     "club": "Légendes Starligue",
     "rarete": "Noël",
     "image_url": "https://i.imgur.com/7STg1XW.png"
-  },              {
+  },              
+  {
       "id": "noel_19",
     "nom": "Vincent Gérard",
     "club": "Légendes Starligue",
     "rarete": "Noël",
     "image_url": "https://i.imgur.com/jI64SZR.png"
-  },              {
+  },              
+  {
       "id": "noel_20",
     "nom": "Mikkel Hansen",
     "club": "Légendes Starligue",
