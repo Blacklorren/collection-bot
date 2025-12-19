@@ -288,9 +288,18 @@ async def main():
     await setup_global_commands(bot)
     
     try:
+        print("⏳ Attente de 5 secondes avant connexion API...")
+        await asyncio.sleep(5) 
         await bot.start(TOKEN)
     except discord.errors.LoginFailure:
         print("❌ Erreur de connexion : Le token fourni est invalide.")
+    except discord.errors.HTTPException as e:
+        if e.status == 429:
+            print("❌ ERREUR 429 (RATE LIMIT): L'IP est bannie temporairement. Arrêt forcé pour 1h.")
+            # On force un long sommeil pour empêcher le conteneur de redémarrer immédiatement
+            await asyncio.sleep(3600) 
+        else:
+            print(f"❌ Erreur HTTP : {e}")
     except Exception as e:
         print(f"❌ Une erreur est survenue lors du lancement du bot : {e}")
     finally:
