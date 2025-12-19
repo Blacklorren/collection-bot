@@ -61,7 +61,7 @@ class PronosticsCog(commands.Cog):
         for match in matches:
             if not database.get_prono_message(match['id']):
                 await self.create_prono_message(channel, match)
-                await asyncio.sleep(1)
+                await asyncio.sleep(5)
 
     # on_raw_reaction_add et on_raw_reaction_remove restent INCHANGÉS
 
