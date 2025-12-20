@@ -1910,6 +1910,31 @@
     "club": "Légendes Starligue",
     "rarete": "Noël",
     "image_url": "https://i.imgur.com/iYMTjGo.png?v=1"
+  },
+    {
+    "id": "noel_21",
+    "nom": "Issam Tej",
+    "club": "Légendes Starligue",
+    "rarete": "Noël",
+    "image_url": "https://i.imgur.com/EWXqc9R.png"
+  },   {
+    "id": "noel_22",
+    "nom": "Luc Abalo",
+    "club": "Légendes Starligue",
+    "rarete": "Noël",
+    "image_url": "https://i.imgur.com/iiON3dw.png"
+  },   {
+    "id": "noel_23",
+    "nom": "Nikola Karabatic",
+    "club": "Légendes Starligue",
+    "rarete": "Noël",
+    "image_url": "https://i.imgur.com/zXWii5z.png"
+  },   {
+    "id": "noel_24",
+    "nom": "Raphael Caucheteux",
+    "club": "Légendes Starligue",
+    "rarete": "Noël",
+    "image_url": "https://i.imgur.com/Y4lkrqj.gif"
   }
 ]
 
