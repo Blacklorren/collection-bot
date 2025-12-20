@@ -225,6 +225,46 @@ class CollectionCog(commands.Cog):
                         await chan.send(embed=e)
                 except: pass
 
+    @commands.command(name='compensation')
+    @commands.has_permissions(administrator=True)
+    async def compensation_command(self, ctx, card_id: str = "noel_19"):
+        """
+        [Admin] Donne une carte à tous les joueurs qui ne l'ont pas.
+        Usage: !compensation noel_19
+        """
+        # 1. Vérifier que la carte existe
+        # On gère le cas où l'ID est un int ou un str
+        target_card = self.card_map.get(card_id) or self.card_map.get(int(card_id) if card_id.isdigit() else card_id)
+        
+        if not target_card:
+            await ctx.send(f"❌ Carte introuvable avec l'ID `{card_id}`.", ephemeral=True)
+            return
+
+        embed = discord.Embed(
+            title="🎁 Distribution de Compensation",
+            description=f"Préparation de la distribution de **{target_card['nom']}**...",
+            color=discord.Color.gold()
+        )
+        msg = await ctx.send(embed=embed)
+
+        # 2. Exécuter la distribution en masse
+        try:
+            # On utilise str(card_id) pour être sûr que ça matche le format dans la DB
+            count = database.mass_give_card_if_missing(card_id)
+            
+            embed.description = (
+                f"✅ **Opération terminée !**\n\n"
+                f"🃏 **Carte :** {target_card['nom']} (ID: {card_id})\n"
+                f"👥 **Utilisateurs crédités :** {count}\n"
+                f"ℹ️ *Les utilisateurs qui l'avaient déjà n'ont pas reçu de doublon.*"
+            )
+            embed.color = discord.Color.green()
+            embed.set_image(url=target_card['image_url'])
+            await msg.edit(embed=embed)
+            
+        except Exception as e:
+            await msg.edit(content=f"❌ Une erreur est survenue : `{e}`", embed=None)
+
     # --- CLASSE D'AFFICHAGE (View) ---
     class CollectionView(discord.ui.View):
         current_club: str = None
