@@ -695,3 +695,27 @@ def get_general_leaderboard(points_per_win, limit=10):
         
         leaderboard = cur.fetchall()
         return [dict(row) for row in leaderboard]
+
+def mass_give_card_if_missing(card_id):
+    """
+    Donne une carte spécifique à TOUS les utilisateurs enregistrés
+    qui ne possèdent pas encore cette carte.
+    Retourne le nombre de cartes distribuées.
+    """
+    with sqlite3.connect(DB_NAME) as con:
+        cur = con.cursor()
+        
+        # Cette requête sélectionne tous les user_id de la table users
+        # qui ne sont PAS dans la liste des gens possédant déjà la carte.
+        # Puis elle insère la carte pour ces gens-là.
+        cur.execute("""
+            INSERT INTO user_cards (user_id, card_id)
+            SELECT user_id, ?
+            FROM users
+            WHERE user_id NOT IN (
+                SELECT user_id FROM user_cards WHERE card_id = ?
+            )
+        """, (card_id, card_id))
+        
+        con.commit()
+        return cur.rowcount
