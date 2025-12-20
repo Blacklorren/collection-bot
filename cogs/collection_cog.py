@@ -237,7 +237,8 @@ class CollectionCog(commands.Cog):
         target_card = self.card_map.get(card_id) or self.card_map.get(int(card_id) if card_id.isdigit() else card_id)
         
         if not target_card:
-            await ctx.send(f"❌ Carte introuvable avec l'ID `{card_id}`.", ephemeral=True)
+            # CORRECTION : pas de ephemeral=True ici
+            await ctx.send(f"❌ Carte introuvable avec l'ID `{card_id}`.", delete_after=10)
             return
 
         embed = discord.Embed(
