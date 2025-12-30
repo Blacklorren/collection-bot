@@ -20,6 +20,8 @@ async def fetch_image(session, url):
             if response.status == 200:
                 data = await response.read()
                 return Image.open(io.BytesIO(data))
+            else:
+                print(f"DEBUG: Failed to fetch {url}, status: {response.status}")
     except Exception as e:
         print(f"Erreur téléchargement image {url}: {e}")
     return None
@@ -31,14 +33,21 @@ def create_placeholder(card_name, rarity):
     
     # Tentative de chargement de font, sinon défaut
     try:
-        # Essayer d'utiliser une font système si possible, sinon défaut
-        font_large = ImageFont.truetype("arial.ttf", 46)
-        font_small = ImageFont.truetype("arial.ttf", 34)
-        font_rarity = ImageFont.truetype("arial.ttf", 28)
+        # Essayer d'utiliser une font BOLD système si possible
+        # Windows/Linux ont souvent arialbd.ttf
+        font_large = ImageFont.truetype("arialbd.ttf", 46)
+        font_small = ImageFont.truetype("arialbd.ttf", 34)
+        font_rarity = ImageFont.truetype("arialbd.ttf", 28)
     except IOError:
-        font_large = ImageFont.load_default()
-        font_small = ImageFont.load_default()
-        font_rarity = ImageFont.load_default()
+        try:
+            # Fallback sur Arial normal
+            font_large = ImageFont.truetype("arial.ttf", 46) 
+            font_small = ImageFont.truetype("arial.ttf", 34)
+            font_rarity = ImageFont.truetype("arial.ttf", 28)
+        except IOError:
+            font_large = ImageFont.load_default()
+            font_small = ImageFont.load_default()
+            font_rarity = ImageFont.load_default()
 
     # Dessin du cadre
     draw.rectangle([0, 0, CARD_WIDTH-1, CARD_HEIGHT-1], outline=(100, 100, 100), width=2)
@@ -46,19 +55,19 @@ def create_placeholder(card_name, rarity):
     # Texte centré (Nom)
     text_bbox = draw.textbbox((0, 0), "MANQUANTE", font=font_large)
     text_w = text_bbox[2] - text_bbox[0]
-    draw.text(((CARD_WIDTH - text_w) / 2, CARD_HEIGHT / 2 - 70), "MANQUANTE", fill=(200, 50, 50), font=font_large)
+    draw.text(((CARD_WIDTH - text_w) / 2, CARD_HEIGHT / 2 - 70), "MANQUANTE", fill=(255, 80, 80), font=font_large)
 
     # Nom de la carte
     # On coupe si trop long
     name_to_draw = card_name if len(card_name) < 20 else card_name[:17] + "..."
     text_bbox = draw.textbbox((0, 0), name_to_draw, font=font_small)
     text_w = text_bbox[2] - text_bbox[0]
-    draw.text(((CARD_WIDTH - text_w) / 2, CARD_HEIGHT / 2), name_to_draw, fill=TEXT_COLOR, font=font_small)
+    draw.text(((CARD_WIDTH - text_w) / 2, CARD_HEIGHT / 2), name_to_draw, fill=(255, 255, 255), font=font_small)
     
     # Rareté
     text_bbox = draw.textbbox((0, 0), rarity, font=font_rarity)
     text_w = text_bbox[2] - text_bbox[0]
-    draw.text(((CARD_WIDTH - text_w) / 2, CARD_HEIGHT / 2 + 50), rarity, fill=(150, 150, 150), font=font_rarity)
+    draw.text(((CARD_WIDTH - text_w) / 2, CARD_HEIGHT / 2 + 50), rarity, fill=(200, 200, 200), font=font_rarity)
 
     return img
 
@@ -83,7 +92,7 @@ async def generate_club_album(club_name, all_cards_in_club, owned_card_ids):
     
     # 2. Titre du Club
     try:
-        title_font = ImageFont.truetype("arial.ttf", 50)
+        title_font = ImageFont.truetype("arialbd.ttf", 60)
     except:
         title_font = ImageFont.load_default()
         
@@ -100,11 +109,9 @@ async def generate_club_album(club_name, all_cards_in_club, owned_card_ids):
             is_owned = (card_id in owned_card_ids) or (str(card_id) in [str(x) for x in owned_card_ids])
             
             # DEBUG
-            if i < 3:
-                print(f"DEBUG CARD {card_id}: Owned? {is_owned} (in list of {len(owned_card_ids)} items)")
-                if is_owned:
-                    print(f"DEBUG: Launching fetch for {card['image_url']}")
-
+            if is_owned:
+                print(f"DEBUG: Found owned card {card['nom']} (ID: {card_id}). Fetching image...")
+            
             if is_owned:
                 tasks.append(fetch_image(session, card['image_url']))
             else:
