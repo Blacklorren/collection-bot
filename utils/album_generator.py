@@ -32,7 +32,6 @@ def get_font(size):
         except (IOError, OSError):
             continue
     # Dernier recours : police par défaut (sera petite)
-    print("WARNING: Aucune police système trouvée, utilisation de la police par défaut")
     return ImageFont.load_default()
 
 async def fetch_image(session, url):
@@ -43,9 +42,9 @@ async def fetch_image(session, url):
                 data = await response.read()
                 return Image.open(io.BytesIO(data))
             else:
-                print(f"DEBUG: Failed to fetch {url}, status: {response.status}")
+                pass  # Image non téléchargée
     except Exception as e:
-        print(f"Erreur téléchargement image {url}: {e}")
+        pass  # Erreur silencieuse
     return None
 
 def create_placeholder(card_name, rarity):
@@ -144,7 +143,6 @@ async def generate_club_album(club_name, all_cards_in_club, owned_card_ids):
             is_owned = (card_id in owned_card_ids) or (str(card_id) in [str(x) for x in owned_card_ids])
             
             if is_owned:
-                print(f"DEBUG: Found owned card {card['nom']} (ID: {card_id}). Fetching image...")
                 tasks.append(fetch_image(session, card['image_url']))
             else:
                 # Pas de tâche réseau pour les placeholders
