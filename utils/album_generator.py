@@ -73,11 +73,30 @@ def create_placeholder(card_name, rarity):
     text_w = text_bbox[2] - text_bbox[0]
     draw.text(((small_w - text_w) / 2, small_h / 2 - 30), text, fill=(255, 80, 80), font=font)
 
-    # Nom de la carte (tronqué si trop long)
-    name_to_draw = card_name if len(card_name) < 15 else card_name[:12] + "..."
-    text_bbox = draw.textbbox((0, 0), name_to_draw, font=small_font)
-    text_w = text_bbox[2] - text_bbox[0]
-    draw.text(((small_w - text_w) / 2, small_h / 2), name_to_draw, fill=(255, 255, 255), font=small_font)
+    # Nom de la carte (sur 2 lignes si trop long)
+    max_chars_per_line = 18
+    if len(card_name) <= max_chars_per_line:
+        # Tient sur une ligne
+        text_bbox = draw.textbbox((0, 0), card_name, font=small_font)
+        text_w = text_bbox[2] - text_bbox[0]
+        draw.text(((small_w - text_w) / 2, small_h / 2), card_name, fill=(255, 255, 255), font=small_font)
+    else:
+        # Diviser sur 2 lignes (au milieu approximativement)
+        words = card_name.split()
+        mid = len(words) // 2
+        line1 = " ".join(words[:mid]) if mid > 0 else words[0]
+        line2 = " ".join(words[mid:]) if mid > 0 else ""
+        
+        # Ligne 1
+        text_bbox = draw.textbbox((0, 0), line1, font=small_font)
+        text_w = text_bbox[2] - text_bbox[0]
+        draw.text(((small_w - text_w) / 2, small_h / 2 - 8), line1, fill=(255, 255, 255), font=small_font)
+        
+        # Ligne 2
+        if line2:
+            text_bbox = draw.textbbox((0, 0), line2, font=small_font)
+            text_w = text_bbox[2] - text_bbox[0]
+            draw.text(((small_w - text_w) / 2, small_h / 2 + 8), line2, fill=(255, 255, 255), font=small_font)
     
     # Rareté
     text_bbox = draw.textbbox((0, 0), rarity, font=tiny_font)
