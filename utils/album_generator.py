@@ -32,24 +32,34 @@ def create_placeholder(card_name, rarity):
     """Crée une carte 'cachée' visuellement."""
     img = Image.new('RGB', (CARD_WIDTH, CARD_HEIGHT), color=PLACEHOLDER_COLOR)
     draw = ImageDraw.Draw(img)
-    
-    # Tentative de chargement de font, sinon défaut
-    try:
-        # Essayer d'utiliser une font BOLD système si possible
-        # Windows/Linux ont souvent arialbd.ttf
-        font_large = ImageFont.truetype("arialbd.ttf", 92)  # Doublé (46 -> 92)
-        font_small = ImageFont.truetype("arialbd.ttf", 68)  # Doublé (34 -> 68)
-        font_rarity = ImageFont.truetype("arialbd.ttf", 46) # +60% (28 -> 46)
-    except IOError:
+    # Tentative d'utilisation de polices systèmes (Windows prioritaire)
+    font_paths = [
+        "C:/Windows/Fonts/arialbd.ttf", # Windows Bold
+        "C:/Windows/Fonts/arial.ttf",   # Windows Normal
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", # Linux (souvent présent)
+        "arialbd.ttf",
+        "arial.ttf"
+    ]
+
+    font_large = None
+    loaded_path = "DEFAULT"
+
+    for path in font_paths:
         try:
-            # Fallback sur Arial normal
-            font_large = ImageFont.truetype("arial.ttf", 92) 
-            font_small = ImageFont.truetype("arial.ttf", 68)
-            font_rarity = ImageFont.truetype("arial.ttf", 46)
-        except IOError:
-            font_large = ImageFont.load_default()
-            font_small = ImageFont.load_default()
-            font_rarity = ImageFont.load_default()
+            font_large = ImageFont.truetype(path, 92)
+            font_small = ImageFont.truetype(path, 68)
+            font_rarity = ImageFont.truetype(path, 46)
+            loaded_path = path
+            print(f"DEBUG: SUCCESS loading font from {path}")
+            break
+        except Exception:
+            continue
+            
+    if font_large is None:
+        print("DEBUG: FAILURE loading custom fonts. Fallback to default (TINY TEXT WARNING).")
+        font_large = ImageFont.load_default()
+        font_small = ImageFont.load_default()
+        font_rarity = ImageFont.load_default()
 
     # Dessin du cadre
     draw.rectangle([0, 0, CARD_WIDTH-1, CARD_HEIGHT-1], outline=(100, 100, 100), width=2)
@@ -102,7 +112,10 @@ async def generate_club_album(club_name, all_cards_in_club, owned_card_ids):
     
     # 2. Titre du Club
     try:
-        title_font = ImageFont.truetype("arialbd.ttf", 100) # Titre géant
+        if loaded_path != "DEFAULT":
+            title_font = ImageFont.truetype(loaded_path, 100)
+        else:
+            title_font = ImageFont.load_default()
     except:
         title_font = ImageFont.load_default()
         
