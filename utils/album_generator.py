@@ -99,6 +99,12 @@ async def generate_club_album(club_name, all_cards_in_club, owned_card_ids):
             # Support int/str
             is_owned = (card_id in owned_card_ids) or (str(card_id) in [str(x) for x in owned_card_ids])
             
+            # DEBUG
+            if i < 3:
+                print(f"DEBUG CARD {card_id}: Owned? {is_owned} (in list of {len(owned_card_ids)} items)")
+                if is_owned:
+                    print(f"DEBUG: Launching fetch for {card['image_url']}")
+
             if is_owned:
                 tasks.append(fetch_image(session, card['image_url']))
             else:
