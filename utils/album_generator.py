@@ -32,9 +32,9 @@ def create_placeholder(card_name, rarity):
     # Tentative de chargement de font, sinon défaut
     try:
         # Essayer d'utiliser une font système si possible, sinon défaut
-        font_large = ImageFont.truetype("arial.ttf", 32)
-        font_small = ImageFont.truetype("arial.ttf", 26)
-        font_rarity = ImageFont.truetype("arial.ttf", 22)
+        font_large = ImageFont.truetype("arial.ttf", 46)
+        font_small = ImageFont.truetype("arial.ttf", 34)
+        font_rarity = ImageFont.truetype("arial.ttf", 28)
     except IOError:
         font_large = ImageFont.load_default()
         font_small = ImageFont.load_default()
@@ -46,7 +46,7 @@ def create_placeholder(card_name, rarity):
     # Texte centré (Nom)
     text_bbox = draw.textbbox((0, 0), "MANQUANTE", font=font_large)
     text_w = text_bbox[2] - text_bbox[0]
-    draw.text(((CARD_WIDTH - text_w) / 2, CARD_HEIGHT / 2 - 50), "MANQUANTE", fill=(200, 50, 50), font=font_large)
+    draw.text(((CARD_WIDTH - text_w) / 2, CARD_HEIGHT / 2 - 70), "MANQUANTE", fill=(200, 50, 50), font=font_large)
 
     # Nom de la carte
     # On coupe si trop long
@@ -58,7 +58,7 @@ def create_placeholder(card_name, rarity):
     # Rareté
     text_bbox = draw.textbbox((0, 0), rarity, font=font_rarity)
     text_w = text_bbox[2] - text_bbox[0]
-    draw.text(((CARD_WIDTH - text_w) / 2, CARD_HEIGHT / 2 + 30), rarity, fill=(150, 150, 150), font=font_rarity)
+    draw.text(((CARD_WIDTH - text_w) / 2, CARD_HEIGHT / 2 + 50), rarity, fill=(150, 150, 150), font=font_rarity)
 
     return img
 
