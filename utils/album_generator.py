@@ -50,33 +50,42 @@ async def fetch_image(session, url):
 
 def create_placeholder(card_name, rarity):
     """Crée une carte 'cachée' visuellement."""
-    img = Image.new('RGB', (CARD_WIDTH, CARD_HEIGHT), color=PLACEHOLDER_COLOR)
+    # WORKAROUND: La police par défaut de Pillow est minuscule et non-redimensionnable.
+    # On dessine sur une petite image puis on l'agrandit.
+    SCALE_FACTOR = 4
+    small_w = CARD_WIDTH // SCALE_FACTOR
+    small_h = CARD_HEIGHT // SCALE_FACTOR
+    
+    img = Image.new('RGB', (small_w, small_h), color=PLACEHOLDER_COLOR)
     draw = ImageDraw.Draw(img)
     
-    # Charger les polices avec le helper
-    font_large = get_font(92)
-    font_small = get_font(68)
-    font_rarity = get_font(46)
+    # Charger la police (sera petite mais on upscale après)
+    font = get_font(16)  # Taille cible après upscale: 16*4 = 64px
+    small_font = get_font(12)  # 12*4 = 48px
+    tiny_font = get_font(10)  # 10*4 = 40px
 
     # Dessin du cadre
-    draw.rectangle([0, 0, CARD_WIDTH-1, CARD_HEIGHT-1], outline=(100, 100, 100), width=2)
+    draw.rectangle([0, 0, small_w-1, small_h-1], outline=(100, 100, 100), width=1)
     
     # Texte "MANQUANTE"
-    text_bbox = draw.textbbox((0, 0), "MANQUANTE", font=font_large)
+    text = "MANQUANTE"
+    text_bbox = draw.textbbox((0, 0), text, font=font)
     text_w = text_bbox[2] - text_bbox[0]
-    draw.text(((CARD_WIDTH - text_w) / 2, CARD_HEIGHT / 2 - 120), "MANQUANTE", fill=(255, 80, 80), font=font_large)
+    draw.text(((small_w - text_w) / 2, small_h / 2 - 30), text, fill=(255, 80, 80), font=font)
 
     # Nom de la carte (tronqué si trop long)
-    name_to_draw = card_name if len(card_name) < 20 else card_name[:17] + "..."
-    text_bbox = draw.textbbox((0, 0), name_to_draw, font=font_small)
+    name_to_draw = card_name if len(card_name) < 15 else card_name[:12] + "..."
+    text_bbox = draw.textbbox((0, 0), name_to_draw, font=small_font)
     text_w = text_bbox[2] - text_bbox[0]
-    draw.text(((CARD_WIDTH - text_w) / 2, CARD_HEIGHT / 2), name_to_draw, fill=(255, 255, 255), font=font_small)
+    draw.text(((small_w - text_w) / 2, small_h / 2), name_to_draw, fill=(255, 255, 255), font=small_font)
     
     # Rareté
-    text_bbox = draw.textbbox((0, 0), rarity, font=font_rarity)
+    text_bbox = draw.textbbox((0, 0), rarity, font=tiny_font)
     text_w = text_bbox[2] - text_bbox[0]
-    draw.text(((CARD_WIDTH - text_w) / 2, CARD_HEIGHT / 2 + 100), rarity, fill=(200, 200, 200), font=font_rarity)
+    draw.text(((small_w - text_w) / 2, small_h / 2 + 25), rarity, fill=(200, 200, 200), font=tiny_font)
 
+    # Agrandissement final avec antialiasing
+    img = img.resize((CARD_WIDTH, CARD_HEIGHT), Image.Resampling.LANCZOS)
     return img
 
 async def generate_club_album(club_name, all_cards_in_club, owned_card_ids):
