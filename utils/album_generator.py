@@ -33,8 +33,8 @@ async def fetch_image(session, url):
 async def ensure_fonts():
     base_path = os.path.dirname(os.path.abspath(__file__))
     font_files = {
-        "Roboto-Bold.ttf": "https://github.com/google/fonts/raw/main/apache/roboto/static/Roboto-Bold.ttf",
-        "Roboto-Regular.ttf": "https://github.com/google/fonts/raw/main/apache/roboto/static/Roboto-Regular.ttf"
+        "Roboto-Bold.ttf": "https://raw.githubusercontent.com/google/fonts/main/apache/roboto/static/Roboto-Bold.ttf",
+        "Roboto-Regular.ttf": "https://raw.githubusercontent.com/google/fonts/main/apache/roboto/static/Roboto-Regular.ttf"
     }
     
     headers = {"User-Agent": "Mozilla/5.0"}
