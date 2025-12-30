@@ -56,7 +56,7 @@ async def ensure_fonts():
                 except Exception as e:
                     print(f"DEBUG: Error downloading {filename}: {e}")
 
-async def create_placeholder(card_name, rarity):
+def create_placeholder(card_name, rarity):
     """Crée une carte 'cachée' visuellement."""
     img = Image.new('RGB', (CARD_WIDTH, CARD_HEIGHT), color=PLACEHOLDER_COLOR)
     draw = ImageDraw.Draw(img)
