@@ -99,7 +99,11 @@ async def generate_club_album(club_name, all_cards_in_club, owned_card_ids):
     draw.text((PADDING, PADDING), f"Album : {club_name}", fill=TEXT_COLOR, font=title_font)
     
     # 3. Traitement des cartes
-    async with aiohttp.ClientSession() as session:
+    # Ajout d'un User-Agent pour éviter le blocage par Imgur
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
+    async with aiohttp.ClientSession(headers=headers) as session:
         tasks = []
         
         # On prépare les tâches pour télécharger les images possédées
