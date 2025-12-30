@@ -445,7 +445,6 @@ class CollectionCog(commands.Cog):
             app_commands.Choice(name=c, value=c)
             for c in clubs if current.lower() in c.lower()
         ][:25]
-
     @app_commands.command(name='recycler', description="Échange doublons contre fragments.")
     async def recycle_command(self, interaction: discord.Interaction):
         ids = database.get_user_collection(interaction.user.id)
