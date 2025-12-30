@@ -94,7 +94,7 @@ async def generate_club_album(club_name, all_cards_in_club, owned_card_ids):
         tasks = []
         
         # On prépare les tâches pour télécharger les images possédées
-        for card in all_cards_in_club:
+        for i, card in enumerate(all_cards_in_club):
             card_id = card['id']
             # Support int/str
             is_owned = (card_id in owned_card_ids) or (str(card_id) in [str(x) for x in owned_card_ids])
