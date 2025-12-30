@@ -1,0 +1,25 @@
+# Fichiers de configuration locale et secrets
+# Même si vous ne l'utilisez pas, c'est une bonne pratique de l'inclure.
+.env
+
+# Fichiers générés par le bot lui-même
+# C'est la section la plus importante pour vous !
+collection.db
+collection.db-journal
+reset_done.lock
+
+# Fichiers cache et compilés de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Dossiers d'environnement virtuel Python
+venv/
+.venv/
+env/
+.env/
+
+# Dossiers de configuration de l'éditeur de code (ex: VS Code, PyCharm)
+.vscode/
+.idea/
