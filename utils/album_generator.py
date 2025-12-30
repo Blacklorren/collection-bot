@@ -5,8 +5,10 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 import aiohttp
 
 # Dimensions standard pour la grille
-CARD_WIDTH = 250
-CARD_HEIGHT = 370
+# Aspect ratio 992x1200 conservé
+# On part sur une base large pour la qualité
+CARD_WIDTH = 496  # 992 / 2
+CARD_HEIGHT = 600 # 1200 / 2
 GRID_COLUMNS = 4
 PADDING = 20
 BG_COLOR = (44, 47, 51)  # Discord Dark Mode Grey
@@ -35,15 +37,15 @@ def create_placeholder(card_name, rarity):
     try:
         # Essayer d'utiliser une font BOLD système si possible
         # Windows/Linux ont souvent arialbd.ttf
-        font_large = ImageFont.truetype("arialbd.ttf", 46)
-        font_small = ImageFont.truetype("arialbd.ttf", 34)
-        font_rarity = ImageFont.truetype("arialbd.ttf", 28)
+        font_large = ImageFont.truetype("arialbd.ttf", 92)  # Doublé (46 -> 92)
+        font_small = ImageFont.truetype("arialbd.ttf", 68)  # Doublé (34 -> 68)
+        font_rarity = ImageFont.truetype("arialbd.ttf", 46) # +60% (28 -> 46)
     except IOError:
         try:
             # Fallback sur Arial normal
-            font_large = ImageFont.truetype("arial.ttf", 46) 
-            font_small = ImageFont.truetype("arial.ttf", 34)
-            font_rarity = ImageFont.truetype("arial.ttf", 28)
+            font_large = ImageFont.truetype("arial.ttf", 92) 
+            font_small = ImageFont.truetype("arial.ttf", 68)
+            font_rarity = ImageFont.truetype("arial.ttf", 46)
         except IOError:
             font_large = ImageFont.load_default()
             font_small = ImageFont.load_default()
@@ -55,7 +57,11 @@ def create_placeholder(card_name, rarity):
     # Texte centré (Nom)
     text_bbox = draw.textbbox((0, 0), "MANQUANTE", font=font_large)
     text_w = text_bbox[2] - text_bbox[0]
-    draw.text(((CARD_WIDTH - text_w) / 2, CARD_HEIGHT / 2 - 70), "MANQUANTE", fill=(255, 80, 80), font=font_large)
+    # Texte centré (Nom)
+    text_bbox = draw.textbbox((0, 0), "MANQUANTE", font=font_large)
+    text_w = text_bbox[2] - text_bbox[0]
+    # On ajuste le décalage vertical proportionnellement à la nouvelle hauteur
+    draw.text(((CARD_WIDTH - text_w) / 2, CARD_HEIGHT / 2 - 120), "MANQUANTE", fill=(255, 80, 80), font=font_large)
 
     # Nom de la carte
     # On coupe si trop long
@@ -67,7 +73,11 @@ def create_placeholder(card_name, rarity):
     # Rareté
     text_bbox = draw.textbbox((0, 0), rarity, font=font_rarity)
     text_w = text_bbox[2] - text_bbox[0]
-    draw.text(((CARD_WIDTH - text_w) / 2, CARD_HEIGHT / 2 + 50), rarity, fill=(200, 200, 200), font=font_rarity)
+    # Rareté
+    text_bbox = draw.textbbox((0, 0), rarity, font=font_rarity)
+    text_w = text_bbox[2] - text_bbox[0]
+    # Plus bas
+    draw.text(((CARD_WIDTH - text_w) / 2, CARD_HEIGHT / 2 + 100), rarity, fill=(200, 200, 200), font=font_rarity)
 
     return img
 
@@ -92,7 +102,7 @@ async def generate_club_album(club_name, all_cards_in_club, owned_card_ids):
     
     # 2. Titre du Club
     try:
-        title_font = ImageFont.truetype("arialbd.ttf", 60)
+        title_font = ImageFont.truetype("arialbd.ttf", 100) # Titre géant
     except:
         title_font = ImageFont.load_default()
         
@@ -131,7 +141,7 @@ async def generate_club_album(club_name, all_cards_in_club, owned_card_ids):
             row = i // GRID_COLUMNS
             
             x = PADDING + (col * (CARD_WIDTH + PADDING))
-            y = 60 + PADDING + (row * (CARD_HEIGHT + PADDING)) # Offset titre
+            y = 120 + PADDING + (row * (CARD_HEIGHT + PADDING)) # Offset titre doublé (60->120)
             
             card_img = results[i]
             
