@@ -524,8 +524,8 @@ class CollectionCog(commands.Cog):
     async def top_command(self, interaction: discord.Interaction):
         # On passe la liste des ID valides pour ne compter que les cartes qui existent encore
         valid_ids = [c['id'] for c in self.all_cards]
-        data = database.get_leaderboard_data(valid_ids)
-        clean_data = [d for d in data if d[0] not in LEADERBOARD_EXCLUDED_IDS][:10]
+        data = database.get_leaderboard_data(valid_ids, limit=20)
+        clean_data = [d for d in data if d[0] not in LEADERBOARD_EXCLUDED_IDS][:20]
 
         total_cards = len(self.all_cards)
         

@@ -348,10 +348,11 @@ def reset_and_set_collection(user_id, unique_card_ids):
             cur.executemany("INSERT INTO user_cards (user_id, card_id) VALUES (?, ?)", new_collection_data)
         con.commit()
 
-def get_leaderboard_data(valid_card_ids=None):
+def get_leaderboard_data(valid_card_ids=None, limit=10):
     """
     Récupère les données pour le classement (top collectionneurs).
     valid_card_ids: Liste d'IDs de cartes valides pour ne compter que celles-ci.
+    limit: Nombre maximum de résultats.
     """
     with sqlite3.connect(DB_NAME) as con:
         cur = con.cursor()
@@ -368,11 +369,12 @@ def get_leaderboard_data(valid_card_ids=None):
             query += f" WHERE card_id IN ({placeholders})"
             params.extend(valid_card_ids)
             
-        query += """
+        query += f"""
             GROUP BY user_id
             ORDER BY unique_cards DESC
-            LIMIT 10
+            LIMIT ?
         """
+        params.append(limit)
         
         cur.execute(query, params)
         return cur.fetchall()
