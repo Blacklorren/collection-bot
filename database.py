@@ -348,17 +348,33 @@ def reset_and_set_collection(user_id, unique_card_ids):
             cur.executemany("INSERT INTO user_cards (user_id, card_id) VALUES (?, ?)", new_collection_data)
         con.commit()
 
-def get_leaderboard_data():
-    """Récupère les données pour le classement (top collectionneurs)."""
+def get_leaderboard_data(valid_card_ids=None):
+    """
+    Récupère les données pour le classement (top collectionneurs).
+    valid_card_ids: Liste d'IDs de cartes valides pour ne compter que celles-ci.
+    """
     with sqlite3.connect(DB_NAME) as con:
         cur = con.cursor()
-        cur.execute("""
+        
+        query = """
             SELECT user_id, COUNT(DISTINCT card_id) as unique_cards
             FROM user_cards
+        """
+        
+        params = []
+        if valid_card_ids:
+            # On filtre pour ne garder que les cartes existantes
+            placeholders = ','.join('?' for _ in valid_card_ids)
+            query += f" WHERE card_id IN ({placeholders})"
+            params.extend(valid_card_ids)
+            
+        query += """
             GROUP BY user_id
             ORDER BY unique_cards DESC
             LIMIT 10
-        """)
+        """
+        
+        cur.execute(query, params)
         return cur.fetchall()
 
 # === NOUVELLES FONCTIONS POUR LES PRONOSTICS ===
