@@ -35,6 +35,12 @@ class EventsCog(commands.Cog):
         self.first_check = True
         self.created_matches = {}
         
+        # --- CONFIGURATION MATCHS ---
+        self.COMPETITIONS = [
+            {"name": "Starligue", "url": "https://www.livescore.in/fr/handball/france/starligue/"},
+            {"name": "Euro", "url": "https://www.livescore.in/fr/handball/europe/ehf-euro/"}
+        ]
+        
         if not BROWSERLESS_API_TOKEN:
             print("❌ (BROWSERLESS) ATTENTION: Le token BROWSERLESS_API_TOKEN n'est pas configuré.")
 
@@ -122,28 +128,28 @@ class EventsCog(commands.Cog):
         except Exception as e:
             print(f"❌ (RSS) Erreur d'envoi de l'article : {e}")
 
-    async def scrape_livescore_matches(self):
-        """Récupère les matchs à venir via Browserless et les parse avec BeautifulSoup."""
+    async def scrape_livescore_matches(self, url, competition_name):
+        """Récupère les matchs à venir via Browserless pour une compétition donnée."""
         if not BROWSERLESS_API_TOKEN:
             print("❌ (BROWSERLESS) Scraping annulé, token manquant.")
             return []
 
         matches = []
         paris_tz = pytz.timezone('Europe/Paris')
-        payload = {"url": LIVESCORE_URL}
+        payload = {"url": url}
 
         try:
-            print("🌐 (BROWSERLESS) Lancement du scraping via /content...")
+            print(f"🌐 (BROWSERLESS) Scraping {competition_name}...")
             async with aiohttp.ClientSession() as session:
                 async with session.post(BROWSERLESS_CONTENT_API_URL, json=payload, timeout=45) as response:
                     if response.status != 200:
                         error_text = await response.text()
-                        print(f"⚠️ (BROWSERLESS) Erreur HTTP {response.status} lors de la récupération du contenu : {error_text}")
+                        print(f"⚠️ (BROWSERLESS) Erreur HTTP {response.status} ({competition_name}): {error_text}")
                         return matches
                     html = await response.text()
             
             soup = BeautifulSoup(html, 'html.parser')
-            print("🔍 (BS4) Parsing du HTML reçu de Browserless...")
+            print(f"🔍 (BS4) Parsing HTML {competition_name}...")
             
             now = datetime.now(paris_tz)
             
@@ -186,25 +192,26 @@ class EventsCog(commands.Cog):
                         matches.append({
                             "team1": team1, "team2": team2,
                             "start_time_utc": match_datetime_utc,
-                            "event_id": match_id
+                            "event_id": match_id,
+                            "competition": competition_name
                         })
                 except Exception as e:
-                    print(f"⚠️ (BS4) Erreur de parsing d'un match : {e}")
+                    print(f"⚠️ (BS4) Erreur de parsing d'un match {competition_name} : {e}")
                     continue
             
-            print(f"📊 (BS4) {len(matches)} matchs valides trouvés pour la création d'événements.")
+            print(f"📊 (BS4) {len(matches)} matchs trouvés pour {competition_name}.")
             return matches
 
         except asyncio.TimeoutError:
-            print("❌ (BROWSERLESS) La requête de contenu a expiré (timeout).")
+            print(f"❌ (BROWSERLESS) Timeout pour {competition_name}.")
         except Exception as e:
-            print(f"❌ (BROWSERLESS) Erreur générale lors de la récupération du contenu: {type(e).__name__}: {str(e)}")
+            print(f"❌ (BROWSERLESS) Erreur {competition_name}: {type(e).__name__}: {str(e)}")
         
         return []
 
     @tasks.loop(seconds=MATCH_CHECK_INTERVAL)
     async def check_matches_loop(self):
-        """Vérifie et crée les événements Discord pour les nouveaux matchs."""
+        """Vérifie et crée les événements Discord pour les nouveaux matchs des différentes compétitions."""
         guild = self.bot.get_guild(self.bot.guild_id)
         if not guild:
             print(f"❌ (MATCHES) Serveur {self.bot.guild_id} introuvable!")
@@ -213,31 +220,41 @@ class EventsCog(commands.Cog):
         print(f"🔍 (MATCHES) Vérification des nouveaux matchs (toutes les {MATCH_CHECK_INTERVAL / 3600} heures)...")
         
         try:
-            scraped_matches = await self.scrape_livescore_matches()
+            all_scraped_matches = []
             
-            if not scraped_matches:
+            # On itère sur toutes les compétitions configurées
+            for competition in self.COMPETITIONS:
+                matches = await self.scrape_livescore_matches(competition["url"], competition["name"])
+                all_scraped_matches.extend(matches)
+                # Petite pause pour être gentil avec l'API
+                await asyncio.sleep(2)
+            
+            if not all_scraped_matches:
                 print("ℹ️ (MATCHES) Aucun nouveau match trouvé via le scraping.")
                 return
             
-            print(f"🏐 (MATCHES) {len(scraped_matches)} matchs trouvés dans la période J+5")
+            print(f"🏐 (MATCHES) Total: {len(all_scraped_matches)} matchs trouvés dans la période J+5")
                        
             existing_event_names = {event.name for event in guild.scheduled_events}
             
             pronos_cog = self.bot.get_cog('PronosticsCog')
             new_matches_for_pronos = []
             
-            for match in scraped_matches:
-                event_name = f"{match['team1']} vs {match['team2']}"
+            for match in all_scraped_matches:
+                # On ajoute le nom de la compétition dans le titre de l'événement pour différencier
+                event_name = f"[{match['competition']}] {match['team1']} vs {match['team2']}"
+                
+                # On vérifie si l'event existe déjà (par ID Livescore ou par Nom Discord)
                 if not database.get_match_by_event_id(match['event_id']) and event_name not in existing_event_names:
                     print(f"✨ (MATCHES) Création de l'événement: {event_name}")
                     try:
                         event = await guild.create_scheduled_event(
                             name=event_name,
-                            description=f"Match de Starligue\n\n📊 Faites vos pronostics dans le canal dédié !",
+                            description=f"Match de {match['competition']}\n\n📊 Faites vos pronostics dans le canal dédié !",
                             start_time=match['start_time_utc'],
                             end_time=match['start_time_utc'] + timedelta(hours=2),
                             entity_type=discord.EntityType.external,
-                            location="Starligue Handball",
+                            location=f"{match['competition']} Handball",
                             privacy_level=discord.PrivacyLevel.guild_only
                         )
                         match_id = database.create_match(
@@ -331,7 +348,13 @@ class EventsCog(commands.Cog):
             if not event: return
 
             new_description = f"🏐 RÉSULTAT FINAL : {score}\n\n{event.description}"
-            new_name = f"[TERMINÉ] {team1} {score} {team2}"
+            # On vérifie si le préfixe de compétition existe déjà pour le garder ou on le laisse tel quel
+            # L'événement a déjà son nom "bracketé" donc on peut juste mettre RESULTAT
+            
+            new_name = f"[TERMINÉ] {score} - {event.name}"
+            # On tronque si c'est trop long (100 chars max)
+            if len(new_name) > 100:
+                new_name = new_name[:97] + "..."
 
             if event.status == discord.EventStatus.scheduled:
                 await event.edit(name=new_name, description=new_description)
