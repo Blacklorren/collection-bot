@@ -245,7 +245,14 @@ class EventsCog(commands.Cog):
                 event_name = f"[{match['competition']}] {match['team1']} vs {match['team2']}"
                 
                 # On vérifie si l'event existe déjà (par ID Livescore ou par Nom Discord)
-                if not database.get_match_by_event_id(match['event_id']) and event_name not in existing_event_names:
+                existing_match = database.get_match_by_event_id(match['event_id'])
+                
+                # MIGRATION AUTOMATIQUE : Si le match existe mais n'a pas de compétition, on l'ajoute !
+                if existing_match and not existing_match['competition']:
+                    print(f"🔧 (MATCHES) Migration : Ajout de la compétition '{match['competition']}' au match {match['event_id']}")
+                    database.update_match_competition(existing_match['id'], match['competition'])
+
+                if not existing_match and event_name not in existing_event_names:
                     print(f"✨ (MATCHES) Création de l'événement: {event_name}")
                     try:
                         event = await guild.create_scheduled_event(
@@ -258,7 +265,8 @@ class EventsCog(commands.Cog):
                             privacy_level=discord.PrivacyLevel.guild_only
                         )
                         match_id = database.create_match(
-                            None, match['event_id'], event.id, match['team1'], match['team2'], match['start_time_utc']
+                            None, match['event_id'], event.id, match['team1'], match['team2'], match['start_time_utc'],
+                            competition=match['competition']
                         )
                         if match_id:
                             new_matches_for_pronos.append({

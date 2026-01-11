@@ -81,6 +81,7 @@ def initialize_database():
                 discord_event_id INTEGER,
                 equipe1 TEXT NOT NULL,
                 equipe2 TEXT NOT NULL,
+                competition TEXT,
                 date_match TIMESTAMP,
                 resultat TEXT,
                 score TEXT,
@@ -120,6 +121,12 @@ def initialize_database():
         cur.execute("CREATE INDEX IF NOT EXISTS idx_matchs_journee ON matchs(journee_id)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_pronostics_user ON pronostics(user_id)")
         
+        # MIGRATION : Ajout de la colonne competition si elle n'existe pas
+        try:
+            cur.execute("ALTER TABLE matchs ADD COLUMN competition TEXT")
+        except sqlite3.OperationalError: 
+            pass
+            
         con.commit()
 
 # === FONCTIONS EXISTANTES POUR LE JEU DE CARTES ===
@@ -419,15 +426,15 @@ def get_active_journee():
         """)
         return cur.fetchone()
 
-def create_match(journee_id, event_id, discord_event_id, equipe1, equipe2, date_match):
+def create_match(journee_id, event_id, discord_event_id, equipe1, equipe2, date_match, competition=None):
     """Crée un match dans la base de données."""
     with sqlite3.connect(DB_NAME) as con:
         cur = con.cursor()
         cur.execute("""
             INSERT OR IGNORE INTO matchs 
-            (journee_id, event_id, discord_event_id, equipe1, equipe2, date_match)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (journee_id, event_id, discord_event_id, equipe1, equipe2, date_match))
+            (journee_id, event_id, discord_event_id, equipe1, equipe2, date_match, competition)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (journee_id, event_id, discord_event_id, equipe1, equipe2, date_match, competition))
         con.commit()
         return cur.lastrowid
 
@@ -456,6 +463,13 @@ def update_match_result(match_id, resultat, score):
             SET resultat = ?, score = ?
             WHERE id = ?
         """, (resultat, score, match_id))
+        con.commit()
+
+def update_match_competition(match_id, competition):
+    """Met à jour la compétition d'un match (pour la migration)."""
+    with sqlite3.connect(DB_NAME) as con:
+        cur = con.cursor()
+        cur.execute("UPDATE matchs SET competition = ? WHERE id = ?", (competition, match_id))
         con.commit()
 
 def save_prono_message(match_id, message_id, channel_id):
@@ -681,7 +695,7 @@ def set_advent_pack_opened(user_id, date_str):
         cur.execute("UPDATE users SET last_advent_pack_date = ? WHERE user_id = ?", (date_str, user_id))
         con.commit()
 
-def get_general_leaderboard(points_per_win, limit=10):
+def get_general_leaderboard(points_per_win, limit=10, competition=None):
     """
     Récupère le classement général des pronostics basé sur tous les matchs terminés.
 
@@ -698,7 +712,7 @@ def get_general_leaderboard(points_per_win, limit=10):
         
         # Cette requête compte les pronostics corrects pour chaque utilisateur
         # sur tous les matchs qui ont un résultat enregistré.
-        cur.execute("""
+        query = """
             SELECT
                 p.user_id,
                 COUNT(p.user_id) AS bons_pronos,
@@ -706,10 +720,24 @@ def get_general_leaderboard(points_per_win, limit=10):
             FROM pronostics p
             JOIN matchs m ON p.match_id = m.id
             WHERE p.pronostic = m.resultat AND m.resultat IS NOT NULL
+        """
+        
+        params = [points_per_win]
+        
+        if competition:
+            # Filtrer par compétition
+            # Note: Si des anciens matchs ont NULL, ils ne seront pas comptés ici si on filtre.
+            query += " AND m.competition = ?"
+            params.append(competition)
+
+        query += """    
             GROUP BY p.user_id
             ORDER BY total_points DESC, bons_pronos DESC
             LIMIT ?
-        """, (points_per_win, limit))
+        """
+        params.append(limit)
+        
+        cur.execute(query, params)
         
         leaderboard = cur.fetchall()
         return [dict(row) for row in leaderboard]
