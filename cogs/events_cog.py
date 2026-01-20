@@ -191,8 +191,16 @@ class EventsCog(commands.Cog):
         # Formatage Date Paris
         paris_tz = pytz.timezone('Europe/Paris')
         local_time = match_data['start_time_utc'].astimezone(paris_tz)
+        
+        # --- AJOUT : Traduction manuelle du jour en Français ---
+        jours_fr = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
+        nom_jour = jours_fr[local_time.weekday()] # 0 = Lundi, 6 = Dimanche
+        
         date_str = local_time.strftime("%d/%m")
         heure_str = local_time.strftime("%H:%M")
+        
+        # Construction de la date complète (ex: Samedi 25/01)
+        date_complete = f"{nom_jour} {date_str}"
         
         # Design du message Slack
         payload = {
@@ -209,7 +217,8 @@ class EventsCog(commands.Cog):
                     "type": "section",
                     "fields": [
                         {"type": "mrkdwn", "text": f"*Compétition :*\n{match_data['competition']}"},
-                        {"type": "mrkdwn", "text": f"*Date :*\n{date_str} à {heure_str}"}
+                        # MODIFICATION ICI : On utilise date_complete
+                        {"type": "mrkdwn", "text": f"*Date :*\n{date_complete} à {heure_str}"}
                     ]
                 },
                 {
