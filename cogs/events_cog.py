@@ -16,34 +16,50 @@ RSS_URL = "https://handnews.fr/feed"
 CHANNEL_ID = int(os.getenv('CHANNEL_ID')) if os.getenv('CHANNEL_ID') else None
 CHECK_INTERVAL = 1800  # 30 minutes pour RSS
 
+# --- CONFIGURATION SLACK ---
+# URL du Webhook Incoming (Format: https://hooks.slack.com/services/...)
+SLACK_WEBHOOK_URL = os.getenv('SLACK_WEBHOOK_URL')
+
 # --- FRÉQUENCES OPTIMISÉES ---
-LIVESCORE_URL = "https://www.livescore.in/fr/handball/france/starligue/"
-# Vérification des nouveaux matchs toutes les 24 heures
-MATCH_CHECK_INTERVAL = 86400
-# Lancement de la boucle de résultats toutes les 2 heures (avec un filtre horaire à l'intérieur)
-RESULTS_CHECK_INTERVAL = 7200
+MATCH_CHECK_INTERVAL = 86400 # 24 heures
+RESULTS_CHECK_INTERVAL = 7200 # 2 heures
 
 # --- Configuration Browserless ---
 BROWSERLESS_API_TOKEN = os.getenv('BROWSERLESS_API_TOKEN')
 BROWSERLESS_CONTENT_API_URL = f"https://production-sfo.browserless.io/content?token={BROWSERLESS_API_TOKEN}"
-
 
 class EventsCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.seen_articles = set()
         self.first_check = True
-        self.created_matches = {}
         
-        # --- CONFIGURATION MATCHS ---
+        # 1. LISTE COMPLÈTE (Sources pour SLACK + DISCORD)
+        # Mettez ici TOUS les liens Livescore que vous voulez suivre
         self.COMPETITIONS = [
             {"name": "Starligue", "url": "https://www.livescore.in/fr/handball/france/starligue/"},
-            {"name": "Euro", "url": "https://www.livescore.in/fr/handball/europe/ehf-euro/"}
+            {"name": "Euro", "url": "https://www.livescore.in/fr/handball/europe/ehf-euro/"},
+        # --- Discord Uniquement ---
+            {"name": "Euro Féminin", "url": "https://www.livescore.in/fr/handball/europe/ehf-euro-women/", "teams_filter": ["france"]},
+            {"name": "Mondial Masculin", "url": "https://www.livescore.in/fr/handball/monde/championnat-du-monde/", "teams_filter": ["france"]},
+            {"name": "Mondial Féminin", "url": "https://www.livescore.in/fr/handball/europe/ehf-euro/", "teams_filter": ["france"]},
+            {"name": "Ligue des Champions Masculine", "url": "https://www.livescore.in/fr/handball/europe/ligue-des-champions", "teams_filter": ["paris", "nantes"]},
+            {"name": "Ligue des Champions Féminine", "url": "https://www.livescore.in/fr/handball/europe/ligue-des-champions-femmes/", "teams_filter": ["metz", "brest-bretagne"]},
+            {"name": "Ligue Européene Masculine", "url": "https://www.livescore.in/fr/handball/europe/ligue-europeenne/", "teams_filter": ["montpellier"]},
+            {"name": "Ligue Européenne Féminine", "url": "https://www.livescore.in/fr/handball/europe/ligue-europeenne-femmes/", "teams_filter": ["chambray-touraine", "dijon"]}
         ]
+        
+        # 2. FILTRE DISCORD
+        # Seules ces compétitions généreront un Event Discord et des Pronostics
+        self.DISCORD_COMPETITIONS_NAMES = ["Starligue", "Euro"]
         
         if not BROWSERLESS_API_TOKEN:
             print("❌ (BROWSERLESS) ATTENTION: Le token BROWSERLESS_API_TOKEN n'est pas configuré.")
+        
+        if not SLACK_WEBHOOK_URL:
+             print("⚠️ (SLACK) ATTENTION: SLACK_WEBHOOK_URL non configuré. L'envoi vers Slack est désactivé.")
 
+        # Démarrage des boucles
         self.check_rss_loop.start()
         self.check_matches_loop.start()
         self.check_results_loop.start()
@@ -53,27 +69,20 @@ class EventsCog(commands.Cog):
         self.check_matches_loop.cancel()
         self.check_results_loop.cancel()
 
+    # --- PARTIE 1 : FLUX RSS (Inchangé) ---
     @tasks.loop(seconds=CHECK_INTERVAL)
     async def check_rss_loop(self):
-        """Vérifie le flux RSS pour de nouveaux articles."""
-        if CHANNEL_ID is None: 
-            return
-            
+        if CHANNEL_ID is None: return
         channel = self.bot.get_channel(CHANNEL_ID)
-        if not channel:
-            print(f"❌ (RSS) Canal {CHANNEL_ID} introuvable!")
-            return
+        if not channel: return
             
         try:
-            print("🔍 (RSS) Vérification du flux RSS...")
             async with aiohttp.ClientSession() as session:
                 async with session.get(RSS_URL) as response:
                     if response.status == 200:
                         content = await response.text()
                         feed = feedparser.parse(content)
-                    else:
-                        print(f"⚠️ (RSS) Erreur HTTP {response.status}")
-                        return
+                    else: return
 
             if not feed.bozo:
                 new_articles = 0
@@ -83,76 +92,39 @@ class EventsCog(commands.Cog):
                             await self.send_article_to_discord(channel, entry)
                             new_articles += 1
                         self.seen_articles.add(entry.link)
-                        
-                if self.first_check: 
-                    self.first_check = False
-                    print(f"ℹ️ (RSS) Premier check, {len(self.seen_articles)} articles ignorés")
-                elif new_articles > 0: 
-                    print(f"✅ (RSS) {new_articles} nouveaux articles envoyés")
-                else: 
-                    print("ℹ️ (RSS) Aucun nouvel article")
-            else: 
-                print(f"⚠️ (RSS) Flux RSS invalide : {feed.bozo_exception}")
-                
+                if self.first_check: self.first_check = False
         except Exception as e:
-            print(f"❌ (RSS) Erreur lors de la vérification : {e}")
+            print(f"❌ (RSS) Erreur : {e}")
 
     async def send_article_to_discord(self, channel, entry):
-        """Envoie un article vers Discord."""
         try:
-            embed = discord.Embed(
-                title=entry.title[:256], url=entry.link, color=0xe8874f,
-                timestamp=datetime.now(timezone.utc)
-            )
+            embed = discord.Embed(title=entry.title[:256], url=entry.link, color=0xe8874f, timestamp=datetime.now(timezone.utc))
             if hasattr(entry, 'summary'):
                 description = re.sub('<[^<]+?>', '', entry.summary)
                 embed.description = description[:2045] + "..." if len(description) > 2048 else description
-            
-            image_url = None
             if 'media_content' in entry and entry.media_content:
-                image_url = entry.media_content[0]['url']
-            
-            if image_url:
-                embed.set_image(url=image_url)
-            
-            embed.set_author(name="📰 Handnews.fr", icon_url="https://handnews.fr/favicon.ico", url="https://handnews.fr")
-            
-            if hasattr(entry, 'published'):
-                try:
-                    pub_date = datetime.strptime(entry.published, "%a, %d %b %Y %H:%M:%S %z")
-                    embed.set_footer(text=f"Publié le {pub_date.strftime('%d/%m/%Y à %H:%M')}")
-                except ValueError:
-                    embed.set_footer(text=f"Publié le • {entry.published}")
-                    
+                embed.set_image(url=entry.media_content[0]['url'])
+            embed.set_author(name="📰 Handnews.fr", icon_url="https://handnews.fr/favicon.ico")
             await channel.send(embed=embed)
-        except Exception as e:
-            print(f"❌ (RSS) Erreur d'envoi de l'article : {e}")
+        except Exception: pass
 
-    async def scrape_livescore_matches(self, url, competition_name):
-        """Récupère les matchs à venir via Browserless pour une compétition donnée."""
-        if not BROWSERLESS_API_TOKEN:
-            print("❌ (BROWSERLESS) Scraping annulé, token manquant.")
-            return []
+    # --- PARTIE 2 : SCRAPING ET LOGIQUE HYBRIDE ---
 
+    async def scrape_livescore_matches(self, url, competition_name, teams_filter=None):
+        """Récupère les matchs via Browserless avec filtrage optionnel."""
+        if not BROWSERLESS_API_TOKEN: return []
         matches = []
         paris_tz = pytz.timezone('Europe/Paris')
         payload = {"url": url}
 
         try:
-            print(f"🌐 (BROWSERLESS) Scraping {competition_name}...")
             async with aiohttp.ClientSession() as session:
                 async with session.post(BROWSERLESS_CONTENT_API_URL, json=payload, timeout=45) as response:
-                    if response.status != 200:
-                        error_text = await response.text()
-                        print(f"⚠️ (BROWSERLESS) Erreur HTTP {response.status} ({competition_name}): {error_text}")
-                        return matches
+                    if response.status != 200: return matches
                     html = await response.text()
             
             soup = BeautifulSoup(html, 'html.parser')
-            print(f"🔍 (BS4) Parsing HTML {competition_name}...")
-            
             now = datetime.now(paris_tz)
-            
             match_containers = soup.select("div.event__match--scheduled")
             
             for container in match_containers:
@@ -170,23 +142,32 @@ class EventsCog(commands.Cog):
                     
                     year = now.year
                     match_date = date(year, month, day)
-                    if match_date < now.date():
-                        match_date = match_date.replace(year=year + 1)
+                    if match_date < now.date(): match_date = match_date.replace(year=year + 1)
                         
-                    # Créer un datetime naïf à partir des informations scrapées
                     match_datetime_naive = datetime.combine(match_date, datetime.min.time()).replace(hour=hour, minute=minute)
-                    # Attribuer directement le fuseau horaire UTC, car l'heure du site est en UTC.
                     match_datetime_utc = match_datetime_naive.replace(tzinfo=timezone.utc)
                     
                     team1 = container.find(class_="event__participant--home").get_text(strip=True)
                     team2 = container.find(class_="event__participant--away").get_text(strip=True)
+                    
+                    if teams_filter:
+                        # On vérifie si team1 OU team2 contient l'un des mots-clés du filtre
+                        # On utilise 'in' pour que "Paris" marche avec "Paris SG"
+                        match_found = False
+                        for filter_name in teams_filter:
+                            if filter_name.lower() in team1.lower() or filter_name.lower() in team2.lower():
+                                match_found = True
+                                break
+                        
+                        if not match_found:
+                            # Si aucune équipe ne correspond, on ignore ce match
+                            continue         
+                            
                     match_id_raw = container.get('id', '')
                     match_id = match_id_raw.replace('g_7_', '')
 
-                    if not all([team1, team2, match_id]):
-                        continue
+                    if not all([team1, team2, match_id]): continue
 
-                    now_utc = datetime.now(pytz.utc)
                     limit_date_utc = datetime.now(timezone.utc) + timedelta(days=5)
                     if now.astimezone(timezone.utc) < match_datetime_utc < limit_date_utc:
                         matches.append({
@@ -195,201 +176,202 @@ class EventsCog(commands.Cog):
                             "event_id": match_id,
                             "competition": competition_name
                         })
-                except Exception as e:
-                    print(f"⚠️ (BS4) Erreur de parsing d'un match {competition_name} : {e}")
-                    continue
-            
-            print(f"📊 (BS4) {len(matches)} matchs trouvés pour {competition_name}.")
+                except Exception: continue
             return matches
-
-        except asyncio.TimeoutError:
-            print(f"❌ (BROWSERLESS) Timeout pour {competition_name}.")
         except Exception as e:
-            print(f"❌ (BROWSERLESS) Erreur {competition_name}: {type(e).__name__}: {str(e)}")
+            print(f"❌ (SCRAPING) Erreur {competition_name}: {e}")
+            return []
+
+    async def send_match_to_slack_list(self, match_data):
+        """Envoie une 'Carte Match' dans le canal Slack via Webhook (Block Kit)."""
+        if not SLACK_WEBHOOK_URL: return
+
+        # Formatage Date Paris
+        paris_tz = pytz.timezone('Europe/Paris')
+        local_time = match_data['start_time_utc'].astimezone(paris_tz)
+        date_str = local_time.strftime("%d/%m")
+        heure_str = local_time.strftime("%H:%M")
         
-        return []
+        # Design du message Slack
+        payload = {
+            "blocks": [
+                {
+                    "type": "header",
+                    "text": {
+                        "type": "plain_text",
+                        "text": f"🏐 {match_data['team1']} vs {match_data['team2']}",
+                        "emoji": True
+                    }
+                },
+                {
+                    "type": "section",
+                    "fields": [
+                        {"type": "mrkdwn", "text": f"*Compétition :*\n{match_data['competition']}"},
+                        {"type": "mrkdwn", "text": f"*Date :*\n{date_str} à {heure_str}"}
+                    ]
+                },
+                {
+                    "type": "section",
+                    "text": {"type": "mrkdwn", "text": "Qui prend le match ? Réagissez avec ✅ ou répondez en thread 🧵"}
+                },
+                {"type": "divider"}
+            ]
+        }
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(SLACK_WEBHOOK_URL, json=payload) as response:
+                    if response.status == 200:
+                        print(f"✅ (SLACK) Carte envoyée : {match_data['team1']} vs {match_data['team2']}")
+                    else:
+                        print(f"⚠️ (SLACK) Erreur {response.status}: {await response.text()}")
+        except Exception as e:
+            print(f"❌ (SLACK) Erreur d'envoi : {e}")
 
     @tasks.loop(seconds=MATCH_CHECK_INTERVAL)
     async def check_matches_loop(self):
-        """Vérifie et crée les événements Discord pour les nouveaux matchs des différentes compétitions."""
+        """Boucle principale : Scrape tout -> Envoie Slack -> Filtre Discord -> Sauvegarde DB."""
         guild = self.bot.get_guild(self.bot.guild_id)
-        if not guild:
-            print(f"❌ (MATCHES) Serveur {self.bot.guild_id} introuvable!")
-            return
+        if not guild: return
         
-        print(f"🔍 (MATCHES) Vérification des nouveaux matchs (toutes les {MATCH_CHECK_INTERVAL / 3600} heures)...")
+        print(f"🔍 (MATCHES) Vérification des nouveaux matchs...")
         
         try:
             all_scraped_matches = []
             
-            # On itère sur toutes les compétitions configurées
-            for competition in self.COMPETITIONS:
-                matches = await self.scrape_livescore_matches(competition["url"], competition["name"])
+            # 1. Scraping de TOUTES les compétitions
+            for comp in self.COMPETITIONS:
+                # On récupère le filtre s'il existe (sinon None)
+                t_filter = comp.get("teams_filter")
+                
+                # On passe le filtre à la fonction
+                matches = await self.scrape_livescore_matches(comp["url"], comp["name"], teams_filter=t_filter)
+                
                 all_scraped_matches.extend(matches)
-                # Petite pause pour être gentil avec l'API
                 await asyncio.sleep(2)
             
             if not all_scraped_matches:
-                print("ℹ️ (MATCHES) Aucun nouveau match trouvé via le scraping.")
+                print("ℹ️ (MATCHES) Aucun match trouvé.")
                 return
-            
-            print(f"🏐 (MATCHES) Total: {len(all_scraped_matches)} matchs trouvés dans la période J+5")
-                       
-            existing_event_names = {event.name for event in guild.scheduled_events}
             
             pronos_cog = self.bot.get_cog('PronosticsCog')
             new_matches_for_pronos = []
             
             for match in all_scraped_matches:
-                # On ajoute le nom de la compétition dans le titre de l'événement pour différencier
-                event_name = f"[{match['competition']}] {match['team1']} vs {match['team2']}"
-                
-                # On vérifie si l'event existe déjà (par ID Livescore ou par Nom Discord)
+                # Vérification Base de Données
                 existing_match = database.get_match_by_event_id(match['event_id'])
                 
-                # MIGRATION AUTOMATIQUE : Si le match existe mais n'a pas de compétition, on l'ajoute !
-                if existing_match and not existing_match['competition']:
-                    print(f"🔧 (MATCHES) Migration : Ajout de la compétition '{match['competition']}' au match {match['event_id']}")
-                    database.update_match_competition(existing_match['id'], match['competition'])
+                # SI LE MATCH EST NOUVEAU
+                if not existing_match:
+                    print(f"✨ (NOUVEAU) {match['competition']} : {match['team1']} vs {match['team2']}")
 
-                if not existing_match and event_name not in existing_event_names:
-                    print(f"✨ (MATCHES) Création de l'événement: {event_name}")
+                    # --- A. SLACK (Tout le monde) ---
+                    await self.send_match_to_slack_list(match)
+
+                    # --- B. DISCORD (Filtrage) ---
+                    discord_event_id = None
+                    # On vérifie si la compétition est dans la liste "VIP" pour Discord
+                    is_discord_eligible = match['competition'] in self.DISCORD_COMPETITIONS_NAMES
+                    
+                    if is_discord_eligible:
+                        try:
+                            event = await guild.create_scheduled_event(
+                                name=f"[{match['competition']}] {match['team1']} vs {match['team2']}",
+                                description=f"Match de {match['competition']}\n📊 Faites vos pronos !",
+                                start_time=match['start_time_utc'],
+                                end_time=match['start_time_utc'] + timedelta(hours=2),
+                                entity_type=discord.EntityType.external,
+                                location=f"{match['competition']} Handball",
+                                privacy_level=discord.PrivacyLevel.guild_only
+                            )
+                            discord_event_id = event.id
+                            print(f"✅ (DISCORD) Event créé.")
+                        except Exception as ex:
+                            print(f"❌ (DISCORD) Erreur création event : {ex}")
+
+                    # --- C. DATABASE (Tout le monde) ---
                     try:
-                        event = await guild.create_scheduled_event(
-                            name=event_name,
-                            description=f"Match de {match['competition']}\n\n📊 Faites vos pronostics dans le canal dédié !",
-                            start_time=match['start_time_utc'],
-                            end_time=match['start_time_utc'] + timedelta(hours=2),
-                            entity_type=discord.EntityType.external,
-                            location=f"{match['competition']} Handball",
-                            privacy_level=discord.PrivacyLevel.guild_only
-                        )
                         match_id = database.create_match(
-                            None, match['event_id'], event.id, match['team1'], match['team2'], match['start_time_utc'],
+                            None, # Pas de journee_id obligatoire
+                            match['event_id'], 
+                            discord_event_id, # Sera None si pas sur Discord
+                            match['team1'], 
+                            match['team2'], 
+                            match['start_time_utc'],
                             competition=match['competition']
                         )
-                        if match_id:
-                            new_matches_for_pronos.append({
+                        
+                        # --- D. PRONOS (Seulement Discord) ---
+                        if is_discord_eligible and discord_event_id and match_id:
+                             new_matches_for_pronos.append({
                                 'id': match_id, 'equipe1': match['team1'], 'equipe2': match['team2'],
                                 'date_match': match['start_time_utc']
                             })
-                        await asyncio.sleep(5)
-                    except discord.Forbidden:
-                        print("❌ (MATCHES) Permission refusée pour créer un événement.")
-                    except Exception as ex:
-                        print(f"❌ (MATCHES) Erreur lors de la création de l'événement Discord : {ex}")
+                            
+                    except Exception as db_ex:
+                        print(f"❌ (DB) Erreur sauvegarde : {db_ex}")
 
+            # Envoi des pronos
             if new_matches_for_pronos and pronos_cog:
                 await pronos_cog.create_pronostic_messages_for_matches(new_matches_for_pronos)
             
         except Exception as e:
-            print(f"❌ (MATCHES) Erreur critique dans la boucle des matchs: {e}")
+            print(f"❌ (MATCHES) Erreur critique boucle: {e}")
+
+    # --- PARTIE 3 : RÉSULTATS (Avec sécurité pour Slack-Only) ---
 
     async def get_match_result(self, event_id):
-        """Récupère le résultat d'un match en utilisant les sélecteurs confirmés."""
-        
-        print(f"\n--- [DEBUG-SCRAPER] Début du traitement pour l'event_id : {event_id} ---")
+        """Récupère le résultat final d'un match."""
         match_url = f"https://www.livescore.in/fr/match/{event_id}/"
-        print(f"[DEBUG-SCRAPER] 🔗 URL cible : {match_url}")
         payload = {"url": match_url}
         
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(BROWSERLESS_CONTENT_API_URL, json=payload, timeout=30) as response:
-                    print(f"[DEBUG-SCRAPER] STATUS HTTP: {response.status}")
                     if response.status != 200: return None
                     html = await response.text()
             
             soup = BeautifulSoup(html, 'html.parser')
-
-            # --- CORRECTION FINALE : Utilisation des classes exactes ---
-
-            # 1. On cherche d'abord le statut "Terminé". Il doit exister pour continuer.
-            # On cible précisément le span avec la classe que vous aviez identifiée.
-            print("[DEBUG-SCRAPER] 1. Recherche du statut (span.fixedHeaderDuel__detailStatus)...")
             status_elem = soup.find('span', class_='fixedHeaderDuel__detailStatus')
-
-            if not status_elem or "Terminé" not in status_elem.get_text():
-                print("[DEBUG-SCRAPER] ❌ Statut 'Terminé' NON trouvé. Le match n'est pas fini.")
-                return None
+            if not status_elem or "Terminé" not in status_elem.get_text(): return None
             
-            print("[DEBUG-SCRAPER] ✅ Statut 'Terminé' trouvé !")
-
-            # 2. Si le match est terminé, on cherche le conteneur des scores.
-            print("[DEBUG-SCRAPER] 2. Recherche du conteneur de score (div.detailScore__wrapper)...")
             score_wrapper = soup.find('div', class_='detailScore__wrapper')
-            
-            if not score_wrapper:
-                print("[DEBUG-SCRAPER] ❌ Conteneur de score NON trouvé.")
-                return None
-                
-            print("[DEBUG-SCRAPER] ✅ Conteneur de score trouvé.")
+            if not score_wrapper: return None
 
-            # 3. On extrait les scores de ce conteneur.
             scores = [span.get_text(strip=True) for span in score_wrapper.find_all('span') if span.get_text(strip=True).isdigit()]
-            print(f"[DEBUG-SCRAPER] 📊 {len(scores)} score(s) numérique(s) extrait(s) : {scores}")
-            
-            if len(scores) < 2:
-                print("[DEBUG-SCRAPER] ❌ Moins de 2 scores numériques trouvés.")
-                return None
+            if len(scores) < 2: return None
 
-            score1 = scores[0]
-            score2 = scores[1]
-            final_score = f"{score1}-{score2}"
-            print(f"[DEBUG-SCRAPER] ✅ Résultat final validé : {final_score}")
-            return final_score
-                        
-        except asyncio.TimeoutError:
-            print(f"❌ (RESULTS) Timeout pour le match {event_id}")
-        except Exception as e:
-            print(f"❌ (RESULTS) Erreur scraping résultat pour {event_id}: {type(e).__name__}")
-            
-        return None
-        
+            return f"{scores[0]}-{scores[1]}"
+        except Exception: return None
+
     async def update_discord_event_with_result(self, discord_event_id, team1, team2, score):
-        """Met à jour l'événement Discord avec le résultat du match."""
+        """Met à jour l'event Discord (si existant)."""
+        # SÉCURITÉ : Si c'est un match Slack uniquement, discord_event_id est None
+        if not discord_event_id: 
+            return
+
         try:
             guild = self.bot.get_guild(self.bot.guild_id)
-            if not guild or not discord_event_id: return
-            
             event = guild.get_scheduled_event(int(discord_event_id))
             if not event: return
 
             new_description = f"🏐 RÉSULTAT FINAL : {score}\n\n{event.description}"
-            # On vérifie si le préfixe de compétition existe déjà pour le garder ou on le laisse tel quel
-            # L'événement a déjà son nom "bracketé" donc on peut juste mettre RESULTAT
-            
             new_name = f"[TERMINÉ] {score} - {event.name}"
-            # On tronque si c'est trop long (100 chars max)
-            if len(new_name) > 100:
-                new_name = new_name[:97] + "..."
+            if len(new_name) > 100: new_name = new_name[:97] + "..."
 
             if event.status == discord.EventStatus.scheduled:
                 await event.edit(name=new_name, description=new_description)
             elif event.status in [discord.EventStatus.active, discord.EventStatus.completed]:
                 await event.edit(description=new_description)
-
-        except discord.NotFound:
-             print(f"⚠️ (RESULTS) Événement Discord {discord_event_id} non trouvé.")
-        except Exception as e:
-            print(f"❌ (RESULTS) Erreur mise à jour événement {discord_event_id}: {e}")
-    
-    # --- DÉBUT DES MODIFICATIONS ---
+        except Exception: pass
 
     async def _internal_check_and_process_results(self):
-        """
-        La logique de base pour vérifier et traiter les résultats.
-        Cette fonction est réutilisable par la boucle et la commande manuelle.
-        """
-        print("🔍 (RESULTS) Lancement de la vérification des résultats...")
+        """Logique de vérification des résultats."""
+        print("🔍 (RESULTS) Vérification des résultats...")
         now_utc = datetime.now(timezone.utc)
-        
-        # --- CORRECTION APPLIQUÉE : On étend la fenêtre de recherche à 10 jours ---
         matches_to_check = database.get_matches_to_check_results(now_utc - timedelta(days=10))
         
-        if not matches_to_check:
-            print("ℹ️ (RESULTS) Aucun match terminé à vérifier pour le moment.")
-            return 0
+        if not matches_to_check: return 0
 
         pronos_cog = self.bot.get_cog('PronosticsCog')
         processed_count = 0
@@ -398,86 +380,56 @@ class EventsCog(commands.Cog):
             match = dict(match_row)
             try:
                 result = await self.get_match_result(match['event_id'])
-                if result and pronos_cog:
-                    print(f"✅ (RESULTS) Résultat trouvé: {match['equipe1']} {result} {match['equipe2']}")
-                    pronos_cog.process_match_result(match['id'], result)
+                if result:
+                    print(f"✅ Résultat trouvé : {match['equipe1']} {result} {match['equipe2']}")
+                    
+                    # 1. Update DB (Pour tout le monde)
+                    database.update_match_result(match['id'], result, result) # on passe result comme score
+                    
+                    # 2. Pronos (Si match Discord)
+                    if pronos_cog and match['discord_event_id']:
+                         pronos_cog.process_match_result(match['id'], result)
+                    
+                    # 3. Event Discord (Si match Discord)
                     await self.update_discord_event_with_result(
                         match['discord_event_id'], match['equipe1'], match['equipe2'], result
                     )
+                    
                     processed_count += 1
                     await asyncio.sleep(5) 
-            except Exception as e:
-                print(f"❌ (RESULTS) Erreur vérification résultat pour match {match['id']}: {e}")
+            except Exception: pass
         
-        print(f"📊 (RESULTS) Fin de la vérification. {processed_count} match(s) traité(s).")
         return processed_count
 
     @tasks.loop(seconds=RESULTS_CHECK_INTERVAL)
     async def check_results_loop(self):
-        """Vérifie et met à jour les résultats des matchs terminés PENDANT les heures de match."""
+        """Vérifie les résultats pendant les heures de match."""
         paris_tz = pytz.timezone('Europe/Paris')
         now_paris = datetime.now(paris_tz)
-        
-        # La contrainte horaire ne s'applique QU'À la boucle automatique
-        if not (16 <= now_paris.hour < 24):
-            # On ne logue plus pour éviter le spam
-            # print(f"ℹ️ (RESULTS) Hors des heures de match ({now_paris.strftime('%H:%M')}). Vérification auto ignorée.")
-            return
-
-        await self._internal_check_and_process_results()
+        if 16 <= now_paris.hour < 24:
+            await self._internal_check_and_process_results()
 
     @check_rss_loop.before_loop
     @check_matches_loop.before_loop
     @check_results_loop.before_loop
     async def before_loops(self):
-        """Attend que le bot soit prêt avant de lancer les boucles."""
         await self.bot.wait_until_ready()
 
-    @commands.command(name='handball')
-    async def handball_command(self, ctx):
-        """Affiche les prochains matchs de handball."""
-        guild = ctx.guild
-        if not guild: return
-        
-        upcoming_events = [e for e in guild.scheduled_events if e.creator == self.bot.user and e.status == discord.EventStatus.scheduled and "vs" in e.name]
-        
-        if not upcoming_events:
-            await ctx.send("Aucun match programmé pour le moment.", ephemeral=True)
-            return
-        
-        upcoming_events.sort(key=lambda e: e.start_time)
-        embed = discord.Embed(title="🏐 Prochains matchs de Starligue", color=discord.Color.orange())
-        
-        for event in upcoming_events[:10]:
-            time_paris = event.start_time.astimezone(pytz.timezone('Europe/Paris'))
-            embed.add_field(name=event.name, value=f"📅 {time_paris.strftime('%d/%m à %H:%M')}", inline=False)
-        
-        await ctx.send(embed=embed, ephemeral=True)
+    # --- COMMANDES ADMIN ---
 
     @commands.command(name='forcesync', aliases=['fs'])
     @commands.has_permissions(administrator=True)
     async def force_sync_command(self, ctx):
-        """Force la synchronisation des matchs (admin uniquement)."""
-        await ctx.send("🔄 Synchronisation forcée des matchs en cours...", ephemeral=True, delete_after=5)
-        async with ctx.typing():
-            await self.check_matches_loop.coro(self)
-        await ctx.send("✅ Synchronisation des matchs terminée!", ephemeral=True)
+        await ctx.send("🔄 Synchronisation forcée (Slack + Discord)...", ephemeral=True)
+        await self.check_matches_loop.coro(self)
+        await ctx.send("✅ Terminé!", ephemeral=True)
 
     @commands.command(name='checkresults', aliases=['cr'])
     @commands.has_permissions(administrator=True)
     async def check_results_command(self, ctx):
-        """[Admin] Force la vérification des résultats, même en dehors des heures de match."""
-        await ctx.send("🔄 Forçage de la vérification des résultats en cours...", ephemeral=True, delete_after=10)
-        async with ctx.typing():
-            # On appelle directement la logique interne, en ignorant la contrainte horaire
-            count = await self._internal_check_and_process_results()
-        await ctx.send(f"✅ Vérification terminée ! **{count}** match(s) ont été traités.", ephemeral=True)
+        await ctx.send("🔄 Vérification résultats...", ephemeral=True)
+        count = await self._internal_check_and_process_results()
+        await ctx.send(f"✅ {count} résultats traités.", ephemeral=True)
 
-    @commands.command(name='debughtml')
-    @commands.has_permissions(administrator=True)
-    async def debug_html_command(self, ctx):
-        """Commande dépréciée."""
-        await ctx.send("🐛 Commande dépréciée. Le scraping utilise maintenant l'API Browserless. Utilisez `!test savehtml`.", ephemeral=True)
-        
 async def setup(bot):
     await bot.add_cog(EventsCog(bot))
