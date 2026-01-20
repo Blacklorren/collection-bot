@@ -173,22 +173,6 @@ def get_leaderboard_for_matches(match_ids):
         cur.execute(query, match_ids)
         return cur.fetchall()
 
-# La fonction suivante est modifiée pour ne plus dépendre des journées
-def create_match(journee_id, event_id, discord_event_id, equipe1, equipe2, date_match):
-    """Crée un match dans la base de données. journee_id peut être None."""
-    try:
-        with sqlite3.connect(DB_NAME) as con:
-            cur = con.cursor()
-            # On utilise désormais journee_id de manière facultative
-            cur.execute("""
-                INSERT INTO matchs (journee_id, event_id, discord_event_id, equipe1, equipe2, date_match)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (journee_id, event_id, discord_event_id, equipe1, equipe2, date_match.isoformat()))
-            con.commit()
-            return cur.lastrowid
-    except sqlite3.IntegrityError:
-        return None # Le match existe déjà
-
 def wipe_all_user_data():
     """
     Vide toutes les données liées aux utilisateurs, collections, et pronostics.
