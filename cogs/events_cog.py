@@ -47,9 +47,9 @@ class EventsCog(commands.Cog):
             {"name": "Mondial Masculin", "url": "https://www.livescore.in/fr/handball/monde/championnat-du-monde/", "teams_filter": ["france"]},
             {"name": "Mondial Féminin", "url": "https://www.livescore.in/fr/handball/europe/ehf-euro/", "teams_filter": ["france"]},
             {"name": "Ligue des Champions Masculine", "url": "https://www.livescore.in/fr/handball/europe/ligue-des-champions", "teams_filter": ["paris", "nantes"]},
-            {"name": "Ligue des Champions Féminine", "url": "https://www.livescore.in/fr/handball/europe/ligue-des-champions-femmes/", "teams_filter": ["metz", "brest-bretagne"]},
+            {"name": "Ligue des Champions Féminine", "url": "https://www.livescore.in/fr/handball/europe/ligue-des-champions-femmes/", "teams_filter": ["metz", "brest"]},
             {"name": "Ligue Européene Masculine", "url": "https://www.livescore.in/fr/handball/europe/ligue-europeenne/", "teams_filter": ["montpellier"]},
-            {"name": "Ligue Européenne Féminine", "url": "https://www.livescore.in/fr/handball/europe/ligue-europeenne-femmes/", "teams_filter": ["chambray-touraine", "dijon"]}
+            {"name": "Ligue Européenne Féminine", "url": "https://www.livescore.in/fr/handball/europe/ligue-europeenne-femmes/", "teams_filter": ["chambray", "dijon"]}
         ]
         
         # 2. FILTRE DISCORD
