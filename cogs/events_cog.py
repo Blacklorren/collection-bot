@@ -42,6 +42,7 @@ class EventsCog(commands.Cog):
             {"name": "Starligue", "url": "https://www.livescore.in/fr/handball/france/starligue/"},
             {"name": "Euro", "url": "https://www.livescore.in/fr/handball/europe/ehf-euro/"},
         # --- Discord Uniquement ---
+            {"name": "LFH", "url": "https://www.livescore.in/fr/handball/france/division-1-femmes/"},
             {"name": "Euro Féminin", "url": "https://www.livescore.in/fr/handball/europe/ehf-euro-women/", "teams_filter": ["france"]},
             {"name": "Mondial Masculin", "url": "https://www.livescore.in/fr/handball/monde/championnat-du-monde/", "teams_filter": ["france"]},
             {"name": "Mondial Féminin", "url": "https://www.livescore.in/fr/handball/europe/ehf-euro/", "teams_filter": ["france"]},
