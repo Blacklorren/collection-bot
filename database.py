@@ -726,6 +726,13 @@ def get_general_leaderboard(points_per_win, limit=10, competition=None):
         leaderboard = cur.fetchall()
         return [dict(row) for row in leaderboard]
 
+def update_match_discord_event_id(match_id, discord_event_id):
+    """Met à jour l'ID de l'événement Discord pour un match existant."""
+    with sqlite3.connect(DB_NAME) as con:
+        cur = con.cursor()
+        cur.execute("UPDATE matchs SET discord_event_id = ? WHERE id = ?", (discord_event_id, match_id))
+        con.commit()
+
 def mass_give_card_if_missing(card_id):
     """
     Donne une carte spécifique à TOUS les utilisateurs enregistrés
