@@ -733,6 +733,13 @@ def update_match_discord_event_id(match_id, discord_event_id):
         cur.execute("UPDATE matchs SET discord_event_id = ? WHERE id = ?", (discord_event_id, match_id))
         con.commit()
 
+def update_match_time(match_id, new_time):
+    """Met à jour l'horaire d'un match."""
+    with sqlite3.connect(DB_NAME) as con:
+        cur = con.cursor()
+        cur.execute("UPDATE matchs SET date_match = ? WHERE id = ?", (new_time.isoformat(), match_id))
+        con.commit()
+
 def mass_give_card_if_missing(card_id):
     """
     Donne une carte spécifique à TOUS les utilisateurs enregistrés
