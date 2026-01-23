@@ -11,6 +11,9 @@ import aiohttp
 import json
 from bs4 import BeautifulSoup
 
+# --- CORRECTION : Variable remise pour éviter l'erreur dans test_cog ---
+LIVESCORE_URL = "https://www.livescore.in/fr/handball/france/starligue/"
+
 # --- Configuration ---
 RSS_URL = "https://handnews.fr/feed"
 CHANNEL_ID = int(os.getenv('CHANNEL_ID')) if os.getenv('CHANNEL_ID') else None
