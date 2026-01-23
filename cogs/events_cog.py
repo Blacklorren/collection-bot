@@ -37,7 +37,7 @@ class EventsCog(commands.Cog):
         self.first_check = True
         
         # 1. LISTE COMPLÈTE (Sources pour SLACK + DISCORD)
-        # Mettez ici TOUS les liens Livescore que vous voulez suivre
+        # Mettez ici TOUS les l iens Livescore que vous voulez suivre
         self.COMPETITIONS = [
             {"name": "Starligue", "url": "https://www.livescore.in/fr/handball/france/starligue/"},
             {"name": "Euro", "url": "https://www.livescore.in/fr/handball/europe/ehf-euro/"},
