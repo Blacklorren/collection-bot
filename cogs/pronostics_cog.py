@@ -546,6 +546,22 @@ class PronosticsCog(commands.Cog):
         except Exception as e:
             await ctx.send(f"❌ Une erreur est survenue lors de la récupération des pronostics : `{e}`", ephemeral=True)
 
+    @commands.command(name='repair_history')
+    @commands.has_permissions(manage_guild=True)
+    async def repair_history_command(self, ctx):
+        """[Admin] Assigne 'Starligue' aux anciens matchs sans compétition."""
+        try:
+            # On appelle la fonction créée dans database.py
+            count = database.fix_null_competitions("Starligue")
+            
+            if count > 0:
+                await ctx.send(f"✅ Succès ! **{count}** anciens matchs ont été réassignés à la compétition 'Starligue'. Le classement devrait être restauré.", ephemeral=True)
+            else:
+                await ctx.send("ℹ️ Aucun match n'avait besoin d'être réparé (tous ont déjà une compétition).", ephemeral=True)
+                
+        except Exception as e:
+            await ctx.send(f"❌ Erreur lors de la réparation : `{e}`", ephemeral=True)
+    
     @commands.command(name='classementgeneral', aliases=['cg'])
     @commands.has_permissions(manage_guild=True)
     async def classement_general_command(self, ctx, limit: int = 10):
