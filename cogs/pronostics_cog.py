@@ -563,47 +563,73 @@ class PronosticsCog(commands.Cog):
             await ctx.send(f"❌ Erreur lors de la réparation : `{e}`", ephemeral=True)
     
     @commands.command(name='classementgeneral', aliases=['cg'])
-    @commands.has_permissions(manage_guild=True)
-    async def classement_general_command(self, ctx, limit: int = 10):
-        """[Admin] Affiche publiquement le classement général des pronostics."""
-        
-        # On limite l'affichage à 25 pour ne pas surcharger Discord.
-        if limit > 25:
-            limit = 25
-            
+    @commands.has_permissions(manage_guild=True) # Réservé aux admins comme demandé
+    async def classement_general_command(self, ctx, *, competition: str = None):
+        """
+        [Admin] Affiche un classement général.
+        Usage :
+        !cg            -> Affiche le classement GLOBAL (toutes compétitions confondues)
+        !cg Starligue  -> Affiche uniquement le classement Starligue
+        !cg Euro       -> Affiche uniquement le classement Euro
+        """
+        # Suppression du message de l'admin pour garder le chat propre
         try:
-            # Supprime la commande pour garder le salon propre
-            await ctx.message.delete() 
-        except discord.Forbidden:
-            pass # Le bot n'a pas la perm, on continue quand même
+            await ctx.message.delete()
+        except:
+            pass
 
-        leaderboard = database.get_general_leaderboard(POINTS_BON_PRONO, limit=limit)
-        
-        if not leaderboard:
-            await ctx.send("Aucun pronostic correct n'a été enregistré pour le moment.", ephemeral=True)
-            return
+        limit = 20 # Nombre de joueurs à afficher
 
-        embed = discord.Embed(
-            title=f"👑 Classement Général des Pronostics (Top {limit}) 👑",
-            description="Classement basé sur tous les matchs terminés.",
-            color=discord.Color.dark_gold(),
-            timestamp=datetime.now(timezone.utc)
-        )
-        
-        classement_text = ""
-        for rank, row in enumerate(leaderboard, 1):
-            user_id, bons_pronos, total_points = row['user_id'], row['bons_pronos'], row['total_points']
-            member = ctx.guild.get_member(user_id)
-            member_name = member.display_name if member else f"Utilisateur Inconnu ({user_id})"
+        # Configuration du titre et de la description
+        if competition:
+            titre = f"🏆 Classement Général : {competition.capitalize()}"
+            desc = f"Top {limit} des meilleurs pronostiqueurs sur la **{competition.capitalize()}**."
+            couleur = discord.Color.blue()
+        else:
+            titre = "👑 Classement Général (Global)"
+            desc = f"Top {limit} toutes compétitions confondues (Starligue + Euro + ...)."
+            couleur = discord.Color.gold()
+
+        try:
+            # Récupération des données (fonction déjà existante dans votre database.py)
+            leaderboard = database.get_general_leaderboard(POINTS_BON_PRONO, limit=limit, competition=competition)
             
-            emoji = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"**#{rank}**"
-            classement_text += f"{emoji} **{member_name}** - **{total_points}** pts ({bons_pronos} corrects)\n"
-        
-        embed.add_field(name="Classement", value=classement_text, inline=False)
-        
-        # Envoi public dans le canal où la commande a été tapée
-        await ctx.send(embed=embed)
+            if not leaderboard:
+                msg = "Aucun pronostic trouvé."
+                if competition:
+                    msg += f" Vérifiez l'orthographe ou lancez `!repair_history` pour récupérer les anciens matchs."
+                await ctx.send(f"❌ {msg}", delete_after=10)
+                return
 
+            embed = discord.Embed(
+                title=titre,
+                description=desc,
+                color=couleur,
+                timestamp=datetime.now(timezone.utc)
+            )
+            
+            classement_text = ""
+            for rank, row in enumerate(leaderboard, 1):
+                user_id, bons_pronos, total_points = row['user_id'], row['bons_pronos'], row['total_points']
+                member = ctx.guild.get_member(user_id)
+                member_name = member.display_name if member else f"Utilisateur ({user_id})"
+                
+                # Médailles
+                if rank == 1: emoji = "🥇"
+                elif rank == 2: emoji = "🥈"
+                elif rank == 3: emoji = "🥉"
+                else: emoji = f"**#{rank}**"
+                
+                classement_text += f"{emoji} **{member_name}** - **{total_points}** pts ({bons_pronos} bons)\n"
+            
+            embed.add_field(name="Top Joueurs", value=classement_text, inline=False)
+            
+            # Envoi du classement
+            await ctx.send(embed=embed)
+
+        except Exception as e:
+            print(f"Erreur classement: {e}")
+            await ctx.send("❌ Une erreur est survenue lors de la génération du classement.", delete_after=5)
 
 async def setup(bot):
     await bot.add_cog(PronosticsCog(bot))
