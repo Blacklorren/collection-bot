@@ -740,6 +740,23 @@ def update_match_time(match_id, new_time):
         cur.execute("UPDATE matchs SET date_match = ? WHERE id = ?", (new_time.isoformat(), match_id))
         con.commit()
 
+def fix_null_competitions(default_name="Starligue"):
+    """
+    Attribue un nom de compétition par défaut à tous les matchs 
+    qui n'en ont pas (pour récupérer l'historique).
+    """
+    with sqlite3.connect(DB_NAME) as con:
+        cur = con.cursor()
+        # On met à jour les matchs où la compétition est NULL ou vide
+        cur.execute("""
+            UPDATE matchs 
+            SET competition = ? 
+            WHERE competition IS NULL OR competition = ''
+        """, (default_name,))
+        changes = cur.rowcount
+        con.commit()
+        return changes
+
 def mass_give_card_if_missing(card_id):
     """
     Donne une carte spécifique à TOUS les utilisateurs enregistrés
