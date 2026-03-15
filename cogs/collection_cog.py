@@ -41,6 +41,9 @@ POINTS_PER_MESSAGE = 20
 MAX_DAILY_MESSAGE_POINTS = 300
 MESSAGE_COOLDOWN = 10
 LEADERBOARD_EXCLUDED_IDS = [133711821214449665]
+MISSING_CARD_WEIGHT = 3
+HIGH_COMPLETION_WEIGHT = 5
+HIGH_COMPLETION_THRESHOLD = 0.95
 
 def load_cards_data():
     """Charge les cartes en mémoire."""
@@ -72,6 +75,31 @@ class CollectionCog(commands.Cog):
         for card in self.all_cards:
             self.card_map[card['id']] = card       # Clé originale (int ou str)
             self.card_map[str(card['id'])] = card  # Clé en string
+
+    def get_weighted_pool(self, user_id: int, cards_pool: list) -> tuple:
+        """Retourne (cards, weights) où les cartes manquantes ont un poids plus élevé."""
+        user_collection = database.get_user_collection(user_id)
+        user_collection_set = set(str(cid) for cid in user_collection)
+        
+        unique_cards = {c['id']: c for c in cards_pool}.values()
+        
+        total_cards = len(self.all_cards)
+        unique_owned = len(set(user_collection))
+        completion_ratio = unique_owned / total_cards if total_cards > 0 else 0
+        
+        weight = HIGH_COMPLETION_WEIGHT if completion_ratio >= HIGH_COMPLETION_THRESHOLD else MISSING_CARD_WEIGHT
+        
+        cards = []
+        weights = []
+        for card in unique_cards:
+            cards.append(card)
+            card_id_str = str(card['id'])
+            if card_id_str not in user_collection_set:
+                weights.append(weight)
+            else:
+                weights.append(1)
+        
+        return cards, weights
 
     # === ÉVÉNEMENTS ===
     @commands.Cog.listener()
@@ -181,10 +209,21 @@ class CollectionCog(commands.Cog):
         await interaction.response.send_message("🎉 Ouverture en cours...", ephemeral=True)
         database.remove_pack(uid, 1)
         
-        # Tirage pondéré
-        slot1 = random.choices([*self.cards_by_rarity["Commun"], *self.cards_by_rarity["Peu Commun"]], weights=[70]*len(self.cards_by_rarity["Commun"]) + [30]*len(self.cards_by_rarity["Peu Commun"]), k=1)[0]
-        slot2 = random.choices([*self.cards_by_rarity["Commun"], *self.cards_by_rarity["Peu Commun"], *self.cards_by_rarity["Rare"]], weights=[30]*len(self.cards_by_rarity["Commun"]) + [50]*len(self.cards_by_rarity["Peu Commun"]) + [20]*len(self.cards_by_rarity["Rare"]), k=1)[0]
-        slot3 = random.choices([*self.cards_by_rarity["Rare"], *self.cards_by_rarity["Épique"], *self.cards_by_rarity["Légendaire"]], weights=[45]*len(self.cards_by_rarity["Rare"]) + [35]*len(self.cards_by_rarity["Épique"]) + [20]*len(self.cards_by_rarity["Légendaire"]), k=1)[0]
+        # Tirage pondéré par rareté + pondération cartes manquantes
+        pool1_cards, pool1_weights = self.get_weighted_pool(uid, [*self.cards_by_rarity["Commun"], *self.cards_by_rarity["Peu Commun"]])
+        base_weights1 = [70 if c['rarete'] == 'Commun' else 30 for c in pool1_cards]
+        final_weights1 = [b * w for b, w in zip(base_weights1, pool1_weights)]
+        slot1 = random.choices(pool1_cards, weights=final_weights1, k=1)[0]
+        
+        pool2_cards, pool2_weights = self.get_weighted_pool(uid, [*self.cards_by_rarity["Commun"], *self.cards_by_rarity["Peu Commun"], *self.cards_by_rarity["Rare"]])
+        base_weights2 = [30 if c['rarete'] == 'Commun' else 50 if c['rarete'] == 'Peu Commun' else 20 for c in pool2_cards]
+        final_weights2 = [b * w for b, w in zip(base_weights2, pool2_weights)]
+        slot2 = random.choices(pool2_cards, weights=final_weights2, k=1)[0]
+        
+        pool3_cards, pool3_weights = self.get_weighted_pool(uid, [*self.cards_by_rarity["Rare"], *self.cards_by_rarity["Épique"], *self.cards_by_rarity["Légendaire"]])
+        base_weights3 = [45 if c['rarete'] == 'Rare' else 35 if c['rarete'] == 'Épique' else 20 for c in pool3_cards]
+        final_weights3 = [b * w for b, w in zip(base_weights3, pool3_weights)]
+        slot3 = random.choices(pool3_cards, weights=final_weights3, k=1)[0]
 
         # Gestion Noël
         is_advent = False
