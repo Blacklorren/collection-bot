@@ -173,22 +173,6 @@ def get_leaderboard_for_matches(match_ids):
         cur.execute(query, match_ids)
         return cur.fetchall()
 
-# La fonction suivante est modifiée pour ne plus dépendre des journées
-def create_match(journee_id, event_id, discord_event_id, equipe1, equipe2, date_match):
-    """Crée un match dans la base de données. journee_id peut être None."""
-    try:
-        with sqlite3.connect(DB_NAME) as con:
-            cur = con.cursor()
-            # On utilise désormais journee_id de manière facultative
-            cur.execute("""
-                INSERT INTO matchs (journee_id, event_id, discord_event_id, equipe1, equipe2, date_match)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (journee_id, event_id, discord_event_id, equipe1, equipe2, date_match.isoformat()))
-            con.commit()
-            return cur.lastrowid
-    except sqlite3.IntegrityError:
-        return None # Le match existe déjà
-
 def wipe_all_user_data():
     """
     Vide toutes les données liées aux utilisateurs, collections, et pronostics.
@@ -741,6 +725,37 @@ def get_general_leaderboard(points_per_win, limit=10, competition=None):
         
         leaderboard = cur.fetchall()
         return [dict(row) for row in leaderboard]
+
+def update_match_discord_event_id(match_id, discord_event_id):
+    """Met à jour l'ID de l'événement Discord pour un match existant."""
+    with sqlite3.connect(DB_NAME) as con:
+        cur = con.cursor()
+        cur.execute("UPDATE matchs SET discord_event_id = ? WHERE id = ?", (discord_event_id, match_id))
+        con.commit()
+
+def update_match_time(match_id, new_time):
+    """Met à jour l'horaire d'un match."""
+    with sqlite3.connect(DB_NAME) as con:
+        cur = con.cursor()
+        cur.execute("UPDATE matchs SET date_match = ? WHERE id = ?", (new_time.isoformat(), match_id))
+        con.commit()
+
+def fix_null_competitions(default_name="Starligue"):
+    """
+    Attribue un nom de compétition par défaut à tous les matchs 
+    qui n'en ont pas (pour récupérer l'historique).
+    """
+    with sqlite3.connect(DB_NAME) as con:
+        cur = con.cursor()
+        # On met à jour les matchs où la compétition est NULL ou vide
+        cur.execute("""
+            UPDATE matchs 
+            SET competition = ? 
+            WHERE competition IS NULL OR competition = ''
+        """, (default_name,))
+        changes = cur.rowcount
+        con.commit()
+        return changes
 
 def mass_give_card_if_missing(card_id):
     """

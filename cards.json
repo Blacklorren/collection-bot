@@ -84,13 +84,6 @@
     "image_url": "https://i.imgur.com/kGNJglO.png"
   },
   {
-    "id": 14,
-    "nom": "Sasser SONN",
-    "club": "Aix",
-    "rarete": "Commun",
-    "image_url": "https://i.imgur.com/ouHmMBD.png"
-  },
-  {
     "id": 15,
     "nom": "Antoine TISSOT",
     "club": "Aix",
@@ -1184,13 +1177,6 @@
     "image_url": "https://i.imgur.com/dqEAGxX.png"
   },
   {
-    "id": 174,
-    "nom": "Abdelrahman ABDOU",
-    "club": "Paris",
-    "rarete": "Commun",
-    "image_url": "https://i.imgur.com/7csv4k7.png"
-  },
-  {
     "id": 175,
     "nom": "Noah GAUDIN",
     "club": "Paris",
@@ -1767,7 +1753,7 @@
         {
     "id": 258,
     "nom": "Boris Zivkovic",
-    "club": "Chambéry",
+    "club": "Chartres",
     "rarete": "Peu Commun",
     "image_url": "https://i.imgur.com/I5UkCwX.png"
   },
