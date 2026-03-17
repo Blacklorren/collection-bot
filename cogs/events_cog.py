@@ -51,7 +51,7 @@ class EventsCog(commands.Cog):
         ]
         
         # 2. FILTRE DISCORD
-        self.DISCORD_COMPETITIONS_NAMES = ["Starligue", "Euro"]
+        self.DISCORD_COMPETITIONS_NAMES = ["Starligue"]
         
         if not BROWSERLESS_API_TOKEN: print("❌ Token Browserless manquant")
         if not SLACK_WEBHOOK_URL: print("⚠️ Webhook Slack manquant")
