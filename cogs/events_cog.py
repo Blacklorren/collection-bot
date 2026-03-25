@@ -101,21 +101,38 @@ class EventsCog(commands.Cog):
     # --- SCRAPING ---
 
     async def scrape_livescore_matches(self, url, competition_name, teams_filter=None):
-        if not BROWSERLESS_API_TOKEN: return []
+        if not BROWSERLESS_API_TOKEN:
+            print(f"❌ (SCRAPING) [{competition_name}] Token Browserless manquant")
+            return []
         matches = []
         paris_tz = pytz.timezone('Europe/Paris')
         payload = {"url": url}
 
+        print(f"🔍 (SCRAPING) [{competition_name}] Démarrage du scraping : {url}")
+
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(BROWSERLESS_CONTENT_API_URL, json=payload, timeout=45) as response:
-                    if response.status != 200: return matches
+                    print(f"📡 (SCRAPING) [{competition_name}] Réponse Browserless: {response.status}")
+                    if response.status != 200:
+                        print(f"❌ (SCRAPING) [{competition_name}] Erreur HTTP {response.status}")
+                        return matches
                     html = await response.text()
+                    print(f"📄 (SCRAPING) [{competition_name}] HTML reçu: {len(html)} caractères")
             
             soup = BeautifulSoup(html, 'html.parser')
             now = datetime.now(paris_tz)
             match_containers = soup.select("div.event__match--scheduled")
-            
+            print(f"📦 (SCRAPING) [{competition_name}] Conteneurs trouvés: {len(match_containers)}")
+
+            if not match_containers:
+                # Vérifier s'il y a d'autres types de matchs
+                all_containers = soup.select("div.event__match")
+                print(f"📦 (SCRAPING) [{competition_name}] Total conteneurs (tous types): {len(all_containers)}")
+                # Debug: afficher un extrait du HTML pour voir la structure
+                body_text = soup.get_text()[:500]
+                print(f"📝 (SCRAPING) [{competition_name}] Extrait page: {body_text}...")
+
             for container in match_containers:
                 try:
                     time_elem = container.find(class_="event__time")
@@ -150,20 +167,33 @@ class EventsCog(commands.Cog):
                     match_id_raw = container.get('id', '')
                     match_id = match_id_raw.replace('g_7_', '')
 
-                    if not all([team1, team2, match_id]): continue
+                    if not all([team1, team2, match_id]):
+                        print(f"⚠️ (SCRAPING) [{competition_name}] Données incomplètes: team1={team1}, team2={team2}, match_id={match_id}")
+                        continue
 
                     limit_date_utc = datetime.now(timezone.utc) + timedelta(days=7)
-                    if now.astimezone(timezone.utc) < match_datetime_utc < limit_date_utc:
+                    now_utc = now.astimezone(timezone.utc)
+                    print(f"🕐 (SCRAPING) [{competition_name}] Match trouvé: {team1} vs {team2} à {match_datetime_utc} (now: {now_utc}, limit: {limit_date_utc})")
+
+                    if now_utc < match_datetime_utc < limit_date_utc:
                         matches.append({
                             "team1": team1, "team2": team2,
                             "start_time_utc": match_datetime_utc,
                             "event_id": match_id,
                             "competition": competition_name
                         })
-                except Exception: continue
+                        print(f"✅ (SCRAPING) [{competition_name}] Match ajouté: {team1} vs {team2}")
+                    else:
+                        print(f"⏭️ (SCRAPING) [{competition_name}] Match hors fenêtre temporelle: {team1} vs {team2}")
+                except Exception as e:
+                    print(f"⚠️ (SCRAPING) [{competition_name}] Erreur parsing match: {e}")
+                    continue
+            print(f"🎯 (SCRAPING) [{competition_name}] Total matchs extraits: {len(matches)}")
             return matches
         except Exception as e:
             print(f"❌ (SCRAPING) Erreur {competition_name}: {e}")
+            import traceback
+            traceback.print_exc()
             return []
 
     async def send_match_to_slack_list(self, match_data):
@@ -221,9 +251,15 @@ class EventsCog(commands.Cog):
 
     @tasks.loop(seconds=MATCH_CHECK_INTERVAL)
     async def check_matches_loop(self):
+        print(f"🔍 (MATCHES) Démarrage check_matches_loop")
+        print(f"   - bot.guild_id: {self.bot.guild_id}")
+
         guild = self.bot.get_guild(self.bot.guild_id)
-        if not guild: return
-        
+        if not guild:
+            print(f"❌ (MATCHES) Guild introuvable avec ID {self.bot.guild_id}")
+            return
+
+        print(f"✅ (MATCHES) Guild trouvée: {guild.name} (ID: {guild.id})")
         print(f"🔍 (MATCHES) Vérification (Mises à jour + Nouveautés)...")
         
         try:
@@ -240,22 +276,35 @@ class EventsCog(commands.Cog):
             new_matches_for_pronos = []
             discord_deadline = datetime.now(timezone.utc) + timedelta(days=5)
             
+            print(f"📊 (MATCHES) Total matchs scrapés: {len(all_scraped_matches)}")
+
             for match in all_scraped_matches:
+                print(f"🔎 (MATCHES) Traitement: {match['team1']} vs {match['team2']} ({match['competition']})")
+
                 existing_match = database.get_match_by_event_id(match['event_id'])
-                
+
                 # --- CAS 1 : NOUVEAU MATCH ---
                 if not existing_match:
                     print(f"✨ (NOUVEAU) {match['competition']} : {match['team1']} vs {match['team2']}")
                     await self.send_match_to_slack_list(match)
-                    
+
                     # (Logique de création existante...)
                     discord_event_id = None
                     should_create_discord = False
+                    print(f"   - Competition: {match['competition']}, DISCORD_COMPETITIONS_NAMES: {self.DISCORD_COMPETITIONS_NAMES}")
+                    print(f"   - Match time: {match['start_time_utc']}, Deadline: {discord_deadline}")
+
                     if match['competition'] in self.DISCORD_COMPETITIONS_NAMES:
                         if match['start_time_utc'] <= discord_deadline:
                             should_create_discord = True
-                    
+                            print(f"   ✅ Conditions remplies pour création Discord")
+                        else:
+                            print(f"   ⏭️ Match trop lointain (> J-5)")
+                    else:
+                        print(f"   ⏭️ Competition non dans DISCORD_COMPETITIONS_NAMES")
+
                     if should_create_discord:
+                        print(f"   📝 Tentative création event Discord...")
                         try:
                             event = await guild.create_scheduled_event(
                                 name=f"[{match['competition']}] {match['team1']} vs {match['team2']}",
@@ -267,22 +316,31 @@ class EventsCog(commands.Cog):
                                 privacy_level=discord.PrivacyLevel.guild_only
                             )
                             discord_event_id = event.id
-                            print(f"✅ (DISCORD) Event créé (J-5).")
-                        except Exception as ex: print(f"❌ (DISCORD) Création : {ex}")
+                            print(f"   ✅ (DISCORD) Event créé: {event.name} (ID: {discord_event_id})")
+                        except Exception as ex:
+                            print(f"   ❌ (DISCORD) Erreur création event: {ex}")
+                            import traceback
+                            traceback.print_exc()
 
+                    print(f"   💾 Sauvegarde en base de données...")
                     match_db_id = database.create_match(
                         None, match['event_id'], discord_event_id,
                         match['team1'], match['team2'], match['start_time_utc'],
                         competition=match['competition']
                     )
+                    print(f"   💾 Match sauvegardé avec ID: {match_db_id}")
                     if discord_event_id and match_db_id:
                         new_matches_for_pronos.append({
                             'id': match_db_id, 'equipe1': match['team1'], 'equipe2': match['team2'],
                             'date_match': match['start_time_utc']
                         })
+                        print(f"   📋 Ajouté à la liste des pronostics")
+                    else:
+                        print(f"   ⏭️ Pas ajouté aux pronostics (discord_event_id={discord_event_id}, match_db_id={match_db_id})")
 
                 # --- CAS 2 : MATCH EXISTANT -> VÉRIFICATION HORAIRE ET J+5 ---
                 else:
+                    print(f"   🔄 Match existant en base (ID: {existing_match['id']}, discord_event_id: {existing_match['discord_event_id']})")
                     # A. Vérification Changement d'Horaire
                     try:
                         # On récupère l'heure en base
@@ -327,11 +385,17 @@ class EventsCog(commands.Cog):
                                 print(f"✅ (DISCORD) Event créé tardivement (J-5 atteint).")
                             except Exception as ex: print(f"❌ (DISCORD) Création tardive : {ex}")
 
+            print(f"📊 (MATCHES) Résumé: {len(new_matches_for_pronos)} nouveaux matchs pour pronostics")
             if new_matches_for_pronos and pronos_cog:
+                print(f"   📤 Envoi vers création des messages de pronostics...")
                 await pronos_cog.create_pronostic_messages_for_matches(new_matches_for_pronos)
-            
+            elif not pronos_cog:
+                print(f"   ⚠️ PronosticsCog non trouvé!")
+
         except Exception as e:
             print(f"❌ (MATCHES) Erreur boucle : {e}")
+            import traceback
+            traceback.print_exc()
 
     # --- RESULTATS ---
     async def get_match_result(self, event_id):
