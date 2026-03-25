@@ -133,14 +133,18 @@ class EventsCog(commands.Cog):
                 body_text = soup.get_text()[:500]
                 print(f"📝 (SCRAPING) [{competition_name}] Extrait page: {body_text}...")
 
-            for container in match_containers:
+            for idx, container in enumerate(match_containers):
                 try:
                     time_elem = container.find(class_="event__time")
-                    if not time_elem: continue
+                    if not time_elem:
+                        print(f"   ⚠️ Container {idx}: Pas d'élément event__time")
+                        continue
                     
                     time_text = time_elem.get_text(strip=True)
                     match_time_parts = time_text.split(' ')
-                    if len(match_time_parts) != 2: continue
+                    if len(match_time_parts) != 2:
+                        print(f"   ⚠️ Container {idx}: Format de temps invalide: '{time_text}'")
+                        continue
                     
                     date_part, time_part = match_time_parts
                     day, month = map(int, date_part.split('.')[:2])
@@ -153,8 +157,27 @@ class EventsCog(commands.Cog):
                     match_datetime_naive = datetime.combine(match_date, datetime.min.time()).replace(hour=hour, minute=minute)
                     match_datetime_utc = match_datetime_naive.replace(tzinfo=timezone.utc)
                     
-                    team1 = container.find(class_="event__participant--home").get_text(strip=True)
-                    team2 = container.find(class_="event__participant--away").get_text(strip=True)
+                    # Essayer plusieurs sélecteurs pour trouver les équipes
+                    team1_elem = container.find(class_="event__participant--home")
+                    team2_elem = container.find(class_="event__participant--away")
+                    
+                    # Si les classes spécifiques ne marchent pas, essayer des sélecteurs plus généraux
+                    if not team1_elem or not team2_elem:
+                        # Essayer avec les classes participant génériques
+                        participants = container.find_all(class_=re.compile(r"event__participant"))
+                        if len(participants) >= 2:
+                            team1_elem = participants[0]
+                            team2_elem = participants[1]
+                    
+                    if not team1_elem or not team2_elem:
+                        # Debug: afficher les classes disponibles dans ce container
+                        all_divs = container.find_all("div", class_=True)
+                        class_names = [" ".join(div.get('class', [])) for div in all_divs[:5]]
+                        print(f"   ⚠️ Container {idx}: Équipes non trouvées. Classes disponibles: {class_names}")
+                        continue
+                    
+                    team1 = team1_elem.get_text(strip=True)
+                    team2 = team2_elem.get_text(strip=True)
                     
                     if teams_filter:
                         match_found = False
