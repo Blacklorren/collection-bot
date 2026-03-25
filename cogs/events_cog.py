@@ -158,13 +158,19 @@ class EventsCog(commands.Cog):
                     match_datetime_utc = match_datetime_naive.replace(tzinfo=timezone.utc)
                     
                     # Essayer plusieurs sélecteurs pour trouver les équipes
-                    team1_elem = container.find(class_="event__participant--home")
-                    team2_elem = container.find(class_="event__participant--away")
+                    # Nouvelles classes livescore.in (2025)
+                    team1_elem = container.find(class_="event__homeParticipant")
+                    team2_elem = container.find(class_="event__awayParticipant")
+                    
+                    # Anciennes classes (pour compatibilité)
+                    if not team1_elem or not team2_elem:
+                        team1_elem = container.find(class_="event__participant--home")
+                        team2_elem = container.find(class_="event__participant--away")
                     
                     # Si les classes spécifiques ne marchent pas, essayer des sélecteurs plus généraux
                     if not team1_elem or not team2_elem:
-                        # Essayer avec les classes participant génériques
-                        participants = container.find_all(class_=re.compile(r"event__participant"))
+                        # Essayer avec les classes participant génériques (pattern wcl-participant_*)
+                        participants = container.find_all(class_=re.compile(r"event__.*Participant"))
                         if len(participants) >= 2:
                             team1_elem = participants[0]
                             team2_elem = participants[1]
