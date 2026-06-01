@@ -38,16 +38,16 @@ class EventsCog(commands.Cog):
         
         # 1. LISTE COMPLÈTE
         self.COMPETITIONS = [
-            {"name": "Starligue", "url": "https://www.livescore.in/fr/handball/france/starligue/"},
-            {"name": "Euro", "url": "https://www.livescore.in/fr/handball/europe/ehf-euro/"},
-            {"name": "LFH", "url": "https://www.livescore.in/fr/handball/france/division-1-femmes/"},
-            {"name": "Euro Féminin", "url": "https://www.livescore.in/fr/handball/europe/ehf-euro-women/", "teams_filter": ["france"]},
-            {"name": "Mondial Masculin", "url": "https://www.livescore.in/fr/handball/monde/championnat-du-monde/", "teams_filter": ["france"]},
-            {"name": "Mondial Féminin", "url": "https://www.livescore.in/fr/handball/europe/ehf-euro/", "teams_filter": ["france"]},
-            {"name": "Ligue des Champions Masculine", "url": "https://www.livescore.in/fr/handball/europe/ligue-des-champions", "teams_filter": ["paris", "psg","nantes"]},
-            {"name": "Ligue des Champions Féminine", "url": "https://www.livescore.in/fr/handball/europe/ligue-des-champions-femmes/", "teams_filter": ["metz", "brest-bretagne"]},
-            {"name": "Ligue Européene Masculine", "url": "https://www.livescore.in/fr/handball/europe/ligue-europeenne/", "teams_filter": ["montpellier"]},
-            {"name": "Ligue Européenne Féminine", "url": "https://www.livescore.in/fr/handball/europe/ligue-europeenne-femmes/", "teams_filter": ["chambray-touraine", "dijon"]}
+            {"name": "Starligue", "url": "https://www.livescore.in/fr/handball/france/starligue/fixtures/"},
+            {"name": "Euro", "url": "https://www.livescore.in/fr/handball/europe/ehf-euro/fixtures/"},
+            {"name": "LFH", "url": "https://www.livescore.in/fr/handball/france/division-1-femmes/fixtures/"},
+            {"name": "Euro Féminin", "url": "https://www.livescore.in/fr/handball/europe/ehf-euro-women/fixtures/", "teams_filter": ["france"]},
+            {"name": "Mondial Masculin", "url": "https://www.livescore.in/fr/handball/monde/championnat-du-monde/fixtures/", "teams_filter": ["france"]},
+            {"name": "Mondial Féminin", "url": "https://www.livescore.in/fr/handball/europe/ehf-euro/fixtures/", "teams_filter": ["france"]},
+            {"name": "Ligue des Champions Masculine", "url": "https://www.livescore.in/fr/handball/europe/ligue-des-champions/fixtures/", "teams_filter": ["paris", "psg","nantes"]},
+            {"name": "Ligue des Champions Féminine", "url": "https://www.livescore.in/fr/handball/europe/ligue-des-champions-femmes/fixtures/", "teams_filter": ["metz", "brest-bretagne"]},
+            {"name": "Ligue Européene Masculine", "url": "https://www.livescore.in/fr/handball/europe/ligue-europeenne/fixtures/", "teams_filter": ["montpellier"]},
+            {"name": "Ligue Européenne Féminine", "url": "https://www.livescore.in/fr/handball/europe/ligue-europeenne-femmes/fixtures/", "teams_filter": ["chambray-touraine", "dijon"]}
         ]
         
         # 2. FILTRE DISCORD
@@ -106,7 +106,12 @@ class EventsCog(commands.Cog):
             return []
         matches = []
         paris_tz = pytz.timezone('Europe/Paris')
-        payload = {"url": url}
+        payload = {
+            "url": url,
+            "gotoOptions": {"waitUntil": "networkidle2", "timeout": 30000},
+            "waitForSelector": {"selector": ".event__match", "timeout": 15000},
+            "bestAttempt": True,
+        }
 
         print(f"🔍 (SCRAPING) [{competition_name}] Démarrage du scraping : {url}")
 
@@ -429,10 +434,15 @@ class EventsCog(commands.Cog):
     # --- RESULTATS ---
     async def get_match_result(self, event_id):
         match_url = f"https://www.livescore.in/fr/match/{event_id}/"
-        payload = {"url": match_url}
+        payload = {
+            "url": match_url,
+            "gotoOptions": {"waitUntil": "networkidle2", "timeout": 30000},
+            "waitForSelector": {"selector": ".detailScore__wrapper", "timeout": 15000},
+            "bestAttempt": True,
+        }
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.post(BROWSERLESS_CONTENT_API_URL, json=payload, timeout=30) as resp:
+                async with session.post(BROWSERLESS_CONTENT_API_URL, json=payload, timeout=60) as resp:
                     if resp.status != 200: return None
                     html = await resp.text()
             soup = BeautifulSoup(html, 'html.parser')
