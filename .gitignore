@@ -11,6 +11,11 @@ reset_done.lock
 # Cartes composées générées au runtime (régénérables depuis les sources)
 assets/card_cache/
 
+# Portraits détourés (générés offline par tools/build_cutouts.py, ~63 Mo).
+# Décision de stockage à trancher (cf. docs/card-redesign-v2.md) :
+# retirer cette ligne quand on décide de committer les WebP.
+assets/cutouts/
+
 # Prototypes jetables
 proto_out/
 
