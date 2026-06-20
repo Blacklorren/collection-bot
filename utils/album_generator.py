@@ -5,11 +5,13 @@ import os
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 import aiohttp
 
+from utils import card_renderer
+
 # Dimensions standard pour la grille
 # Aspect ratio 992x1200 conservé
 # On part sur une base large pour la qualité
 CARD_WIDTH = 496  # 992 / 2
-CARD_HEIGHT = 600 # 1200 / 2
+CARD_HEIGHT = 620 # 1240 / 2 (aspect de la carte composee)
 GRID_COLUMNS = 4
 PADDING = 20
 BG_COLOR = (44, 47, 51)  # Discord Dark Mode Grey
@@ -136,38 +138,38 @@ async def generate_club_album(club_name, all_cards_in_club, owned_card_ids):
     async with aiohttp.ClientSession(headers=headers) as session:
         tasks = []
         
-        # On prépare les tâches pour télécharger les images possédées
+        # On prépare les tâches : rendu de la carte composée pour les cartes possédées
         for i, card in enumerate(all_cards_in_club):
             card_id = card['id']
             # Support int/str
             is_owned = (card_id in owned_card_ids) or (str(card_id) in [str(x) for x in owned_card_ids])
-            
+
             if is_owned:
-                tasks.append(fetch_image(session, card['image_url']))
+                tasks.append(card_renderer.get_card_bytes(session, card))
             else:
                 # Pas de tâche réseau pour les placeholders
-                tasks.append(asyncio.sleep(0, result=None)) 
-        
-        # Exécution des téléchargements
+                tasks.append(asyncio.sleep(0, result=None))
+
+        # Exécution (téléchargement + rendu, avec cache disque)
         results = await asyncio.gather(*tasks)
-        
+
         # 4. Collage sur le canvas
         for i, card in enumerate(all_cards_in_club):
             col = i % GRID_COLUMNS
             row = i // GRID_COLUMNS
-            
+
             x = PADDING + (col * (CARD_WIDTH + PADDING))
             y = 140 + PADDING + (row * (CARD_HEIGHT + PADDING)) # Offset titre
-            
-            card_img = results[i]
-            
-            if card_img:
-                # C'est une carte possédée et téléchargée
-                # Redimensionnement propre
-                card_img = card_img.resize((CARD_WIDTH, CARD_HEIGHT), Image.Resampling.LANCZOS)
-                final_img.paste(card_img, (x, y))
+
+            data = results[i]
+
+            if data:
+                # Carte possédée : PNG composé (bytes) -> redimensionnement propre
+                rendered = Image.open(io.BytesIO(data)).convert("RGB").resize(
+                    (CARD_WIDTH, CARD_HEIGHT), Image.Resampling.LANCZOS)
+                final_img.paste(rendered, (x, y))
             else:
-                # C'est une carte manquante ou erreur de download -> Placeholder
+                # Carte manquante ou erreur -> Placeholder
                 placeholder = create_placeholder(card['nom'], card['rarete'])
                 final_img.paste(placeholder, (x, y))
                 

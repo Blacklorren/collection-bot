@@ -8,6 +8,12 @@ collection.db
 collection.db-journal
 reset_done.lock
 
+# Cartes composées générées au runtime (régénérables depuis les sources)
+assets/card_cache/
+
+# Prototypes jetables
+proto_out/
+
 # Fichiers cache et compilés de Python
 __pycache__/
 *.pyc
