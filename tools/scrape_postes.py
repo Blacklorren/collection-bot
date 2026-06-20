@@ -14,6 +14,7 @@ Sortie :
 Le matching se fait sur le nom normalise (sans accents, majuscules, espaces compactes).
 Ne modifie PAS cards.json : la fusion est laissee a l'etape d'integration.
 """
+import html
 import json
 import os
 import re
@@ -54,9 +55,26 @@ NON_PLAYER = ("entraineur", "entraîneur", "coach", "preparateur", "kine", "mede
 
 
 def norm(name):
+    name = html.unescape(name)  # &apos; &amp; ... -> caracteres reels
     n = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
+    n = re.sub(r"[^A-Za-z0-9 ]", " ", n)  # apostrophes/traits d'union -> espace
     n = re.sub(r"\s+", " ", n).strip().upper()
     return n
+
+
+def subset_match(target, roster):
+    """Trouve un poste quand le nom de carte et celui du roster different par des
+    tokens en plus/en moins (2e prenom, nom compose). Match si l'un des deux
+    ensembles de tokens est inclus dans l'autre, avec >=2 tokens communs."""
+    tset = set(target.split())
+    best = None
+    for rname, pos in roster.items():
+        rset = set(rname.split())
+        common = tset & rset
+        if len(common) >= 2 and (tset <= rset or rset <= tset):
+            if best is None or len(common) > best[0]:
+                best = (len(common), pos)
+    return best[1] if best else None
 
 
 def fetch_html(slug):
@@ -91,7 +109,8 @@ def main():
         roster = rosters.get(c["club"])
         if not roster:
             continue
-        poste = roster.get(norm(c["nom"]))
+        target = norm(c["nom"])
+        poste = roster.get(target) or subset_match(target, roster)
         if poste:
             postes[str(c["id"])] = poste
         else:

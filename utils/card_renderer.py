@@ -1,11 +1,14 @@
-"""Rendu de carte style TCG : bordure noire -> cadre metallique (couleur rarete) -> art du joueur,
-plaque de nom noire (nom Anton + club Oswald + pastille de rarete), ecusson du club.
+"""Rendu de carte style TCG (layout v2) : silhouette noire a coins biseautes, fond degrade
+couleur de rarete + joueur detoure pose dessus, ecusson du club sur disque blanc (bas-gauche),
+nom (Anton) + poste (Oswald) alignes a droite (bas-droite).
 
 Expose :
-- compose(portrait, nom, club, rarete) -> PIL.Image       (rendu pur, synchrone)
-- get_card_bytes(card, session=None) -> bytes | None       (telecharge + rend + cache disque)
+- compose_v2(cutout, nom, club, rarete, poste) -> PIL.Image  (rendu pur, synchrone, layout actif)
+- compose(portrait, nom, club, rarete) -> PIL.Image          (ancien layout v1, conserve)
+- get_card_bytes(card, session=None) -> bytes | None          (cutout/portrait + rend + cache disque)
 """
 import io
+import math
 import os
 import unicodedata
 
@@ -15,15 +18,19 @@ HERE = os.path.dirname(__file__)
 ROOT = os.path.dirname(HERE)
 FONTS = os.path.join(ROOT, "assets", "fonts")
 LOGOS = os.path.join(ROOT, "assets", "logos")
+CUTOUTS = os.path.join(ROOT, "assets", "cutouts")
 CACHE_DIR = os.path.join(ROOT, "assets", "card_cache")
 
 # Incrementer pour invalider le cache disque quand le design change
-DESIGN_VERSION = "v1"
+DESIGN_VERSION = "v2"
 
 W, H = 992, 1240
-R = 40          # rayon des coins (carte)
-BLACK = 30      # bordure noire externe
-FRAME = 18      # epaisseur du cadre stylise
+R = 40          # rayon des coins (carte, layout v1)
+BLACK = 30      # bordure noire externe (v1)
+FRAME = 18      # epaisseur du cadre stylise (v1)
+
+CHAMFER = 140   # taille du coin biseaute (bas-gauche + haut-droite, v2)
+BORDER = 42     # epaisseur de la bordure noire (v2)
 
 RARITY_RGB = {
     "Commun": (150, 154, 162),
@@ -177,6 +184,108 @@ def compose(portrait, nom, club, rarete):
     return card
 
 
+# ---------------------------------------------------------------------------
+# Layout v2 (actif) : silhouette biseautee + joueur detoure
+# ---------------------------------------------------------------------------
+def _outer_poly():
+    c = CHAMFER
+    return [(0, 0), (W - c, 0), (W, c), (W, H), (c, H), (0, H - c)]
+
+
+def _inner_poly(b):
+    """Contour interieur = offset perpendiculaire de `b` sur chaque arete
+    -> bordure d'epaisseur uniforme, diagonales comprises."""
+    c = CHAMFER
+    k = b * math.sqrt(2)
+    c_tr = (W - c) - k         # arete haut-droite : x - y = c_tr
+    c_bl = (c - H) + k         # arete bas-gauche : x - y = c_bl
+    return [
+        (b, b),
+        (b + c_tr, b),
+        (W - b, (W - b) - c_tr),
+        (W - b, H - b),
+        ((H - b) + c_bl, H - b),
+        (b, b - c_bl),
+    ]
+
+
+def _poly_mask(size, points, ss=3):
+    big = Image.new("L", (size[0] * ss, size[1] * ss), 0)
+    ImageDraw.Draw(big).polygon([(x * ss, y * ss) for x, y in points], fill=255)
+    return big.resize(size, Image.Resampling.LANCZOS)
+
+
+def _bottom_shade(size, start=0.5, max_a=210):
+    w, h = size
+    g = Image.new("L", (1, h), 0)
+    s = int(h * start)
+    for y in range(h):
+        g.putpixel((0, y), 0 if y < s else int(max_a * ((y - s) / (h - s)) ** 1.4))
+    layer = Image.new("RGBA", (w, h), (8, 9, 12, 0))
+    layer.putalpha(g.resize((w, h)))
+    return layer
+
+
+def compose_v2(cutout, nom, club, rarete, poste=""):
+    """Compose la carte (PIL RGBA) layout v2. `cutout` : portrait detoure (fond
+    transparent) de preference ; un portrait brut plein cadre marche en fallback."""
+    rgb = RARITY_RGB.get(rarete, (150, 150, 150))
+    out = _outer_poly()
+    inn = _inner_poly(BORDER)
+
+    # Carte noire (silhouette a coins coupes)
+    card = Image.new("RGBA", (W, H), (12, 13, 16, 255))
+    card.putalpha(_poly_mask((W, H), out))
+
+    # Fond rarete + joueur detoure + ombre basse, clippe au polygone interieur
+    bg = _vgradient((W, H), darken(rgb, 0.15), darken(rgb, 0.6))
+    art = cutout.convert("RGBA").resize((W, H), Image.Resampling.LANCZOS)
+    bg.alpha_composite(art)
+    bg.alpha_composite(_bottom_shade((W, H)))
+    bg.putalpha(_poly_mask((W, H), inn))
+    card.alpha_composite(bg)
+
+    cd = ImageDraw.Draw(card)
+    cd.line(inn + [inn[0]], fill=rgb, width=3, joint="curve")
+
+    # Ecusson sur disque blanc, bas-gauche
+    disc_c = (BORDER + 118, H - BORDER - 130)
+    r = 92
+    disc = Image.new("RGBA", (r * 2 + 8, r * 2 + 8), (0, 0, 0, 0))
+    ImageDraw.Draw(disc).ellipse([4, 4, r * 2 + 3, r * 2 + 3], fill=(248, 249, 250, 255),
+                                 outline=(12, 13, 16, 255), width=4)
+    card.alpha_composite(disc, (disc_c[0] - r - 4, disc_c[1] - r - 4))
+    logo_path = os.path.join(LOGOS, slugify(club) + ".png")
+    if os.path.exists(logo_path):
+        ls = 150
+        logo = Image.open(logo_path).convert("RGBA").resize((ls, ls), Image.Resampling.LANCZOS)
+        card.alpha_composite(logo, (disc_c[0] - ls // 2, disc_c[1] - ls // 2))
+
+    # Nom (grand) + poste (dessous), alignes a droite, bas-droite
+    x_r = W - BORDER - 36
+    name = nom.upper()
+    size = 80
+    nf = anton(size)
+    max_w = x_r - (disc_c[0] + r + 28)
+    while cd.textlength(name, font=nf) > max_w and size > 40:
+        size -= 3
+        nf = anton(size)
+    pf = oswald(38, 500)
+    nb = cd.textbbox((0, 0), name, font=nf, anchor="ra")
+    pb = cd.textbbox((0, 0), (poste or "").upper(), font=pf, anchor="ra")
+    nh, ph = nb[3] - nb[1], pb[3] - pb[1]
+    gap = 8
+    bottom_y = H - BORDER - 46
+    if poste:
+        poste_top = bottom_y - ph
+        name_top = poste_top - gap - nh
+        cd.text((x_r, name_top), name, font=nf, fill=(255, 255, 255), anchor="ra")
+        cd.text((x_r, poste_top), poste.upper(), font=pf, fill=lighten(rgb, 0.55), anchor="ra")
+    else:
+        cd.text((x_r, bottom_y - nh), name, font=nf, fill=(255, 255, 255), anchor="ra")
+    return card
+
+
 def _cache_path(card_id):
     return os.path.join(CACHE_DIR, f"{DESIGN_VERSION}_{card_id}.png")
 
@@ -192,30 +301,44 @@ async def _fetch_portrait(session, url):
     return None
 
 
-async def get_card_bytes(card, session=None):
-    """Renvoie le PNG (bytes) de la carte composee, avec cache disque par id+version.
+def _load_cutout(card_id):
+    """Portrait detoure local (assets/cutouts/<id>.webp) ou None s'il manque."""
+    p = os.path.join(CUTOUTS, f"{card_id}.webp")
+    if os.path.exists(p):
+        try:
+            return Image.open(p).convert("RGBA")
+        except Exception:
+            return None
+    return None
 
-    `session` : aiohttp.ClientSession optionnelle. Si absente et qu'un telechargement
-    est necessaire, une session ephemere est ouverte. Retourne None si le portrait
-    est introuvable."""
+
+async def get_card_bytes(card, session=None):
+    """Renvoie le PNG (bytes) de la carte composee (layout v2), cache disque par id+version.
+
+    Utilise le portrait detoure `assets/cutouts/<id>.webp` s'il existe ; sinon retombe
+    sur le portrait brut telecharge (plein cadre). `session` : aiohttp.ClientSession
+    optionnelle (ouverte a la volee au besoin). Retourne None si aucune image dispo."""
     path = _cache_path(card["id"])
     if os.path.exists(path):
         with open(path, "rb") as f:
             return f.read()
 
-    own_session = session is None
-    if own_session:
-        import aiohttp
-        session = aiohttp.ClientSession()
-    try:
-        portrait = await _fetch_portrait(session, card["image_url"])
-    finally:
+    art = _load_cutout(card["id"])
+    if art is None:
+        # Fallback : pas de cutout -> portrait brut plein cadre
+        own_session = session is None
         if own_session:
-            await session.close()
-    if portrait is None:
+            import aiohttp
+            session = aiohttp.ClientSession()
+        try:
+            art = await _fetch_portrait(session, card["image_url"])
+        finally:
+            if own_session:
+                await session.close()
+    if art is None:
         return None
 
-    img = compose(portrait, card["nom"], card["club"], card["rarete"])
+    img = compose_v2(art, card["nom"], card["club"], card["rarete"], card.get("poste", ""))
     buf = io.BytesIO()
     img.convert("RGB").save(buf, format="PNG")
     data = buf.getvalue()
