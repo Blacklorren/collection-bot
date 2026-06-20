@@ -124,9 +124,50 @@ def initialize_database():
         # MIGRATION : Ajout de la colonne competition si elle n'existe pas
         try:
             cur.execute("ALTER TABLE matchs ADD COLUMN competition TEXT")
-        except sqlite3.OperationalError: 
+        except sqlite3.OperationalError:
             pass
-            
+
+        # === SAISON 2 : Elo, échanges, duels ===
+        # Note d'Elo pour le matchmaking des duels (défaut 1000).
+        try:
+            cur.execute("ALTER TABLE users ADD COLUMN elo INTEGER NOT NULL DEFAULT 1000")
+        except sqlite3.OperationalError:
+            pass
+
+        # Journal des échanges (traçabilité / litiges).
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS trade_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                user_a INTEGER NOT NULL,
+                user_b INTEGER NOT NULL,
+                cards_a TEXT NOT NULL,
+                cards_b TEXT NOT NULL
+            )
+        ''')
+
+        # Historique des duels entre joueurs.
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS duels (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                joueur1 INTEGER NOT NULL,
+                joueur2 INTEGER NOT NULL,
+                score1 INTEGER NOT NULL,
+                score2 INTEGER NOT NULL,
+                gagnant INTEGER,
+                classe INTEGER NOT NULL DEFAULT 1,
+                elo1_before INTEGER,
+                elo2_before INTEGER,
+                elo1_after INTEGER,
+                elo2_after INTEGER,
+                lineup1 TEXT,
+                lineup2 TEXT
+            )
+        ''')
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_duels_joueurs ON duels(joueur1, joueur2)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_duels_date ON duels(created_at)")
+
         con.commit()
 
 # === FONCTIONS EXISTANTES POUR LE JEU DE CARTES ===
@@ -780,3 +821,84 @@ def mass_give_card_if_missing(card_id):
         
         con.commit()
         return cur.rowcount
+
+# === SAISON 2 : ÉCHANGES DE CARTES ===
+
+def get_user_cards_with_rowid(user_id):
+    """Retourne la liste des exemplaires possédés : [(rowid, card_id), ...].
+    Le rowid identifie un exemplaire précis (utile pour échanger un doublon donné)."""
+    check_user(user_id)
+    with sqlite3.connect(DB_NAME) as con:
+        cur = con.cursor()
+        cur.execute("SELECT id, card_id FROM user_cards WHERE user_id = ? ORDER BY id", (user_id,))
+        return cur.fetchall()
+
+def execute_trade(user_a, rowids_a, user_b, rowids_b):
+    """Échange ATOMIQUE de N cartes (de A vers B) contre M cartes (de B vers A).
+    Les listes contiennent des rowids de user_cards. Tout est revérifié DANS la
+    transaction : si un exemplaire ne correspond plus au bon propriétaire, on
+    annule tout et on retourne False (aucune carte n'est dupliquée ni perdue)."""
+    rowids_a = list(rowids_a)
+    rowids_b = list(rowids_b)
+    # Sécurités basiques avant d'ouvrir la transaction
+    if not rowids_a or not rowids_b:
+        return False
+    if len(set(rowids_a)) != len(rowids_a) or len(set(rowids_b)) != len(rowids_b):
+        return False
+    if set(rowids_a) & set(rowids_b):
+        return False
+
+    with sqlite3.connect(DB_NAME) as con:
+        cur = con.cursor()
+        # Revérifier la propriété de CHAQUE exemplaire dans la transaction
+        for rid in rowids_a:
+            if not cur.execute("SELECT 1 FROM user_cards WHERE id = ? AND user_id = ?", (rid, user_a)).fetchone():
+                return False
+        for rid in rowids_b:
+            if not cur.execute("SELECT 1 FROM user_cards WHERE id = ? AND user_id = ?", (rid, user_b)).fetchone():
+                return False
+        # Transfert : on réaffecte simplement le propriétaire de chaque ligne
+        cur.executemany("UPDATE user_cards SET user_id = ? WHERE id = ?", [(user_b, r) for r in rowids_a])
+        cur.executemany("UPDATE user_cards SET user_id = ? WHERE id = ?", [(user_a, r) for r in rowids_b])
+        con.commit()
+        return True
+
+def log_trade(user_a, card_ids_a, user_b, card_ids_b):
+    """Enregistre un échange réalisé (pour traçabilité / gestion des litiges)."""
+    import json as _json
+    with sqlite3.connect(DB_NAME) as con:
+        cur = con.cursor()
+        cur.execute(
+            "INSERT INTO trade_log (user_a, user_b, cards_a, cards_b) VALUES (?, ?, ?, ?)",
+            (user_a, user_b, _json.dumps(list(card_ids_a)), _json.dumps(list(card_ids_b)))
+        )
+        con.commit()
+        return cur.lastrowid
+
+def remove_extra_copies(user_id, card_ids):
+    """Recyclage sélectif : pour chaque card_id donné, supprime tous les
+    exemplaires SAUF UN. Retourne {card_id: nb_supprimés}."""
+    removed = {}
+    with sqlite3.connect(DB_NAME) as con:
+        cur = con.cursor()
+        for cid in card_ids:
+            rows = cur.execute(
+                "SELECT id FROM user_cards WHERE user_id = ? AND card_id = ? ORDER BY id",
+                (user_id, cid)
+            ).fetchall()
+            if len(rows) > 1:
+                to_delete = [(r[0],) for r in rows[1:]]  # on garde le 1er exemplaire
+                cur.executemany("DELETE FROM user_cards WHERE id = ?", to_delete)
+                removed[cid] = len(to_delete)
+        con.commit()
+    return removed
+
+# === SAISON 2 : ELO (duels) ===
+
+def get_user_elo(user_id):
+    """Retourne l'Elo de l'utilisateur (1000 par défaut)."""
+    check_user(user_id)
+    with sqlite3.connect(DB_NAME) as con:
+        cur = con.cursor()
+        row = cur.execute("SELECT elo FROM users WHERE user_id = ?", (user_id,)).fetchone()
+        return row[0] if row and row[0] is not None else 1000

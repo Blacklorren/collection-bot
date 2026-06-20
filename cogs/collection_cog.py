@@ -18,6 +18,11 @@ RARITY_COLORS = {
     "Noël": discord.Color.from_rgb(220, 20, 60)
 }
 
+RARITY_EMOJI = {
+    "Commun": "⬜", "Peu Commun": "🟩", "Rare": "🟦",
+    "Épique": "🟪", "Légendaire": "🟨", "Noël": "🎄",
+}
+
 FRAGMENT_VALUES = {
     "Commun": 2,
     "Peu Commun": 5,
@@ -49,6 +54,87 @@ def load_cards_data():
     """Charge les cartes en mémoire."""
     with open('cards.json', 'r', encoding='utf-8') as f:
         return json.load(f)
+
+class RecycleView(discord.ui.View):
+    """Recyclage sélectif (Saison 2) : choisir les doublons à recycler, ou tout recycler."""
+
+    def __init__(self, cog, user_id, dups):
+        super().__init__(timeout=120)
+        self.cog = cog
+        self.user_id = user_id
+        self.dups = dups          # {card_id: nombre total possédé}
+        self.selected = []
+        self.done = False
+        self.id_by_str = {}
+
+        options = []
+        for cid, cnt in list(dups.items())[:25]:
+            card = cog.get_card_safe(cid)
+            self.id_by_str[str(cid)] = cid
+            extra = cnt - 1
+            frags = (FRAGMENT_VALUES.get(card['rarete'], 0) * extra) if card else 0
+            options.append(discord.SelectOption(
+                label=(card['nom'] if card else str(cid))[:100],
+                value=str(cid),
+                description=f"{extra} doublon(s) → {frags} fragments",
+                emoji=RARITY_EMOJI.get(card['rarete'], "🔹") if card else "🔹",
+            ))
+        self.pick.options = options
+        self.pick.min_values = 0
+        self.pick.max_values = len(options)
+
+    async def interaction_check(self, interaction):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("Ce n'est pas ton recyclage.", ephemeral=True)
+            return False
+        return True
+
+    def _frags_all(self):
+        removed = {cid: cnt - 1 for cid, cnt in self.dups.items()}
+        return self.cog._fragments_for_removed(removed)
+
+    def build_embed(self):
+        truncated = len(self.dups) > 25
+        e = discord.Embed(
+            title="♻️ Recyclage sélectif",
+            description=("Choisis les doublons à recycler, ou recycle tout.\n"
+                         "⚠️ Garde tes doublons si tu comptes les **échanger** !"),
+            color=discord.Color.green(),
+        )
+        e.set_footer(text=f"Tout recycler = {self._frags_all()} fragments"
+                          + (" · (25 premiers affichés dans la liste)" if truncated else ""))
+        return e
+
+    async def _finish(self, interaction, title, fragments):
+        self.done = True
+        for c in self.children:
+            c.disabled = True
+        embed = discord.Embed(title=title, description=f"Tu as gagné **{fragments} fragments**.", color=discord.Color.green())
+        await interaction.response.edit_message(embed=embed, view=self)
+        self.stop()
+
+    @discord.ui.select(placeholder="Choisis les doublons à recycler…", row=0)
+    async def pick(self, interaction, select):
+        self.selected = select.values
+        await interaction.response.defer()
+
+    @discord.ui.button(label="Recycler la sélection", emoji="♻️", style=discord.ButtonStyle.green, row=1)
+    async def recycle_sel_btn(self, interaction, button):
+        if self.done:
+            return
+        cids = [self.id_by_str[v] for v in self.selected if v in self.id_by_str]
+        if not cids:
+            return await interaction.response.send_message("Sélectionne au moins une carte.", ephemeral=True)
+        fragments = self.cog.recycle_selected(self.user_id, cids)
+        await self._finish(interaction, "♻️ Doublons recyclés", fragments)
+
+    @discord.ui.button(label="Tout recycler", emoji="🗑️", style=discord.ButtonStyle.grey, row=1)
+    async def recycle_all_btn(self, interaction, button):
+        if self.done:
+            return
+        fragments = self.cog.recycle_all(self.user_id)
+        await self._finish(interaction, "♻️ Tous les doublons recyclés", fragments)
+
 
 class CollectionCog(commands.Cog):
     def __init__(self, bot):
@@ -484,29 +570,68 @@ class CollectionCog(commands.Cog):
             app_commands.Choice(name=c, value=c)
             for c in clubs if current.lower() in c.lower()
         ][:25]
-    @app_commands.command(name='recycler', description="Échange doublons contre fragments.")
-    async def recycle_command(self, interaction: discord.Interaction):
-        ids = database.get_user_collection(interaction.user.id)
-        if not ids: return await interaction.response.send_message("Rien à recycler.", ephemeral=True)
-            
+    # --- Helpers de recyclage (partagés legacy / sélectif) ---
+    def get_card_safe(self, cid):
+        return self.card_map.get(cid) or self.card_map.get(str(cid))
+
+    def _fragments_for_removed(self, removed_counts):
+        """removed_counts: {card_id: nb_exemplaires_retirés} -> total fragments."""
+        total = 0
+        for cid, n in removed_counts.items():
+            card = self.get_card_safe(cid)
+            if card:
+                total += FRAGMENT_VALUES.get(card['rarete'], 0) * n
+        return total
+
+    def recycle_all(self, user_id):
+        """Recycle TOUS les doublons (garde un de chaque). Retourne les fragments gagnés."""
+        ids = database.get_user_collection(user_id)
         counts = {}
-        for cid in ids: counts[cid] = counts.get(cid, 0) + 1
-        
-        fragments = 0
-        kept = []
-        for cid, count in counts.items():
-            kept.append(cid)
-            if count > 1:
-                card = self.card_map.get(cid) or self.card_map.get(str(cid))
-                if card: fragments += FRAGMENT_VALUES.get(card['rarete'], 0) * (count - 1)
-        
-        if fragments == 0: return await interaction.response.send_message("Aucun doublon.", ephemeral=True)
-        
-        database.update_fragments(interaction.user.id, fragments)
-        database.reset_and_set_collection(interaction.user.id, kept)
-        
-        embed = discord.Embed(title="♻️ Recyclage", description=f"Tu as gagné **{fragments} fragments**.", color=discord.Color.green())
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        for cid in ids:
+            counts[cid] = counts.get(cid, 0) + 1
+        removed = {cid: cnt - 1 for cid, cnt in counts.items() if cnt > 1}
+        fragments = self._fragments_for_removed(removed)
+        if fragments > 0:
+            database.update_fragments(user_id, fragments)
+            database.reset_and_set_collection(user_id, list(counts.keys()))
+        return fragments
+
+    def recycle_selected(self, user_id, card_ids):
+        """Recycle uniquement les doublons des cartes choisies. Retourne les fragments gagnés."""
+        removed = database.remove_extra_copies(user_id, card_ids)
+        fragments = self._fragments_for_removed(removed)
+        if fragments > 0:
+            database.update_fragments(user_id, fragments)
+        return fragments
+
+    @app_commands.command(name='recycler', description="Échange tes doublons contre des fragments.")
+    async def recycle_command(self, interaction: discord.Interaction):
+        from beta import beta_access
+
+        # --- Public (avant la sortie) : ancien recyclage « tout d'un coup » ---
+        if not beta_access(interaction):
+            fragments = self.recycle_all(interaction.user.id)
+            if fragments == 0:
+                return await interaction.response.send_message("Aucun doublon.", ephemeral=True)
+            embed = discord.Embed(title="♻️ Recyclage", description=f"Tu as gagné **{fragments} fragments**.", color=discord.Color.green())
+            return await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        # --- Saison 2 : recyclage sélectif + garde-fou anti-échange ---
+        from cogs.trade_cog import ACTIVE_TRADERS
+        if interaction.user.id in ACTIVE_TRADERS:
+            return await interaction.response.send_message(
+                "♻️ Tu as un échange en cours — termine-le avant de recycler.", ephemeral=True)
+
+        ids = database.get_user_collection(interaction.user.id)
+        counts = {}
+        for cid in ids:
+            counts[cid] = counts.get(cid, 0) + 1
+        dups = {cid: cnt for cid, cnt in counts.items() if cnt > 1}
+        if not dups:
+            return await interaction.response.send_message("Aucun doublon à recycler.", ephemeral=True)
+
+        view = RecycleView(self, interaction.user.id, dups)
+        await interaction.response.send_message(embed=view.build_embed(), view=view, ephemeral=True)
 
     @app_commands.command(name='creer', description="Fabriquer une carte.")
     async def create_card_command(self, interaction: discord.Interaction, nom_de_la_carte: str):
@@ -603,6 +728,46 @@ class CollectionCog(commands.Cog):
         await interaction.response.send_message(f"✅ **{montant} points** donnés à {membre.mention}.", ephemeral=True)
         try: await membre.send(f"🎁 Un admin t'a donné **{montant} points** !")
         except: pass
+
+    @app_commands.command(name='donnercarte', description="[Admin] Donner une carte précise à un joueur.")
+    @app_commands.describe(membre="Le joueur qui reçoit la carte", carte="Nom de la carte à donner")
+    @app_commands.default_permissions(manage_guild=True)
+    async def give_card_command(self, interaction: discord.Interaction, membre: discord.Member, carte: str):
+        # L'autocomplétion renvoie l'ID de la carte ; on accepte aussi un nom saisi à la main
+        target = self.card_map.get(carte) or self.card_map.get(str(carte))
+        if not target:
+            matches = [c for c in self.all_cards if carte.lower() in c['nom'].lower()]
+            if not matches:
+                return await interaction.response.send_message(f"❌ Carte introuvable : `{carte}`.", ephemeral=True)
+            if len(matches) > 1:
+                return await interaction.response.send_message(
+                    "❌ Plusieurs cartes correspondent, précise le nom (ou utilise l'autocomplétion).", ephemeral=True)
+            target = matches[0]
+
+        database.add_card_to_collection(membre.id, target['id'])
+
+        e = discord.Embed(
+            title="🎁 Carte donnée !",
+            description=f"**{target['nom']}** a été ajoutée à la collection de {membre.mention}.",
+            color=RARITY_COLORS.get(target['rarete'], discord.Color.default()),
+        )
+        e.set_image(url=target['image_url'])
+        await interaction.response.send_message(embed=e, ephemeral=True)
+        try:
+            await membre.send(f"🎁 Un admin t'a offert la carte **{target['nom']}** ({target['rarete']}) !")
+        except discord.errors.Forbidden:
+            pass
+
+    @give_card_command.autocomplete('carte')
+    async def give_card_autocomplete(self, interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+        cur = current.lower()
+        results = []
+        for c in self.all_cards:
+            if cur in c['nom'].lower():
+                results.append(app_commands.Choice(name=f"{c['nom']} · {c['rarete']}"[:100], value=str(c['id'])))
+            if len(results) >= 25:
+                break
+        return results
 
 async def setup(bot):
     await bot.add_cog(CollectionCog(bot))

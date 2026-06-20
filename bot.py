@@ -88,8 +88,12 @@ class HandnewsBot(commands.Bot):
 
         await self.load_extension('cogs.test_cog')
         print("✅ Cog Test chargé")
-        
-      
+
+        # Saison 2 (échanges / duels) — accès filtré par beta.py jusqu'à l'ouverture publique
+        await self.load_extension('cogs.trade_cog')
+        print("✅ Cog Échanges chargé")
+
+
         print("🎮 Tous les systèmes sont opérationnels !")
 
     async def on_ready(self):
