@@ -6,6 +6,7 @@ import json
 import random
 import asyncio
 import datetime
+import io
 import pytz
 from utils import album_generator
 
@@ -640,182 +641,160 @@ class CollectionCog(commands.Cog):
 
     # --- CLASSE D'AFFICHAGE (View) ---
     class CollectionView(discord.ui.View):
-        current_club: str = None
-        current_page: int = 0
-    
-        def __init__(self, author_id, user_collection_data, total_available_cards, cards_per_club_total):
+        # Ordre d'affichage des raretés dans le tableau de bord
+        RARITY_ORDER_LIST = ["Commun", "Peu Commun", "Rare", "Épique", "Légendaire", "Noël"]
+
+        def __init__(self, author_id, all_cards, owned_ids):
             super().__init__(timeout=180)
             self.author_id = author_id
-            self.collection = user_collection_data
-            self.total_available_cards = total_available_cards
-            self.cards_per_club_total = cards_per_club_total
-            
+            self.all_cards = all_cards
+            self.owned_ids = {str(x) for x in owned_ids}
+            self.current_club = None
+            self._album_cache = {}  # bytes de l'image d'album, par club (évite de régénérer)
+
+            # Cartes possédées (uniques)
+            self.collection = [c for c in all_cards if str(c['id']) in self.owned_ids]
+
+            # Index : toutes les cartes par club, cartes possédées par club, totaux par rareté
+            self.full_by_club = {}
+            self.cards_per_club_total = {}
+            self.rarity_total = {}
+            for card in all_cards:
+                self.full_by_club.setdefault(card['club'], []).append(card)
+                self.cards_per_club_total[card['club']] = self.cards_per_club_total.get(card['club'], 0) + 1
+                self.rarity_total[card['rarete']] = self.rarity_total.get(card['rarete'], 0) + 1
+
             self.cards_by_club = {}
+            self.rarity_owned = {}
             for card in self.collection:
-                club = card['club']
-                if club not in self.cards_by_club:
-                    self.cards_by_club[club] = []
-                self.cards_by_club[club].append(card)
-            
+                self.cards_by_club.setdefault(card['club'], []).append(card)
+                self.rarity_owned[card['rarete']] = self.rarity_owned.get(card['rarete'], 0) + 1
+
             self.club_select.options = self.create_select_options()
             if not self.collection:
                 self.club_select.placeholder = "Ta collection est vide !"
                 self.club_select.disabled = True
-            self.update_buttons_state()
-    
+
+        # --- Helpers d'affichage ---
+        def _bar(self, pct, length=20):
+            filled = int(round(pct / 100 * length))
+            if pct > 0 and filled == 0:
+                filled = 1
+            if pct >= 100:
+                filled = length
+            return "▰" * filled + "▱" * (length - filled)
+
         def create_select_options(self):
             options = []
             for club, total_count in sorted(self.cards_per_club_total.items()):
                 owned = len(self.cards_by_club.get(club, []))
+                done = owned >= total_count
                 label = f"🎄 {club}" if club == "Légendes Starligue" else club
                 emoji = "🎁" if club == "Légendes Starligue" else None
-                options.append(discord.SelectOption(label=label, description=f"{owned} / {total_count}", value=club, emoji=emoji))
-            return options[:25] # Limite Discord
-    
-        def update_buttons_state(self):
-            has_cards = self.current_club and self.cards_by_club.get(self.current_club)
-            self.prev_button.disabled = not has_cards or self.current_page == 0
-            self.next_button.disabled = not has_cards or self.current_page >= len(self.cards_by_club[self.current_club]) - 1
+                desc = f"{owned} / {total_count}" + (" ✅" if done else "")
+                options.append(discord.SelectOption(label=label, description=desc, value=club, emoji=emoji))
+            return options[:25]  # Limite Discord
 
-        def get_emoji_safe(self, rarity):
-            return {"Commun":"⬜", "Peu Commun":"🟩", "Rare":"🟦", "Épique":"🟪", "Légendaire":"🟨", "Noël":"🎄"}.get(rarity, "🔹")
+        # --- VUE GLOBALE : tableau de bord ---
+        def build_home_embed(self):
+            unique = len(self.collection)
+            total = len(self.all_cards)
+            pct = (unique / total * 100) if total else 0
 
-        async def generate_embed(self):
-            # --- VUE GLOBALE ---
-            if not self.current_club:
-                unique = len(self.collection)
-                total = self.total_available_cards
-                pct = (unique / total * 100) if total > 0 else 0
-                
-                # Barre harmonisée (Style footer)
-                nb_filled = int(pct / 5)
-                if pct > 0 and pct < 5: nb_filled = 1 # Au moins un bloc si on a des cartes
-                if pct >= 100: nb_filled = 20
-                
-                bar = "▰" * nb_filled + "▱" * (20 - nb_filled)
-                
-                embed = discord.Embed(title="🗂️ Album de Collection", description="Choisis un club ci-dessous pour voir tes cartes.", color=discord.Color.dark_theme())
-                embed.add_field(
-                    name="📈 Progression Globale", 
-                    value=f"```\n{bar} {pct:.1f}%\n```\nVous possédez **{unique}** / **{total}** cartes.", 
-                    inline=False
-                )
-                return embed
-            
-            # --- VUE CLUB ---
-            cards = self.cards_by_club.get(self.current_club)
-            if not cards:
-                return discord.Embed(title=f"📁 {self.current_club}", description="Aucune carte dans ce classeur.", color=discord.Color.dark_grey())
+            embed = discord.Embed(
+                title="🗂️ Album de Collection",
+                description="Choisis un club ci-dessous pour afficher son album complet en image.",
+                color=discord.Color.dark_theme(),
+            )
+            embed.add_field(
+                name="📈 Progression globale",
+                value=f"```\n{self._bar(pct)} {pct:.1f}%\n```**{unique}** / **{total}** cartes possédées.",
+                inline=False,
+            )
 
-            card = cards[self.current_page]
-            is_xmas = card['rarete'] == "Noël"
-            color = RARITY_COLORS.get(card['rarete'], discord.Color.default())
-            
-            embed = discord.Embed(title=f"{'❄️' if is_xmas else '🃏'} {card['nom']}", color=color)
-            embed.set_image(url=card['image_url'])
-            
-            emoji = self.get_emoji_safe(card['rarete'])
-            
-            embed.add_field(name=f"{'🎁' if is_xmas else '🤾'} Club", value=f"**{card['club']}**", inline=True)
-            embed.add_field(name=f"{emoji} Rareté", value=f"**{card['rarete']}**", inline=True)
-            # Suppression du champ "Niveau" (étoiles) comme demandé
-            
-            total = len(cards)
-            # Barre de progression interne au club
-            prog_pct = (self.current_page + 1) / total
-            nb_filled = int(prog_pct * 10)
-            if nb_filled == 0 and total > 0: nb_filled = 1
-            
-            prog_bar = "▰" * nb_filled + "▱" * (10 - nb_filled)
-            embed.set_footer(text=f"Carte {self.current_page + 1}/{total} │ {prog_bar}")
+            # Répartition par rareté
+            rarity_lines = []
+            for r in self.RARITY_ORDER_LIST:
+                tot = self.rarity_total.get(r, 0)
+                if not tot:
+                    continue
+                own = self.rarity_owned.get(r, 0)
+                rarity_lines.append(f"{RARITY_EMOJI.get(r, '🔹')} **{r}** — {own}/{tot}")
+            if rarity_lines:
+                embed.add_field(name="🎚️ Par rareté", value="\n".join(rarity_lines), inline=True)
+
+            # Clubs complétés / bientôt complétés
+            completed, in_progress = [], []
+            for club, tot in self.cards_per_club_total.items():
+                own = len(self.cards_by_club.get(club, []))
+                if tot > 0 and own >= tot:
+                    completed.append(club)
+                elif own > 0:
+                    in_progress.append((club, own, tot, tot - own))
+            in_progress.sort(key=lambda x: (x[3], -x[1]))  # moins de cartes restantes d'abord
+            if in_progress:
+                near = "\n".join(f"**{club}** — {own}/{tot} (reste {rem})"
+                                 for club, own, tot, rem in in_progress[:3])
+                embed.add_field(name="🔥 Bientôt complétés", value=near, inline=True)
+
+            if completed:
+                embed.set_footer(text=f"🏆 {len(completed)} club(s) complété(s) sur {len(self.cards_per_club_total)}")
+            else:
+                embed.set_footer(text="Aucun club complété pour l'instant — continue d'ouvrir des packs !")
             return embed
-    
+
+        # --- VUE CLUB : image d'album ---
+        async def build_club_view(self):
+            club = self.current_club
+            cards = sorted(self.full_by_club.get(club, []),
+                           key=lambda x: (RARITY_ORDER.get(x['rarete'], 99), x['nom']))
+            owned = len(self.cards_by_club.get(club, []))
+            total = len(cards)
+            pct = (owned / total * 100) if total else 0
+
+            if club not in self._album_cache:
+                buf = await album_generator.generate_club_album(club, cards, self.owned_ids)
+                self._album_cache[club] = buf.getvalue()
+            file = discord.File(io.BytesIO(self._album_cache[club]), filename=f"album_{club}.png")
+
+            is_xmas = club == "Légendes Starligue"
+            embed = discord.Embed(
+                title=f"{'🎄' if is_xmas else '📖'} {club}",
+                description=f"{self._bar(pct)} **{pct:.0f}%**\n"
+                            f"**{owned}/{total}** cartes — reste **{total - owned}** à trouver.",
+                color=discord.Color.gold(),
+            )
+            embed.set_image(url=f"attachment://album_{club}.png")
+            return embed, file
+
+        # --- Interactions ---
+        async def _deny(self, interaction):
+            await interaction.response.send_message("Ce n'est pas ta collection 😉", ephemeral=True)
+
         @discord.ui.select(placeholder="Choisis un club...", row=0)
         async def club_select(self, interaction: discord.Interaction, select: discord.ui.Select):
-            if interaction.user.id != self.author_id: return
+            if interaction.user.id != self.author_id:
+                return await self._deny(interaction)
             self.current_club = select.values[0]
-            self.current_page = 0
-            self.update_buttons_state()
-            await interaction.response.edit_message(embed=await self.generate_embed(), view=self)
-    
-        @discord.ui.button(label="◀", style=discord.ButtonStyle.blurple, row=1)
-        async def prev_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-            if interaction.user.id != self.author_id: return
-            self.current_page -= 1
-            self.update_buttons_state()
-            await interaction.response.edit_message(embed=await self.generate_embed(), view=self)
-    
-        @discord.ui.button(label="▶", style=discord.ButtonStyle.blurple, row=1)
-        async def next_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-            if interaction.user.id != self.author_id: return
-            self.current_page += 1
-            self.update_buttons_state()
-            await interaction.response.edit_message(embed=await self.generate_embed(), view=self)
+            self.home_button.disabled = False
+            await interaction.response.defer()  # la génération d'image peut prendre quelques secondes
+            embed, file = await self.build_club_view()
+            await interaction.edit_original_response(embed=embed, attachments=[file], view=self)
+
+        @discord.ui.button(label="↩️ Vue d'ensemble", style=discord.ButtonStyle.grey, row=1, disabled=True)
+        async def home_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+            if interaction.user.id != self.author_id:
+                return await self._deny(interaction)
+            self.current_club = None
+            button.disabled = True
+            await interaction.response.edit_message(embed=self.build_home_embed(), attachments=[], view=self)
 
     @app_commands.command(name='collection', description="Affiche ta collection.")
     async def collection_command(self, interaction: discord.Interaction):
-        # Récupération sécurisée avec support int/str
         raw_ids = database.get_user_collection(interaction.user.id)
-        user_cards = []
-        for cid in set(raw_ids):
-            if cid in self.card_map: user_cards.append(self.card_map[cid])
-            elif str(cid) in self.card_map: user_cards.append(self.card_map[str(cid)])
-        
-        view = self.CollectionView(interaction.user.id, user_cards, len(self.all_cards), self.cards_per_club_total)
-        await interaction.response.send_message(embed=await view.generate_embed(), view=view, ephemeral=True)
+        view = self.CollectionView(interaction.user.id, self.all_cards, raw_ids)
+        await interaction.response.send_message(embed=view.build_home_embed(), view=view, ephemeral=True)
 
-    @app_commands.command(name='album', description="Affiche l'album d'un club (visuels masqués si non possédé).")
-    @app_commands.describe(club="Le club dont tu veux voir l'album")
-    async def album_command(self, interaction: discord.Interaction, club: str):
-        # Validation du club (sensible à la casse mais on va aider)
-        club_found = None
-        for c in self.cards_per_club_total.keys():
-            if c.lower() == club.lower():
-                club_found = c
-                break
-        
-        if not club_found:
-            # On propose une liste si non trouvé
-            clubs_list = ", ".join(sorted(self.cards_per_club_total.keys())[:5]) + "..."
-            return await interaction.response.send_message(f"❌ Club inconnu. Essaye parmi : {clubs_list}", ephemeral=True)
-            
-        await interaction.response.defer(ephemeral=True)
-        
-        # 1. Cartes du club
-        cards_in_club = [c for c in self.all_cards if c['club'] == club_found]
-        # Tri par rareté puis nom
-        rarity_order = {"Commun": 1, "Peu Commun": 2, "Rare": 3, "Épique": 4, "Légendaire": 5, "Noël": 6}
-        cards_in_club.sort(key=lambda x: (rarity_order.get(x['rarete'], 99), x['nom']))
-        
-        # 2. Collection user
-        user_ids = database.get_user_collection(interaction.user.id)
-        
-        # 3. Génération
-        try:
-            image_buffer = await album_generator.generate_club_album(club_found, cards_in_club, user_ids)
-            file = discord.File(fp=image_buffer, filename=f"album_{club_found}.png")
-            
-            # 4. Stats
-            owned_count = sum(1 for c in cards_in_club if c['id'] in user_ids or str(c['id']) in [str(u) for u in user_ids])
-            total_count = len(cards_in_club)
-            pct = (owned_count / total_count * 100) if total_count > 0 else 0
-            
-            embed = discord.Embed(title=f"📖 Album : {club_found}", color=discord.Color.gold())
-            embed.description = f"Progression : **{owned_count}/{total_count}** ({pct:.1f}%)"
-            embed.set_image(url=f"attachment://album_{club_found}.png")
-            
-            await interaction.followup.send(embed=embed, file=file)
-            
-        except Exception as e:
-            await interaction.followup.send(f"❌ Erreur lors de la génération de l'album : {e}")
-
-    @album_command.autocomplete('club')
-    async def album_club_autocomplete(self, interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
-        clubs = sorted(self.cards_per_club_total.keys())
-        return [
-            app_commands.Choice(name=c, value=c)
-            for c in clubs if current.lower() in c.lower()
-        ][:25]
     # --- Helpers de recyclage (partagés legacy / sélectif) ---
     def get_card_safe(self, cid):
         return self.card_map.get(cid) or self.card_map.get(str(cid))
