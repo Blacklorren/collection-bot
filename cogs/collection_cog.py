@@ -4,6 +4,7 @@ from discord.ext import commands
 import database
 import json
 import random
+import asyncio
 import datetime
 import pytz
 from utils import album_generator
@@ -37,6 +38,15 @@ JOKER_COSTS = {
     "legendaire": 3000,
     "noel": 100
 }
+
+# Ordre de rareté pour le crescendo de révélation (la meilleure carte en dernier)
+RARITY_ORDER = {"Commun": 0, "Peu Commun": 1, "Rare": 2, "Épique": 3, "Légendaire": 4, "Noël": 5}
+# Raretés annoncées dans le salon public lors d'un gros tirage
+ANNOUNCE_RARITIES = {"Épique", "Légendaire", "Noël"}
+# À partir de cette rareté, on joue un petit suspense avant la révélation
+RARE_REVEAL_THRESHOLD = RARITY_ORDER["Épique"]
+# Garde-fou : nombre max de packs ouverts en une seule action
+MAX_BULK_OPEN = 20
 
 # --- CONFIGURATION ---
 ANNONCE_CHANNEL_ID = 1405724982436167762 
@@ -134,6 +144,37 @@ class RecycleView(discord.ui.View):
             return
         fragments = self.cog.recycle_all(self.user_id)
         await self._finish(interaction, "♻️ Tous les doublons recyclés", fragments)
+
+
+class PackOpenView(discord.ui.View):
+    """Boutons pour enchaîner les ouvertures de packs automatiquement."""
+
+    def __init__(self, cog, user_id):
+        super().__init__(timeout=180)
+        self.cog = cog
+        self.user_id = user_id
+
+    async def interaction_check(self, interaction):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("Ce ne sont pas tes packs !", ephemeral=True)
+            return False
+        return True
+
+    def refresh(self, packs_left):
+        """Met à jour libellés et états des boutons selon les packs restants."""
+        packs_left = max(0, packs_left)
+        self.open_one.disabled = packs_left <= 0
+        self.open_all.disabled = packs_left <= 0
+        self.open_one.label = f"🎴 Ouvrir encore ({packs_left})"
+        self.open_all.label = f"📦 Tout ouvrir ({min(packs_left, MAX_BULK_OPEN)})"
+
+    @discord.ui.button(label="🎴 Ouvrir encore", style=discord.ButtonStyle.green, row=0)
+    async def open_one(self, interaction, button):
+        await self.cog._run_button_open(interaction, self, 1)
+
+    @discord.ui.button(label="📦 Tout ouvrir", style=discord.ButtonStyle.blurple, row=0)
+    async def open_all(self, interaction, button):
+        await self.cog._run_button_open(interaction, self, MAX_BULK_OPEN)
 
 
 class CollectionCog(commands.Cog):
@@ -252,7 +293,7 @@ class CollectionCog(commands.Cog):
             ("`/collection`", "Voir tes cartes."),
             ("`/points`", "Voir ton solde."),
             ("`/pack`", f"Acheter un pack ({PACK_COST} pts)."),
-            ("`/ouvrir`", "Ouvrir un pack."),
+            ("`/ouvrir`", "Ouvrir un ou plusieurs packs (`/ouvrir nombre:5`)."),
             ("`/recycler`", "Vendre les doublons."),
             ("`/creer`", "Fabriquer une carte spécifique."),
             ("`/fragments`", "Voir les coûts de fabrication.")
@@ -281,75 +322,221 @@ class CollectionCog(commands.Cog):
         else:
             await interaction.response.send_message(f"❌ Il te manque **{PACK_COST - pts} points**.", ephemeral=True)
 
-    @app_commands.command(name='ouvrir', description="Ouvrir un pack.")
-    async def open_command(self, interaction: discord.Interaction):
+    @app_commands.command(name='ouvrir', description="Ouvrir un ou plusieurs packs.")
+    @app_commands.describe(nombre="Combien de packs ouvrir d'un coup (défaut : 1).")
+    async def open_command(self, interaction: discord.Interaction, nombre: int = 1):
         uid = interaction.user.id
-        
-        # --- MODIFICATION ICI : Conversion explicite en dictionnaire ---
-        # Cela permet d'utiliser la méthode .get() sans erreur
-        user_data = dict(database.get_user_data(uid))
-        
-        if user_data['packs'] <= 0:
+        packs_owned = dict(database.get_user_data(uid))['packs']
+
+        if packs_owned <= 0:
             return await interaction.response.send_message("❌ Tu n'as pas de pack. Fais `/pack`.", ephemeral=True)
-        
-        await interaction.response.send_message("🎉 Ouverture en cours...", ephemeral=True)
-        database.remove_pack(uid, 1)
-        
-        # Tirage pondéré par rareté + pondération cartes manquantes
-        pool1_cards, pool1_weights = self.get_weighted_pool(uid, [*self.cards_by_rarity["Commun"], *self.cards_by_rarity["Peu Commun"]])
-        base_weights1 = [70 if c['rarete'] == 'Commun' else 30 for c in pool1_cards]
-        final_weights1 = [b * w for b, w in zip(base_weights1, pool1_weights)]
-        slot1 = random.choices(pool1_cards, weights=final_weights1, k=1)[0]
-        
-        pool2_cards, pool2_weights = self.get_weighted_pool(uid, [*self.cards_by_rarity["Commun"], *self.cards_by_rarity["Peu Commun"], *self.cards_by_rarity["Rare"]])
-        base_weights2 = [30 if c['rarete'] == 'Commun' else 50 if c['rarete'] == 'Peu Commun' else 20 for c in pool2_cards]
-        final_weights2 = [b * w for b, w in zip(base_weights2, pool2_weights)]
-        slot2 = random.choices(pool2_cards, weights=final_weights2, k=1)[0]
-        
-        pool3_cards, pool3_weights = self.get_weighted_pool(uid, [*self.cards_by_rarity["Rare"], *self.cards_by_rarity["Épique"], *self.cards_by_rarity["Légendaire"]])
-        base_weights3 = [45 if c['rarete'] == 'Rare' else 35 if c['rarete'] == 'Épique' else 20 for c in pool3_cards]
-        final_weights3 = [b * w for b, w in zip(base_weights3, pool3_weights)]
-        slot3 = random.choices(pool3_cards, weights=final_weights3, k=1)[0]
 
-        # Gestion Noël
-        is_advent = False
+        count = max(1, min(nombre, packs_owned, MAX_BULK_OPEN))
+        await interaction.response.defer(ephemeral=True)
+        database.remove_pack(uid, count)
+
+        msg = await interaction.followup.send(
+            embed=discord.Embed(title="🎴 Préparation du pack…", color=discord.Color.dark_theme()),
+            ephemeral=True, wait=True
+        )
+
+        async def edit(embed):
+            await msg.edit(embed=embed)
+
+        packs = await self._animate_open(edit, uid, count, allow_advent=True)
+        await self._announce_big_pulls(interaction.user, packs)
+
+        view = PackOpenView(self, uid)
+        view.refresh(packs_owned - count)
+        await msg.edit(view=view)
+
+    # === MOTEUR D'OUVERTURE DE PACKS ===
+
+    async def _run_button_open(self, interaction: discord.Interaction, view: "PackOpenView", requested: int):
+        """Ouverture déclenchée par un bouton : ré-édite le message d'origine."""
+        uid = interaction.user.id
+        packs_owned = dict(database.get_user_data(uid))['packs']
+        if packs_owned <= 0:
+            view.refresh(0)
+            return await interaction.response.edit_message(view=view)
+
+        count = max(1, min(requested, packs_owned, MAX_BULK_OPEN))
+        await interaction.response.defer()
+        database.remove_pack(uid, count)
+
+        async def edit(embed):
+            await interaction.edit_original_response(embed=embed)
+
+        packs = await self._animate_open(edit, uid, count, allow_advent=True)
+        await self._announce_big_pulls(interaction.user, packs)
+
+        view.refresh(packs_owned - count)
+        await interaction.edit_original_response(view=view)
+
+    def _draw_pack(self, uid):
+        """Tire les 3 cartes d'un pack (pondérations rareté + cartes manquantes)."""
+        pool1, w1 = self.get_weighted_pool(uid, [*self.cards_by_rarity["Commun"], *self.cards_by_rarity["Peu Commun"]])
+        base1 = [70 if c['rarete'] == 'Commun' else 30 for c in pool1]
+        slot1 = random.choices(pool1, weights=[b * w for b, w in zip(base1, w1)], k=1)[0]
+
+        pool2, w2 = self.get_weighted_pool(uid, [*self.cards_by_rarity["Commun"], *self.cards_by_rarity["Peu Commun"], *self.cards_by_rarity["Rare"]])
+        base2 = [30 if c['rarete'] == 'Commun' else 50 if c['rarete'] == 'Peu Commun' else 20 for c in pool2]
+        slot2 = random.choices(pool2, weights=[b * w for b, w in zip(base2, w2)], k=1)[0]
+
+        pool3, w3 = self.get_weighted_pool(uid, [*self.cards_by_rarity["Rare"], *self.cards_by_rarity["Épique"], *self.cards_by_rarity["Légendaire"]])
+        base3 = [45 if c['rarete'] == 'Rare' else 35 if c['rarete'] == 'Épique' else 20 for c in pool3]
+        slot3 = random.choices(pool3, weights=[b * w for b, w in zip(base3, w3)], k=1)[0]
+
+        return [slot1, slot2, slot3]
+
+    def _maybe_advent(self, uid):
+        """Renvoie la carte du calendrier de l'avent du jour si éligible, sinon None."""
         now = datetime.datetime.now(pytz.timezone('Europe/Paris'))
-        # Active uniquement du 1er au 24 décembre
-        if now.month == 12 and 1 <= now.day <= 24:
-            today_str = now.date().isoformat()
-            # Grâce à la conversion en dict plus haut, .get() fonctionne maintenant
-            if user_data.get('last_advent_pack_date') != today_str:
-                advent_card = self.card_map.get(f"noel_{now.day}")
-                if advent_card:
-                    slot1 = advent_card
-                    database.set_advent_pack_opened(uid, today_str)
-                    is_advent = True
+        if not (now.month == 12 and 1 <= now.day <= 24):
+            return None
+        today_str = now.date().isoformat()
+        if dict(database.get_user_data(uid)).get('last_advent_pack_date') == today_str:
+            return None
+        advent_card = self.card_map.get(f"noel_{now.day}")
+        if advent_card:
+            database.set_advent_pack_opened(uid, today_str)
+        return advent_card
 
-        cards = [slot1, slot2, slot3]
-        
-        for i, card in enumerate(cards):
-            database.add_card_to_collection(uid, card['id'])
-            
-            title = f"**{card['nom']}**"
-            desc = f"**{card['rarete']}**\nClub : {card['club']}"
-            if is_advent and i == 0:
-                title = f"🎄 CALENDRIER : {card['nom']} 🎄"
-                desc += "\n✨ *Carte du jour !* ✨"
+    def _open_batch(self, uid, count, allow_advent_first):
+        """Ouvre `count` packs en base. Retourne une liste de packs,
+        chaque pack étant une liste de {card, is_new}."""
+        owned = set(str(c) for c in database.get_user_collection(uid))
+        packs = []
+        for i in range(count):
+            cards = self._draw_pack(uid)
+            if allow_advent_first and i == 0:
+                advent = self._maybe_advent(uid)
+                if advent:
+                    cards[0] = advent
+            pack = []
+            for card in cards:
+                cid = str(card['id'])
+                is_new = cid not in owned
+                if is_new:
+                    owned.add(cid)
+                database.add_card_to_collection(uid, card['id'])
+                pack.append({"card": card, "is_new": is_new})
+            packs.append(pack)
+        return packs
 
-            embed = discord.Embed(title=title, description=desc, color=RARITY_COLORS.get(card['rarete'], discord.Color.default()))
-            embed.set_image(url=card['image_url'])
-            await interaction.followup.send(embed=embed, ephemeral=True)
+    def _card_line(self, card, is_new):
+        """Une ligne de carte avec son tag neuf / doublon."""
+        emoji = RARITY_EMOJI.get(card['rarete'], "🔹")
+        if is_new:
+            tag = "✨ **NOUVELLE !**"
+        else:
+            frags = FRAGMENT_VALUES.get(card['rarete'], 0)
+            tag = f"♻️ doublon (+{frags} frag.)" if frags else "♻️ doublon"
+        return f"{emoji} **{card['nom']}** · {card['rarete']} — {tag}"
 
-            # Annonce globale (sauf calendrier auto si on ne veut pas spammer)
-            if card['rarete'] in ["Épique", "Légendaire", "Noël"] and ANNONCE_CHANNEL_ID != 0:
-                if card['rarete'] == "Noël" and is_advent: continue
-                try:
-                    chan = self.bot.get_channel(ANNONCE_CHANNEL_ID)
-                    if chan:
-                        e = discord.Embed(title="✨ Gros Tirage !", description=f"**{interaction.user.mention}** a eu **{card['nom']}** !", color=embed.color)
-                        e.set_image(url=card['image_url'])
-                        await chan.send(embed=e)
-                except: pass
+    def _album_progress_text(self, uid):
+        unique = len(set(database.get_user_collection(uid)))
+        total = len(self.all_cards)
+        pct = (unique / total * 100) if total else 0
+        return f"📈 Album : {unique}/{total} ({pct:.0f}%)"
+
+    async def _animate_open(self, edit, uid, count, allow_advent):
+        packs = self._open_batch(uid, count, allow_advent)
+        if count == 1:
+            await self._reveal_single(edit, uid, packs[0])
+        else:
+            await self._reveal_bulk(edit, uid, packs)
+        return packs
+
+    async def _reveal_single(self, edit, uid, pack):
+        """Révélation dramatique d'un pack : crescendo de rareté, une carte à la fois."""
+        ordered = sorted(pack, key=lambda e: RARITY_ORDER.get(e['card']['rarete'], 0))
+        n = len(ordered)
+        new_count = sum(1 for e in pack if e['is_new'])
+
+        await edit(discord.Embed(title="🎴 Ouverture du pack…", description="Tu déchires l'emballage… 🤞",
+                                 color=discord.Color.dark_theme()))
+        await asyncio.sleep(0.9)
+
+        lines = []
+        for i, entry in enumerate(ordered):
+            card, is_new = entry['card'], entry['is_new']
+            if RARITY_ORDER.get(card['rarete'], 0) >= RARE_REVEAL_THRESHOLD:
+                await edit(discord.Embed(title="✨ Quelque chose brille…", description="Une carte rare se révèle ! 👀",
+                                         color=RARITY_COLORS.get(card['rarete'], discord.Color.gold())))
+                await asyncio.sleep(1.2)
+
+            lines.append(self._card_line(card, is_new))
+            title = ("🎄 " if card['rarete'] == "Noël" else "🃏 ") + card['nom']
+            emb = discord.Embed(title=title, description="\n".join(lines),
+                                color=RARITY_COLORS.get(card['rarete'], discord.Color.default()))
+            emb.set_image(url=card['image_url'])
+            if i == n - 1:
+                emb.set_footer(text=f"✨ {new_count} nouvelle(s) · ♻️ {n - new_count} doublon(s) · {self._album_progress_text(uid)}")
+            else:
+                emb.set_footer(text=f"Carte {i + 1}/{n}…")
+            await edit(emb)
+            await asyncio.sleep(0.85)
+
+    async def _reveal_bulk(self, edit, uid, packs):
+        """Ouverture groupée : suspense court puis récap global (pas de spam)."""
+        entries = [e for pack in packs for e in pack]
+        new_entries = [e for e in entries if e['is_new']]
+        dup_entries = [e for e in entries if not e['is_new']]
+        frags = sum(FRAGMENT_VALUES.get(e['card']['rarete'], 0) for e in dup_entries)
+        best = max(entries, key=lambda e: RARITY_ORDER.get(e['card']['rarete'], 0))
+        best_color = RARITY_COLORS.get(best['card']['rarete'], discord.Color.blurple())
+
+        await edit(discord.Embed(title=f"📦 Ouverture de {len(packs)} packs…",
+                                 description="Ça déchire de partout ! 🎴🎴🎴", color=discord.Color.dark_theme()))
+        await asyncio.sleep(1.0)
+
+        if RARITY_ORDER.get(best['card']['rarete'], 0) >= RARE_REVEAL_THRESHOLD:
+            await edit(discord.Embed(title="✨ Une pépite est apparue dans le lot…", color=best_color))
+            await asyncio.sleep(1.2)
+
+        emb = discord.Embed(title=f"📦 {len(packs)} packs ouverts !", color=best_color)
+        emb.set_image(url=best['card']['image_url'])
+        emb.add_field(name="🏆 Meilleure carte", value=self._card_line(best['card'], best['is_new']), inline=False)
+
+        if new_entries:
+            new_sorted = sorted(new_entries, key=lambda e: -RARITY_ORDER.get(e['card']['rarete'], 0))
+            shown = new_sorted[:12]
+            txt = "\n".join(self._card_line(e['card'], True) for e in shown)
+            if len(new_sorted) > len(shown):
+                txt += f"\n… et **+{len(new_sorted) - len(shown)}** autres nouvelles"
+            emb.add_field(name=f"✨ Nouvelles cartes ({len(new_entries)})", value=txt, inline=False)
+        else:
+            emb.add_field(name="✨ Nouvelles cartes", value="Aucune cette fois… 😅", inline=False)
+
+        emb.add_field(name="♻️ Doublons",
+                      value=f"{len(dup_entries)} doublon(s) · ~{frags} fragments en recyclant (`/recycler`)",
+                      inline=False)
+        emb.set_footer(text=self._album_progress_text(uid))
+        await edit(emb)
+
+    async def _announce_big_pulls(self, member, packs):
+        """Annonce les plus gros tirages dans le salon public (cappé pour éviter le spam)."""
+        if not ANNONCE_CHANNEL_ID:
+            return
+        chan = self.bot.get_channel(ANNONCE_CHANNEL_ID)
+        if not chan:
+            return
+        bigs = [e for pack in packs for e in pack if e['card']['rarete'] in ANNOUNCE_RARITIES]
+        # Priorité aux nouvelles cartes puis à la rareté la plus haute, max 3 annonces
+        bigs.sort(key=lambda e: (e['is_new'], RARITY_ORDER.get(e['card']['rarete'], 0)), reverse=True)
+        for e in bigs[:3]:
+            card = e['card']
+            try:
+                em = discord.Embed(
+                    title="✨ Gros Tirage !",
+                    description=f"**{member.mention}** vient de tirer **{card['nom']}** ({card['rarete']}) !",
+                    color=RARITY_COLORS.get(card['rarete'], discord.Color.gold()),
+                )
+                em.set_image(url=card['image_url'])
+                await chan.send(embed=em)
+            except Exception:
+                pass
 
     @commands.command(name='compensation')
     @commands.has_permissions(administrator=True)
