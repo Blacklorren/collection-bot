@@ -3,7 +3,7 @@ plaque de nom noire (nom Anton + club Oswald + pastille de rarete), ecusson du c
 
 Expose :
 - compose(portrait, nom, club, rarete) -> PIL.Image       (rendu pur, synchrone)
-- get_card_bytes(session, card) -> bytes | None            (telecharge + rend + cache disque)
+- get_card_bytes(card, session=None) -> bytes | None       (telecharge + rend + cache disque)
 """
 import io
 import os
@@ -192,15 +192,26 @@ async def _fetch_portrait(session, url):
     return None
 
 
-async def get_card_bytes(session, card):
+async def get_card_bytes(card, session=None):
     """Renvoie le PNG (bytes) de la carte composee, avec cache disque par id+version.
-    `session` : aiohttp.ClientSession. Retourne None si le portrait est introuvable."""
+
+    `session` : aiohttp.ClientSession optionnelle. Si absente et qu'un telechargement
+    est necessaire, une session ephemere est ouverte. Retourne None si le portrait
+    est introuvable."""
     path = _cache_path(card["id"])
     if os.path.exists(path):
         with open(path, "rb") as f:
             return f.read()
 
-    portrait = await _fetch_portrait(session, card["image_url"])
+    own_session = session is None
+    if own_session:
+        import aiohttp
+        session = aiohttp.ClientSession()
+    try:
+        portrait = await _fetch_portrait(session, card["image_url"])
+    finally:
+        if own_session:
+            await session.close()
     if portrait is None:
         return None
 

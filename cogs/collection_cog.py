@@ -8,7 +8,9 @@ import asyncio
 import datetime
 import io
 import pytz
+import aiohttp
 from utils import album_generator
+from utils import card_renderer
 
 # --- CONSTANTES & COULEURS ---
 RARITY_COLORS = {
@@ -384,8 +386,8 @@ class CollectionCog(commands.Cog):
             ephemeral=True, wait=True
         )
 
-        async def edit(embed):
-            await msg.edit(embed=embed)
+        async def edit(embed, file=None):
+            await msg.edit(embed=embed, attachments=[file] if file else [])
 
         packs = await self._animate_open(edit, uid, count, allow_advent=True)
         await self._announce_big_pulls(interaction.user, packs)
@@ -408,8 +410,8 @@ class CollectionCog(commands.Cog):
         await interaction.response.defer()
         database.remove_pack(uid, count)
 
-        async def edit(embed):
-            await interaction.edit_original_response(embed=embed)
+        async def edit(embed, file=None):
+            await interaction.edit_original_response(embed=embed, attachments=[file] if file else [])
 
         packs = await self._animate_open(edit, uid, count, allow_advent=True)
         await self._announce_big_pulls(interaction.user, packs)
@@ -486,11 +488,36 @@ class CollectionCog(commands.Cog):
 
     async def _animate_open(self, edit, uid, count, allow_advent):
         packs = self._open_batch(uid, count, allow_advent)
+        await self._prewarm_cards(packs)
         if count <= DETAILED_OPEN_MAX:
             await self._reveal_each(edit, uid, packs)
         else:
             await self._reveal_bulk(edit, uid, packs)
         return packs
+
+    async def _prewarm_cards(self, packs):
+        """Pré-rend (et met en cache disque) toutes les cartes du lot avec une seule
+        session réseau, pour que le reveal lise ensuite depuis le cache."""
+        cards_by_id = {str(e['card']['id']): e['card'] for pack in packs for e in pack}
+        try:
+            async with aiohttp.ClientSession() as session:
+                await asyncio.gather(
+                    *[card_renderer.get_card_bytes(c, session) for c in cards_by_id.values()],
+                    return_exceptions=True,
+                )
+        except Exception:
+            pass  # le reveal retombera sur l'image brute si le rendu échoue
+
+    async def _card_image(self, card):
+        """Renvoie (discord.File, url) pour l'embed : la carte composée si dispo,
+        sinon l'image brute en fallback."""
+        try:
+            data = await card_renderer.get_card_bytes(card)
+        except Exception:
+            data = None
+        if data:
+            return discord.File(io.BytesIO(data), filename="card.png"), "attachment://card.png"
+        return None, card['image_url']
 
     async def _reveal_each(self, edit, uid, packs):
         """Ouverture détaillée : révèle chaque pack l'un après l'autre (1 à 5 packs)."""
@@ -527,7 +554,8 @@ class CollectionCog(commands.Cog):
             title = ("🎄 " if card['rarete'] == "Noël" else "🃏 ") + card['nom']
             emb = discord.Embed(title=title, description="\n".join(lines),
                                 color=RARITY_COLORS.get(card['rarete'], discord.Color.default()))
-            emb.set_image(url=card['image_url'])
+            file, url = await self._card_image(card)
+            emb.set_image(url=url)
             last_card = i == n - 1
             if last_card and final:
                 emb.set_footer(text=f"✨ {new_count} nouvelle(s) · ♻️ {n - new_count} doublon(s) · {self._album_progress_text(uid)}")
@@ -535,7 +563,7 @@ class CollectionCog(commands.Cog):
                 emb.set_footer(text=f"Pack {pack_index}/{pack_total} terminé · ✨ {new_count} nouvelle(s) · ♻️ {n - new_count} doublon(s)")
             else:
                 emb.set_footer(text=f"{prefix}Carte {i + 1}/{n}…")
-            await edit(emb)
+            await edit(emb, file)
             await asyncio.sleep(REVEAL_CARD_DELAY)
 
     async def _reveal_bulk(self, edit, uid, packs):
@@ -556,7 +584,8 @@ class CollectionCog(commands.Cog):
             await asyncio.sleep(1.2)
 
         emb = discord.Embed(title=f"📦 {len(packs)} packs ouverts !", color=best_color)
-        emb.set_image(url=best['card']['image_url'])
+        best_file, best_url = await self._card_image(best['card'])
+        emb.set_image(url=best_url)
         emb.add_field(name="🏆 Meilleure carte", value=self._card_line(best['card'], best['is_new']), inline=False)
 
         if new_entries:
@@ -573,7 +602,7 @@ class CollectionCog(commands.Cog):
                       value=f"{len(dup_entries)} doublon(s) · ~{frags} fragments en recyclant (`/recycler`)",
                       inline=False)
         emb.set_footer(text=self._album_progress_text(uid))
-        await edit(emb)
+        await edit(emb, best_file)
 
     async def _announce_big_pulls(self, member, packs):
         """Annonce les plus gros tirages dans le salon public (cappé pour éviter le spam)."""

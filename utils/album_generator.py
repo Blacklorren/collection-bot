@@ -145,7 +145,7 @@ async def generate_club_album(club_name, all_cards_in_club, owned_card_ids):
             is_owned = (card_id in owned_card_ids) or (str(card_id) in [str(x) for x in owned_card_ids])
 
             if is_owned:
-                tasks.append(card_renderer.get_card_bytes(session, card))
+                tasks.append(card_renderer.get_card_bytes(card, session))
             else:
                 # Pas de tâche réseau pour les placeholders
                 tasks.append(asyncio.sleep(0, result=None))
