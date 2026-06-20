@@ -47,6 +47,14 @@ ANNOUNCE_RARITIES = {"Épique", "Légendaire", "Noël"}
 RARE_REVEAL_THRESHOLD = RARITY_ORDER["Épique"]
 # Garde-fou : nombre max de packs ouverts en une seule action
 MAX_BULK_OPEN = 20
+# Jusqu'à ce nombre de packs, on joue l'ouverture détaillée pack par pack.
+# Au-delà, on bascule sur une ouverture groupée (récap global, pas de spam).
+DETAILED_OPEN_MAX = 5
+# Rythme de l'animation d'ouverture (en secondes) — laisse le temps de lire
+REVEAL_TEAR_DELAY = 1.1       # déchirure de l'emballage
+REVEAL_SUSPENSE_DELAY = 1.7   # suspense avant une carte rare
+REVEAL_CARD_DELAY = 1.7       # pause entre chaque carte révélée
+REVEAL_PACK_GAP = 1.3         # respiration entre deux packs (mode détaillé)
 
 # --- CONFIGURATION ---
 ANNONCE_CHANNEL_ID = 1405724982436167762 
@@ -442,21 +450,34 @@ class CollectionCog(commands.Cog):
 
     async def _animate_open(self, edit, uid, count, allow_advent):
         packs = self._open_batch(uid, count, allow_advent)
-        if count == 1:
-            await self._reveal_single(edit, uid, packs[0])
+        if count <= DETAILED_OPEN_MAX:
+            await self._reveal_each(edit, uid, packs)
         else:
             await self._reveal_bulk(edit, uid, packs)
         return packs
 
-    async def _reveal_single(self, edit, uid, pack):
+    async def _reveal_each(self, edit, uid, packs):
+        """Ouverture détaillée : révèle chaque pack l'un après l'autre (1 à 5 packs)."""
+        total = len(packs)
+        for idx, pack in enumerate(packs):
+            await self._reveal_single(edit, uid, pack,
+                                      pack_index=idx + 1, pack_total=total,
+                                      final=(idx == total - 1))
+            if idx != total - 1:
+                await asyncio.sleep(REVEAL_PACK_GAP)
+
+    async def _reveal_single(self, edit, uid, pack, pack_index=1, pack_total=1, final=True):
         """Révélation dramatique d'un pack : crescendo de rareté, une carte à la fois."""
         ordered = sorted(pack, key=lambda e: RARITY_ORDER.get(e['card']['rarete'], 0))
         n = len(ordered)
         new_count = sum(1 for e in pack if e['is_new'])
+        multi = pack_total > 1
+        prefix = f"Pack {pack_index}/{pack_total} · " if multi else ""
 
-        await edit(discord.Embed(title="🎴 Ouverture du pack…", description="Tu déchires l'emballage… 🤞",
+        await edit(discord.Embed(title=f"🎴 {prefix}Ouverture du pack…",
+                                 description="Tu déchires l'emballage… 🤞",
                                  color=discord.Color.dark_theme()))
-        await asyncio.sleep(0.9)
+        await asyncio.sleep(REVEAL_TEAR_DELAY)
 
         lines = []
         for i, entry in enumerate(ordered):
@@ -464,19 +485,22 @@ class CollectionCog(commands.Cog):
             if RARITY_ORDER.get(card['rarete'], 0) >= RARE_REVEAL_THRESHOLD:
                 await edit(discord.Embed(title="✨ Quelque chose brille…", description="Une carte rare se révèle ! 👀",
                                          color=RARITY_COLORS.get(card['rarete'], discord.Color.gold())))
-                await asyncio.sleep(1.2)
+                await asyncio.sleep(REVEAL_SUSPENSE_DELAY)
 
             lines.append(self._card_line(card, is_new))
             title = ("🎄 " if card['rarete'] == "Noël" else "🃏 ") + card['nom']
             emb = discord.Embed(title=title, description="\n".join(lines),
                                 color=RARITY_COLORS.get(card['rarete'], discord.Color.default()))
             emb.set_image(url=card['image_url'])
-            if i == n - 1:
+            last_card = i == n - 1
+            if last_card and final:
                 emb.set_footer(text=f"✨ {new_count} nouvelle(s) · ♻️ {n - new_count} doublon(s) · {self._album_progress_text(uid)}")
+            elif last_card and multi:
+                emb.set_footer(text=f"Pack {pack_index}/{pack_total} terminé · ✨ {new_count} nouvelle(s) · ♻️ {n - new_count} doublon(s)")
             else:
-                emb.set_footer(text=f"Carte {i + 1}/{n}…")
+                emb.set_footer(text=f"{prefix}Carte {i + 1}/{n}…")
             await edit(emb)
-            await asyncio.sleep(0.85)
+            await asyncio.sleep(REVEAL_CARD_DELAY)
 
     async def _reveal_bulk(self, edit, uid, packs):
         """Ouverture groupée : suspense court puis récap global (pas de spam)."""
