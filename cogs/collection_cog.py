@@ -47,13 +47,15 @@ ANNOUNCE_RARITIES = {"Épique", "Légendaire", "Noël"}
 RARE_REVEAL_THRESHOLD = RARITY_ORDER["Épique"]
 # Garde-fou : nombre max de packs ouverts en une seule action
 MAX_BULK_OPEN = 20
+# Garde-fou : nombre max de packs achetés en une seule commande
+MAX_BULK_BUY = 100
 # Jusqu'à ce nombre de packs, on joue l'ouverture détaillée pack par pack.
 # Au-delà, on bascule sur une ouverture groupée (récap global, pas de spam).
 DETAILED_OPEN_MAX = 5
 # Rythme de l'animation d'ouverture (en secondes) — laisse le temps de lire
 REVEAL_TEAR_DELAY = 1.1       # déchirure de l'emballage
 REVEAL_SUSPENSE_DELAY = 1.7   # suspense avant une carte rare
-REVEAL_CARD_DELAY = 1.7       # pause entre chaque carte révélée
+REVEAL_CARD_DELAY = 2.1       # pause entre chaque carte révélée
 REVEAL_PACK_GAP = 1.3         # respiration entre deux packs (mode détaillé)
 
 # --- CONFIGURATION ---
@@ -318,17 +320,50 @@ class CollectionCog(commands.Cog):
             ephemeral=True
         )
 
-    @app_commands.command(name='pack', description=f"Acheter un pack ({PACK_COST} pts).")
-    async def pack_command(self, interaction: discord.Interaction):
+    @app_commands.command(name='pack', description=f"Acheter un ou plusieurs packs ({PACK_COST} pts/pack).")
+    @app_commands.describe(quantite="Nombre de packs, ou « tout » pour tout dépenser (défaut : 1).")
+    async def pack_command(self, interaction: discord.Interaction, quantite: str = "1"):
         uid = interaction.user.id
         pts = database.get_user_data(uid)['points']
-        
-        if pts >= PACK_COST:
-            database.update_points(uid, -PACK_COST)
-            database.add_pack(uid, 1)
-            await interaction.response.send_message(f"🛍️ Pack acheté ! (`/ouvrir` pour l'utiliser)", ephemeral=True)
+        affordable = pts // PACK_COST
+
+        # Parse de la quantité : un nombre, ou un mot-clé pour tout dépenser
+        token = quantite.strip().lower()
+        spend_all = token in ("tout", "max", "all")
+        if not spend_all:
+            if not token.isdigit() or int(token) < 1:
+                return await interaction.response.send_message(
+                    "❌ Indique un nombre de packs (ex. `5`) ou `tout` pour tout dépenser.",
+                    ephemeral=True)
+            requested = int(token)
         else:
-            await interaction.response.send_message(f"❌ Il te manque **{PACK_COST - pts} points**.", ephemeral=True)
+            requested = affordable
+
+        if affordable <= 0:
+            return await interaction.response.send_message(
+                f"❌ Il te manque **{PACK_COST - pts} points** pour acheter un pack.", ephemeral=True)
+
+        count = min(requested, affordable, MAX_BULK_BUY)
+        cost = count * PACK_COST
+
+        database.update_points(uid, -cost)
+        database.add_pack(uid, count)
+        new_pts = pts - cost
+
+        note = ""
+        if not spend_all and count < requested:
+            reasons = []
+            if affordable < requested:
+                reasons.append(f"points insuffisants (max {affordable})")
+            if requested > MAX_BULK_BUY:
+                reasons.append(f"limite {MAX_BULK_BUY}/achat")
+            note = f"\nℹ️ Demandé {requested}, acheté {count} — {', '.join(reasons)}."
+
+        await interaction.response.send_message(
+            f"🛍️ **{count} pack(s)** acheté(s) pour **{cost} pts** !\n"
+            f"💰 Solde : **{new_pts} pts** · 🎒 ouvre avec `/ouvrir nombre:{count}`.{note}",
+            ephemeral=True
+        )
 
     @app_commands.command(name='ouvrir', description="Ouvrir un ou plusieurs packs.")
     @app_commands.describe(nombre="Combien de packs ouvrir d'un coup (défaut : 1).")
