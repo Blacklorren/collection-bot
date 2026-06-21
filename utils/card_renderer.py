@@ -22,7 +22,7 @@ CUTOUTS = os.path.join(ROOT, "assets", "cutouts")
 CACHE_DIR = os.path.join(ROOT, "assets", "card_cache")
 
 # Incrementer pour invalider le cache disque quand le design change
-DESIGN_VERSION = "v3"
+DESIGN_VERSION = "v4"
 
 W, H = 992, 1240
 R = 40          # rayon des coins (carte, layout v1)
@@ -295,7 +295,7 @@ def compose_v2(cutout, nom, club, rarete, poste="", zoom=PLAYER_ZOOM):
     while cd.textlength(name, font=nf) > max_w and size > 40:
         size -= 3
         nf = anton(size)
-    pf = oswald(38, 500)
+    pf = oswald(57, 500)
     nb = cd.textbbox((0, 0), name, font=nf, anchor="ra")
     pb = cd.textbbox((0, 0), (poste or "").upper(), font=pf, anchor="ra")
     nh, ph = nb[3] - nb[1], pb[3] - pb[1]
