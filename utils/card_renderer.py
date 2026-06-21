@@ -22,7 +22,7 @@ CUTOUTS = os.path.join(ROOT, "assets", "cutouts")
 CACHE_DIR = os.path.join(ROOT, "assets", "card_cache")
 
 # Incrementer pour invalider le cache disque quand le design change
-DESIGN_VERSION = "v4"
+DESIGN_VERSION = "v5"
 
 W, H = 992, 1240
 R = 40          # rayon des coins (carte, layout v1)
@@ -35,8 +35,8 @@ BORDER = 42     # epaisseur de la bordure noire (v2)
 # Reglages design v2 (bandeau bas + cadrage joueur)
 PLAYER_ZOOM = 0.87   # echelle du joueur detoure (haut cale sur le liseré superieur)
 BAND_TOP = 1012      # y du haut du bandeau noir / du separateur de couleur
-LOGO_SIZE = 120      # taille de l'ecusson dans le bandeau
-DISC_R = 72          # rayon du disque blanc sous l'ecusson
+LOGO_SIZE = 180      # taille de l'ecusson dans le bandeau
+DISC_R = 108         # rayon du disque blanc sous l'ecusson (suit la taille du logo)
 
 RARITY_RGB = {
     "Commun": (150, 154, 162),
