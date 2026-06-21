@@ -22,7 +22,7 @@ CUTOUTS = os.path.join(ROOT, "assets", "cutouts")
 CACHE_DIR = os.path.join(ROOT, "assets", "card_cache")
 
 # Incrementer pour invalider le cache disque quand le design change
-DESIGN_VERSION = "v2"
+DESIGN_VERSION = "v3"
 
 W, H = 992, 1240
 R = 40          # rayon des coins (carte, layout v1)
@@ -31,6 +31,12 @@ FRAME = 18      # epaisseur du cadre stylise (v1)
 
 CHAMFER = 140   # taille du coin biseaute (bas-gauche + haut-droite, v2)
 BORDER = 42     # epaisseur de la bordure noire (v2)
+
+# Reglages design v2 (bandeau bas + cadrage joueur)
+PLAYER_ZOOM = 0.87   # echelle du joueur detoure (haut cale sur le liseré superieur)
+BAND_TOP = 1012      # y du haut du bandeau noir / du separateur de couleur
+LOGO_SIZE = 120      # taille de l'ecusson dans le bandeau
+DISC_R = 72          # rayon du disque blanc sous l'ecusson
 
 RARITY_RGB = {
     "Commun": (150, 154, 162),
@@ -226,9 +232,12 @@ def _bottom_shade(size, start=0.5, max_a=210):
     return layer
 
 
-def compose_v2(cutout, nom, club, rarete, poste=""):
-    """Compose la carte (PIL RGBA) layout v2. `cutout` : portrait detoure (fond
-    transparent) de preference ; un portrait brut plein cadre marche en fallback."""
+def compose_v2(cutout, nom, club, rarete, poste="", zoom=PLAYER_ZOOM):
+    """Compose la carte (PIL RGBA) layout v2 : joueur detoure (dezoom `zoom`, centre
+    en X, haut cale sur le liseré superieur) sur fond degrade de rarete, puis bandeau
+    noir pleine largeur en pied englobant l'ecusson (a cheval sur le separateur de
+    couleur) + le nom + le poste. `cutout` : portrait detoure (fond transparent) ;
+    un portrait brut plein cadre marche en fallback (passer zoom=1.0)."""
     rgb = RARITY_RGB.get(rarete, (150, 150, 150))
     out = _outer_poly()
     inn = _inner_poly(BORDER)
@@ -237,27 +246,43 @@ def compose_v2(cutout, nom, club, rarete, poste=""):
     card = Image.new("RGBA", (W, H), (12, 13, 16, 255))
     card.putalpha(_poly_mask((W, H), out))
 
-    # Fond rarete + joueur detoure + ombre basse, clippe au polygone interieur
+    # Fond degrade de rarete + joueur, clippe au polygone interieur
     bg = _vgradient((W, H), darken(rgb, 0.15), darken(rgb, 0.6))
-    art = cutout.convert("RGBA").resize((W, H), Image.Resampling.LANCZOS)
+    art_src = cutout.convert("RGBA")
+    if zoom >= 1.0:
+        art = art_src.resize((W, H), Image.Resampling.LANCZOS)
+    else:
+        sw, sh = max(1, int(W * zoom)), max(1, int(H * zoom))
+        scaled = art_src.resize((sw, sh), Image.Resampling.LANCZOS)
+        art = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        art.alpha_composite(scaled, ((W - sw) // 2, BORDER))  # centre X, haut au liseré
     bg.alpha_composite(art)
-    bg.alpha_composite(_bottom_shade((W, H)))
     bg.putalpha(_poly_mask((W, H), inn))
     card.alpha_composite(bg)
 
     cd = ImageDraw.Draw(card)
+    # Liseré rarete autour de la partie haute (dessine avant le bandeau)
     cd.line(inn + [inn[0]], fill=rgb, width=3, joint="curve")
 
-    # Ecusson sur disque blanc, bas-gauche
-    disc_c = (BORDER + 118, H - BORDER - 130)
-    r = 92
+    # Bandeau noir en pied, clippe a la silhouette EXTERIEURE (masque le liseré bas)
+    band_mask = _poly_mask((W, H), out)
+    ImageDraw.Draw(band_mask).rectangle([0, 0, W, BAND_TOP - 1], fill=0)
+    band = Image.new("RGBA", (W, H), (10, 11, 14, 255))
+    band.putalpha(band_mask)
+    card.alpha_composite(band)
+    # Seul liseré conserve : le separateur entre la partie haute et le bandeau
+    cd.line([(BORDER, BAND_TOP), (W - BORDER, BAND_TOP)], fill=rgb, width=3)
+
+    # Ecusson sur disque blanc, a cheval sur le separateur (bas-gauche)
+    r = DISC_R
+    disc_c = (BORDER + 118, BAND_TOP)
     disc = Image.new("RGBA", (r * 2 + 8, r * 2 + 8), (0, 0, 0, 0))
     ImageDraw.Draw(disc).ellipse([4, 4, r * 2 + 3, r * 2 + 3], fill=(248, 249, 250, 255),
                                  outline=(12, 13, 16, 255), width=4)
     card.alpha_composite(disc, (disc_c[0] - r - 4, disc_c[1] - r - 4))
     logo_path = os.path.join(LOGOS, slugify(club) + ".png")
     if os.path.exists(logo_path):
-        ls = 150
+        ls = LOGO_SIZE
         logo = Image.open(logo_path).convert("RGBA").resize((ls, ls), Image.Resampling.LANCZOS)
         card.alpha_composite(logo, (disc_c[0] - ls // 2, disc_c[1] - ls // 2))
 
@@ -324,8 +349,9 @@ async def get_card_bytes(card, session=None):
             return f.read()
 
     art = _load_cutout(card["id"])
+    is_cutout = art is not None
     if art is None:
-        # Fallback : pas de cutout -> portrait brut plein cadre
+        # Fallback : pas de cutout -> portrait brut
         own_session = session is None
         if own_session:
             import aiohttp
@@ -338,7 +364,9 @@ async def get_card_bytes(card, session=None):
     if art is None:
         return None
 
-    img = compose_v2(art, card["nom"], card["club"], card["rarete"], card.get("poste", ""))
+    # Detoure -> dezoom design ; portrait brut -> plein cadre (evite l'effet "flottant")
+    zoom = PLAYER_ZOOM if is_cutout else 1.0
+    img = compose_v2(art, card["nom"], card["club"], card["rarete"], card.get("poste", ""), zoom=zoom)
     buf = io.BytesIO()
     img.convert("RGB").save(buf, format="PNG")
     data = buf.getvalue()
