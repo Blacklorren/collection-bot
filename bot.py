@@ -93,6 +93,9 @@ class HandnewsBot(commands.Bot):
         await self.load_extension('cogs.trade_cog')
         print("✅ Cog Échanges chargé")
 
+        await self.load_extension('cogs.duel_cog')
+        print("✅ Cog Duels chargé")
+
 
         print("🎮 Tous les systèmes sont opérationnels !")
 

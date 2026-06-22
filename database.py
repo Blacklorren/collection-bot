@@ -635,7 +635,7 @@ def get_journees_for_rappel():
     with sqlite3.connect(DB_NAME) as con:
         con.row_factory = sqlite3.Row
         cur = con.cursor()
-        tomorrow = datetime.datetime.now() + datetime.timedelta(days=1)
+        tomorrow = datetime.now() + timedelta(days=1)
         cur.execute("""
             SELECT * FROM journees 
             WHERE rappel_envoye = 0 
@@ -902,3 +902,67 @@ def get_user_elo(user_id):
         cur = con.cursor()
         row = cur.execute("SELECT elo FROM users WHERE user_id = ?", (user_id,)).fetchone()
         return row[0] if row and row[0] is not None else 1000
+
+def set_user_elo(user_id, elo):
+    """Fixe l'Elo d'un utilisateur."""
+    check_user(user_id)
+    with sqlite3.connect(DB_NAME) as con:
+        cur = con.cursor()
+        cur.execute("UPDATE users SET elo = ? WHERE user_id = ?", (int(elo), user_id))
+        con.commit()
+
+def record_duel(joueur1, joueur2, score1, score2, gagnant, classe,
+                elo1_before, elo2_before, elo1_after, elo2_after, lineup1, lineup2):
+    """Enregistre un duel joué. lineup1/lineup2 : dicts {slot: card_id} (sérialisés en JSON)."""
+    import json as _json
+    with sqlite3.connect(DB_NAME) as con:
+        cur = con.cursor()
+        cur.execute("""
+            INSERT INTO duels
+                (joueur1, joueur2, score1, score2, gagnant, classe,
+                 elo1_before, elo2_before, elo1_after, elo2_after, lineup1, lineup2)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (joueur1, joueur2, score1, score2, gagnant, 1 if classe else 0,
+              elo1_before, elo2_before, elo1_after, elo2_after,
+              _json.dumps(lineup1), _json.dumps(lineup2)))
+        con.commit()
+        return cur.lastrowid
+
+def count_ranked_duels_between(user_a, user_b, since_iso):
+    """Nb de duels CLASSÉS entre deux joueurs depuis `since_iso` (anti-farm de paire)."""
+    with sqlite3.connect(DB_NAME) as con:
+        cur = con.cursor()
+        return cur.execute("""
+            SELECT COUNT(*) FROM duels
+            WHERE classe = 1 AND datetime(created_at) >= datetime(?)
+              AND ((joueur1 = ? AND joueur2 = ?) OR (joueur1 = ? AND joueur2 = ?))
+        """, (since_iso, user_a, user_b, user_b, user_a)).fetchone()[0]
+
+def count_ranked_duels_for(user_id, since_iso):
+    """Nb de duels CLASSÉS joués par un utilisateur depuis `since_iso` (plafond quotidien)."""
+    with sqlite3.connect(DB_NAME) as con:
+        cur = con.cursor()
+        return cur.execute("""
+            SELECT COUNT(*) FROM duels
+            WHERE classe = 1 AND datetime(created_at) >= datetime(?)
+              AND (joueur1 = ? OR joueur2 = ?)
+        """, (since_iso, user_id, user_id)).fetchone()[0]
+
+def get_duel_leaderboard(limit=10):
+    """Classement Elo des joueurs ayant disputé au moins un duel classé."""
+    with sqlite3.connect(DB_NAME) as con:
+        con.row_factory = sqlite3.Row
+        cur = con.cursor()
+        cur.execute("""
+            SELECT u.user_id, u.elo,
+                (SELECT COUNT(*) FROM duels d
+                   WHERE d.classe = 1 AND (d.joueur1 = u.user_id OR d.joueur2 = u.user_id)) AS matchs,
+                (SELECT COUNT(*) FROM duels d
+                   WHERE d.classe = 1 AND d.gagnant = u.user_id) AS victoires
+            FROM users u
+            WHERE EXISTS (SELECT 1 FROM duels d
+                          WHERE d.classe = 1 AND (d.joueur1 = u.user_id OR d.joueur2 = u.user_id))
+            ORDER BY u.elo DESC
+            LIMIT ?
+        """, (limit,))
+        return [dict(r) for r in cur.fetchall()]
