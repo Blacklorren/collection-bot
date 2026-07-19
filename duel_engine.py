@@ -70,7 +70,9 @@ OVERTIME_CAP = 200        # garde-fou de la mort subite
 # --- ELO ---
 ELO_START = 1000
 ELO_K = 32
-ELO_BAND = 150            # écart max pour un duel CLASSÉ (configurable côté cog)
+ELO_BAND = 150            # au-delà : duel classé « hors bande » (configurable côté cog)
+ELO_K_SOFT = 8            # K réduit pour un classé hors bande (bande douce)
+SOFT_REWARD_FACTOR = 0.5  # récompenses réduites hors bande
 
 # --- RÉCOMPENSES (classé uniquement) ---
 DUEL_WIN_POINTS = 100     # base ; scalé par l'écart d'Elo
@@ -121,15 +123,25 @@ def _convs(power1, power2, rng):
     return c1, c2
 
 
-def resolve_duel(power1, power2, allow_draw=False, rng=None):
-    """Simule un match. Retourne (score1, score2).
-    Si `allow_draw` est False, départage en mort subite (style 7 mètres)."""
+def simulate_match(power1, power2, allow_draw=False, rng=None):
+    """Simule un match possession par possession.
+    Retourne (score1, score2, half, overtime) : `half` = (s1, s2) à la mi-temps,
+    `overtime` = True si le match a été départagé en mort subite."""
     rng = rng or random
     c1, c2 = _convs(power1, power2, rng)
-    s1 = sum(rng.random() < c1 for _ in range(POSSESSIONS))
-    s2 = sum(rng.random() < c2 for _ in range(POSSESSIONS))
+    s1 = s2 = 0
+    half = (0, 0)
+    for i in range(POSSESSIONS):
+        if rng.random() < c1:
+            s1 += 1
+        if rng.random() < c2:
+            s2 += 1
+        if i + 1 == POSSESSIONS // 2:
+            half = (s1, s2)
 
+    overtime = False
     if s1 == s2 and not allow_draw:
+        overtime = True
         for _ in range(OVERTIME_CAP):
             h = rng.random() < c1
             a = rng.random() < c2
@@ -145,6 +157,13 @@ def resolve_duel(power1, power2, allow_draw=False, rng=None):
                 s1 += 1
             else:
                 s2 += 1
+    return s1, s2, half, overtime
+
+
+def resolve_duel(power1, power2, allow_draw=False, rng=None):
+    """Simule un match. Retourne (score1, score2).
+    Si `allow_draw` est False, départage en mort subite (style 7 mètres)."""
+    s1, s2, _, _ = simulate_match(power1, power2, allow_draw=allow_draw, rng=rng)
     return s1, s2
 
 

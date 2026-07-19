@@ -11,9 +11,14 @@ Duels entre joueurs (Saison 2).
      bouton « Compo automatique » qui réutilise auto_lineup(). Le match se lance quand
      les deux ont cliqué « Prêt ». (Pattern repris de cogs/trade_cog.py.)
   ✅ Classement            -> /classement_duel
+  ✅ Historique            -> /historique_duel [membre]
+  ✅ Bande Elo DOUCE       -> classé hors bande autorisé, mais K et récompenses réduits
+  ✅ Compo préremplie      -> dernière compo jouée (cartes encore possédées), sinon compo auto
+  ✅ Narration             -> coup d'envoi → mi-temps → résultat (éditions successives)
 
 Gating : beta_guard (visible-mais-bloqué jusqu'au 1er août, cf beta.py).
 """
+import asyncio
 import os
 from datetime import datetime
 
@@ -30,7 +35,8 @@ from cogs.collection_cog import load_cards_data, RARITY_EMOJI
 PARIS = pytz.timezone("Europe/Paris")
 
 # --- Réglages anti-farm (surchargeables via .env) ---
-DUEL_ELO_BAND = int(os.getenv("DUEL_ELO_BAND", str(E.ELO_BAND)))   # écart Elo max (classé)
+DUEL_ELO_BAND = int(os.getenv("DUEL_ELO_BAND", str(E.ELO_BAND)))   # au-delà : classé « hors bande »
+DUEL_SOFT_K = int(os.getenv("DUEL_SOFT_K", str(E.ELO_K_SOFT)))     # K réduit hors bande
 DAILY_PAIR_CAP = int(os.getenv("DUEL_DAILY_PAIR_CAP", "3"))        # duels classés/jour entre 2 mêmes joueurs
 DAILY_REWARD_CAP = int(os.getenv("DUEL_DAILY_REWARD_CAP", "10"))   # duels récompensés/jour/joueur
 
@@ -43,6 +49,15 @@ def _today_start_iso():
     now = datetime.now(PARIS)
     midnight = PARIS.localize(datetime(now.year, now.month, now.day))
     return midnight.astimezone(pytz.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _fmt_date(created_at):
+    """created_at SQLite (UTC) -> 'jj/mm' heure de Paris."""
+    try:
+        dt = datetime.strptime(str(created_at), "%Y-%m-%d %H:%M:%S")
+        return pytz.utc.localize(dt).astimezone(PARIS).strftime("%d/%m")
+    except (ValueError, TypeError):
+        return "?"
 
 
 class DuelChallengeView(discord.ui.View):
@@ -64,19 +79,28 @@ class DuelChallengeView(discord.ui.View):
         return True
 
     def _cleanup(self):
+        # Ne libère QUE le challenger : l'adversaire n'est pas verrouillé au stade
+        # du défi (et s'il figure dans ACTIVE_DUELISTS, c'est pour un autre duel).
         ACTIVE_DUELISTS.discard(self.challenger.id)
-        ACTIVE_DUELISTS.discard(self.opponent.id)
 
     @discord.ui.button(label="Accepter", emoji="⚔️", style=discord.ButtonStyle.green)
     async def accept(self, interaction, button):
         if self.resolved:
             return
+        # L'adversaire n'est verrouillé qu'à l'acceptation (pas au défi), pour
+        # qu'un simple défi non répondu ne le bloque pas.
+        if self.opponent.id in ACTIVE_DUELISTS:
+            return await interaction.response.send_message(
+                "Tu as déjà un duel en cours, termine-le d'abord.", ephemeral=True)
         self.resolved = True
+        ACTIVE_DUELISTS.add(self.opponent.id)
         for c in self.children:
             c.disabled = True
         # On passe à la phase de COMPOSITION : chaque joueur aligne son équipe,
         # puis le match se lance. ACTIVE_DUELISTS reste verrouillé jusqu'à la fin.
-        session = DuelSession(self.challenger, self.opponent, self.ranked)
+        session = DuelSession(self.challenger, self.opponent, self.ranked,
+                              lineup_c=self.cog.initial_lineup(self.challenger.id),
+                              lineup_o=self.cog.initial_lineup(self.opponent.id))
         lineup_view = DuelLineupView(self.cog, session)
         await interaction.response.edit_message(embed=lineup_view.build_embed(), view=lineup_view)
         lineup_view.message = await interaction.original_response()
@@ -101,14 +125,15 @@ class DuelSession:
     """État partagé d'un duel pendant la phase de composition.
     lineup_x : dict {slot: card_dict | None}. ready_x : bool."""
 
-    def __init__(self, challenger, opponent, ranked):
+    def __init__(self, challenger, opponent, ranked, lineup_c=None, lineup_o=None):
         self.challenger = challenger      # discord.Member
         self.opponent = opponent          # discord.Member
         self.ranked = ranked
-        self.lineup_c = {s: None for s in E.SLOTS}
-        self.lineup_o = {s: None for s in E.SLOTS}
+        self.lineup_c = lineup_c if lineup_c is not None else {s: None for s in E.SLOTS}
+        self.lineup_o = lineup_o if lineup_o is not None else {s: None for s in E.SLOTS}
         self.ready_c = False
         self.ready_o = False
+        self.cancelled = False            # annulation/expiration : invalide les pickers ouverts
 
     def side_of(self, user_id):
         return "c" if user_id == self.challenger.id else "o"
@@ -145,6 +170,10 @@ class LineupPicker(discord.ui.View):
     async def interaction_check(self, interaction):
         if interaction.user.id != self.user_id:
             await interaction.response.send_message("Ce n'est pas ton équipe.", ephemeral=True)
+            return False
+        if self.s.cancelled:
+            await interaction.response.send_message("⌛ Ce duel a été annulé ou a expiré.", ephemeral=True)
+            self.stop()
             return False
         return True
 
@@ -321,8 +350,10 @@ class DuelLineupView(discord.ui.View):
         s = self.s
         e = discord.Embed(
             title="⚔️ Composez vos équipes",
-            description="Cliquez **Composer mon équipe** pour aligner vos 7 cartes dans un menu privé, "
-                        "puis **Prêt**.\nLe match se lance dès que les deux joueurs sont prêts.",
+            description="Vos équipes sont **préremplies** (dernière compo jouée, sinon compo auto).\n"
+                        "Cliquez **Prêt** pour la valider telle quelle, ou **Composer mon équipe** "
+                        "pour l'ajuster dans un menu privé.\n"
+                        "Le match se lance dès que les deux joueurs sont prêts.",
             color=discord.Color.blurple())
         e.add_field(name=s.challenger.display_name, value=self._status("c"), inline=True)
         e.add_field(name=s.opponent.display_name, value=self._status("o"), inline=True)
@@ -346,8 +377,22 @@ class DuelLineupView(discord.ui.View):
         picker = LineupPicker(self.cog, self.s, self, side, interaction.user.id)
         await interaction.response.send_message(embed=picker._embed(), view=picker, ephemeral=True)
 
+    @discord.ui.button(label="Prêt", emoji="✅", style=discord.ButtonStyle.green, row=0)
+    async def ready_main_btn(self, interaction, button):
+        """Valide la compo préremplie sans ouvrir le picker."""
+        side = self.s.side_of(interaction.user.id)
+        if self.s.is_ready(side):
+            return await interaction.response.send_message("Tu es déjà prêt.", ephemeral=True)
+        if not any(self.s.lineup(side).values()):
+            return await interaction.response.send_message(
+                "Tu n'as aucune carte alignée : clique « Composer mon équipe ».", ephemeral=True)
+        self.s.set_ready(side, True)
+        await interaction.response.defer()
+        await self.after_ready()
+
     @discord.ui.button(label="Annuler", emoji="❌", style=discord.ButtonStyle.red, row=0)
     async def cancel_btn(self, interaction, button):
+        self.s.cancelled = True
         self._cleanup()
         for c in self.children:
             c.disabled = True
@@ -359,6 +404,8 @@ class DuelLineupView(discord.ui.View):
 
     async def after_ready(self):
         """Appelé après qu'un joueur a cliqué « Prêt ». Lance le match si les deux le sont."""
+        if self.s.cancelled or self.launched:
+            return
         await self.refresh()
         if self.s.ready_c and self.s.ready_o and not self.launched:
             self.launched = True
@@ -369,6 +416,7 @@ class DuelLineupView(discord.ui.View):
     async def on_timeout(self):
         if self.launched:
             return
+        self.s.cancelled = True
         self._cleanup()
         if self.message:
             for c in self.children:
@@ -434,6 +482,20 @@ class DuelCog(commands.Cog):
                 used.add(best_key)
         return lineup
 
+    def initial_lineup(self, user_id):
+        """Compo préremplie : dernière compo jouée (cartes encore possédées), sinon compo auto."""
+        last = database.get_last_duel_lineup(user_id) or {}
+        owned = {str(cid) for cid in database.get_user_collection(user_id)}
+        lineup = {s: None for s in E.SLOTS}
+        for slot in E.SLOTS:
+            cid = last.get(slot)
+            card = self.get_card(cid) if cid is not None else None
+            if card and str(card["id"]) in owned and card.get("rarete") != "Noël":
+                lineup[slot] = card
+        if not any(lineup.values()):
+            lineup = self.auto_lineup(user_id)
+        return lineup
+
     def _lineup_card_ids(self, lineup):
         return {slot: (card["id"] if card else None) for slot, card in lineup.items()}
 
@@ -465,27 +527,27 @@ class DuelCog(commands.Cog):
             return await interaction.response.send_message("Tu n'as pas encore de cartes jouables.", ephemeral=True)
 
         ranked = not amical
+        soft_note = ""
         if ranked:
             elo_c, elo_o = database.get_user_elo(challenger.id), database.get_user_elo(opponent.id)
             if not E.within_band(elo_c, elo_o, DUEL_ELO_BAND):
-                return await interaction.response.send_message(
-                    f"⚖️ Écart d'Elo trop grand pour un match **classé** "
-                    f"(toi {elo_c} · lui {elo_o}, max ±{DUEL_ELO_BAND}).\n"
-                    f"Lance un **match amical** : `/defi @{opponent.display_name} amical:True`.",
-                    ephemeral=True)
+                # Bande DOUCE : le duel classé reste possible, mais K et récompenses réduits.
+                soft_note = (f"\n⚖️ Écart d'Elo important ({elo_c} vs {elo_o}, bande ±{DUEL_ELO_BAND}) : "
+                             f"duel **hors bande** — gains d'Elo et récompenses réduits.")
             since = _today_start_iso()
             if database.count_ranked_duels_between(challenger.id, opponent.id, since) >= DAILY_PAIR_CAP:
                 return await interaction.response.send_message(
                     f"🚫 Vous avez déjà fait {DAILY_PAIR_CAP} duels classés aujourd'hui. "
                     f"Joue en **amical** pour continuer.", ephemeral=True)
 
+        # Seul le challenger est verrouillé ici ; l'adversaire ne l'est qu'à l'acceptation
+        # (sinon défier quelqu'un suffirait à le bloquer 120 s).
         ACTIVE_DUELISTS.add(challenger.id)
-        ACTIVE_DUELISTS.add(opponent.id)
         view = DuelChallengeView(self, challenger, opponent, ranked)
         mode = "🏆 Classé" if ranked else "🤝 Amical"
         e = discord.Embed(
             title="⚔️ Défi lancé !",
-            description=f"{challenger.mention} défie {opponent.mention} !\n**Mode : {mode}**\n\n"
+            description=f"{challenger.mention} défie {opponent.mention} !\n**Mode : {mode}**{soft_note}\n\n"
                         f"{opponent.mention}, acceptes-tu le duel ?",
             color=discord.Color.blurple())
         await interaction.response.send_message(content=opponent.mention, embed=e, view=view)
@@ -494,58 +556,88 @@ class DuelCog(commands.Cog):
     async def play_match(self, view: "DuelLineupView"):
         """Simule avec les compositions choisies, applique Elo + récompenses, enregistre, affiche."""
         s = view.s
-        c, o = s.challenger, s.opponent
-        lu_c = s.lineup_c
-        lu_o = s.lineup_o
-        pow_c, det_c = E.team_power(lu_c)
-        pow_o, det_o = E.team_power(lu_o)
+        try:
+            c, o = s.challenger, s.opponent
+            lu_c = s.lineup_c
+            lu_o = s.lineup_o
+            pow_c, det_c = E.team_power(lu_c)
+            pow_o, det_o = E.team_power(lu_o)
 
-        s_c, s_o = E.resolve_duel(pow_c, pow_o, allow_draw=False)
-        winner = c.id if s_c > s_o else o.id if s_o > s_c else None
+            s_c, s_o, half, overtime = E.simulate_match(pow_c, pow_o, allow_draw=False)
+            winner = c.id if s_c > s_o else o.id if s_o > s_c else None
+            mode = "🏆 Classé" if s.ranked else "🤝 Amical"
 
-        elo_c0, elo_o0 = database.get_user_elo(c.id), database.get_user_elo(o.id)
-        elo_c1, elo_o1 = elo_c0, elo_o0
-        reward_line = ""
+            # --- Narration : coup d'envoi → mi-temps → résultat ---
+            kick = discord.Embed(
+                title="🟢 Coup d'envoi !",
+                description=f"**{c.display_name}** (puissance {round(pow_c)}) affronte "
+                            f"**{o.display_name}** (puissance {round(pow_o)})…",
+                color=discord.Color.blurple())
+            kick.set_footer(text=mode)
+            await view.message.edit(embed=kick, view=view)
+            await asyncio.sleep(2.5)
 
-        if s.ranked:
-            result1 = 1.0 if winner == c.id else 0.0 if winner == o.id else 0.5
-            elo_c1, elo_o1 = E.elo_apply(elo_c0, elo_o0, result1)
-            database.set_user_elo(c.id, elo_c1)
-            database.set_user_elo(o.id, elo_o1)
-            reward_line = self._apply_rewards(c, o, winner, elo_c0, elo_o0)
+            ht = discord.Embed(
+                title=f"⏸️ Mi-temps : {half[0]} - {half[1]}",
+                description=f"**{c.display_name}** {half[0]} · {half[1]} **{o.display_name}**",
+                color=discord.Color.blurple())
+            ht.set_footer(text=mode)
+            await view.message.edit(embed=ht, view=view)
+            await asyncio.sleep(2.5)
 
-        database.record_duel(c.id, o.id, s_c, s_o, winner, s.ranked,
-                             elo_c0, elo_o0, elo_c1, elo_o1,
-                             self._lineup_card_ids(lu_c), self._lineup_card_ids(lu_o))
-        view._cleanup()
+            elo_c0, elo_o0 = database.get_user_elo(c.id), database.get_user_elo(o.id)
+            elo_c1, elo_o1 = elo_c0, elo_o0
+            reward_line = ""
+            soft = False
 
-        # --- Embed résultat ---
-        if winner is None:
-            title = f"🤝 Match nul {s_c} - {s_o}"
-            color = discord.Color.greyple()
-        else:
-            win_member = c if winner == c.id else o
-            title = f"🏆 {win_member.display_name} l'emporte {max(s_c, s_o)} - {min(s_c, s_o)} !"
-            color = discord.Color.gold()
-        e = discord.Embed(title=title, color=color)
-        e.add_field(name=f"{c.display_name}", value=self._team_summary(lu_c, det_c, s_c), inline=True)
-        e.add_field(name=f"{o.display_name}", value=self._team_summary(lu_o, det_o, s_o), inline=True)
-        mvp = self._mvp(lu_c if s_c >= s_o else lu_o)
-        if mvp:
-            e.add_field(name="⭐ Homme du match", value=f"{RARITY_EMOJI.get(mvp['rarete'], '🔹')} {mvp['nom']}", inline=False)
-        if s.ranked:
-            e.add_field(name="📊 Elo",
-                        value=f"{c.display_name} : {elo_c0} → **{elo_c1}**\n{o.display_name} : {elo_o0} → **{elo_o1}**",
-                        inline=False)
-            if reward_line:
-                e.add_field(name="🎁 Récompenses", value=reward_line, inline=False)
-        else:
-            e.set_footer(text="Match amical — aucun impact sur l'Elo.")
-        await view.message.edit(embed=e, view=view)
-        view.stop()
+            if s.ranked:
+                # Bande douce : hors bande, le duel compte mais K et récompenses réduits.
+                soft = not E.within_band(elo_c0, elo_o0, DUEL_ELO_BAND)
+                k = DUEL_SOFT_K if soft else E.ELO_K
+                result1 = 1.0 if winner == c.id else 0.0 if winner == o.id else 0.5
+                elo_c1, elo_o1 = E.elo_apply(elo_c0, elo_o0, result1, k=k)
+                database.set_user_elo(c.id, elo_c1)
+                database.set_user_elo(o.id, elo_o1)
+                reward_line = self._apply_rewards(c, o, winner, elo_c0, elo_o0, soft)
 
-    def _apply_rewards(self, c, o, winner, elo_c0, elo_o0):
-        """Points au vainqueur (scalés par l'Elo), consolation au perdant, avec plafond quotidien."""
+            database.record_duel(c.id, o.id, s_c, s_o, winner, s.ranked,
+                                 elo_c0, elo_o0, elo_c1, elo_o1,
+                                 self._lineup_card_ids(lu_c), self._lineup_card_ids(lu_o))
+
+            # --- Embed résultat ---
+            ms = " (mort subite)" if overtime else ""
+            if winner is None:
+                title = f"🤝 Match nul {s_c} - {s_o}"
+                color = discord.Color.greyple()
+            else:
+                win_member = c if winner == c.id else o
+                title = f"🏆 {win_member.display_name} l'emporte {max(s_c, s_o)} - {min(s_c, s_o)}{ms} !"
+                color = discord.Color.gold()
+            e = discord.Embed(title=title, color=color)
+            e.add_field(name=f"{c.display_name}", value=self._team_summary(lu_c, det_c, s_c), inline=True)
+            e.add_field(name=f"{o.display_name}", value=self._team_summary(lu_o, det_o, s_o), inline=True)
+            mvp = self._mvp(lu_c if s_c >= s_o else lu_o)
+            if mvp:
+                e.add_field(name="⭐ Homme du match", value=f"{RARITY_EMOJI.get(mvp['rarete'], '🔹')} {mvp['nom']}", inline=False)
+            if s.ranked:
+                elo_note = " · ⚖️ hors bande (gains réduits)" if soft else ""
+                e.add_field(name="📊 Elo",
+                            value=f"{c.display_name} : {elo_c0} → **{elo_c1}**\n"
+                                  f"{o.display_name} : {elo_o0} → **{elo_o1}**{elo_note}",
+                            inline=False)
+                if reward_line:
+                    e.add_field(name="🎁 Récompenses", value=reward_line, inline=False)
+            else:
+                e.set_footer(text="Match amical — aucun impact sur l'Elo.")
+            await view.message.edit(embed=e, view=view)
+            view.stop()
+        finally:
+            # Quoi qu'il arrive (exception comprise), on libère les deux joueurs.
+            view._cleanup()
+
+    def _apply_rewards(self, c, o, winner, elo_c0, elo_o0, soft=False):
+        """Points au vainqueur (scalés par l'Elo), consolation au perdant, avec plafond quotidien.
+        `soft` : duel hors bande Elo → récompenses réduites (SOFT_REWARD_FACTOR)."""
         if winner is None:
             return ""
         since = _today_start_iso()
@@ -553,17 +645,21 @@ class DuelCog(commands.Cog):
         lose_member = o if winner == c.id else c
         win_elo = elo_c0 if winner == c.id else elo_o0
         lose_elo = elo_o0 if winner == c.id else elo_c0
+        factor = E.SOFT_REWARD_FACTOR if soft else 1.0
 
+        # NB : le compte exclut le duel en cours (record_duel est appelé après),
+        # d'où le `<` strict pour respecter exactement DAILY_REWARD_CAP.
         lines = []
-        if database.count_ranked_duels_for(win_member.id, since) <= DAILY_REWARD_CAP:
-            gain = E.duel_reward(win_elo, lose_elo)
+        if database.count_ranked_duels_for(win_member.id, since) < DAILY_REWARD_CAP:
+            gain = max(1, round(E.duel_reward(win_elo, lose_elo) * factor))
             database.update_points(win_member.id, gain)
             lines.append(f"🥇 {win_member.display_name} : +{gain} points")
         else:
             lines.append(f"🥇 {win_member.display_name} : plafond quotidien atteint (0 pt)")
-        if database.count_ranked_duels_for(lose_member.id, since) <= DAILY_REWARD_CAP:
-            database.update_points(lose_member.id, E.DUEL_LOSS_POINTS)
-            lines.append(f"🥈 {lose_member.display_name} : +{E.DUEL_LOSS_POINTS} points")
+        if database.count_ranked_duels_for(lose_member.id, since) < DAILY_REWARD_CAP:
+            consolation = max(1, round(E.DUEL_LOSS_POINTS * factor))
+            database.update_points(lose_member.id, consolation)
+            lines.append(f"🥈 {lose_member.display_name} : +{consolation} points")
         return "\n".join(lines)
 
     def _team_summary(self, lineup, details, score):
@@ -578,6 +674,36 @@ class DuelCog(commands.Cog):
             else:
                 lines.append(f"`{slot}` — *(vide)*")
         return "\n".join(lines)
+
+    @app_commands.command(name="historique_duel", description="Les derniers duels d'un joueur.")
+    @app_commands.describe(membre="Joueur à consulter (toi par défaut)")
+    @beta_guard()
+    async def historique_duel(self, interaction: discord.Interaction, membre: discord.Member = None):
+        target = membre or interaction.user
+        duels = database.get_user_duels(target.id, limit=10)
+        if not duels:
+            return await interaction.response.send_message(
+                f"{target.display_name} n'a encore joué aucun duel.", ephemeral=True)
+        lines = []
+        for d in duels:
+            is_j1 = d["joueur1"] == target.id
+            my_score = d["score1"] if is_j1 else d["score2"]
+            opp_score = d["score2"] if is_j1 else d["score1"]
+            opp_id = d["joueur2"] if is_j1 else d["joueur1"]
+            opp = interaction.guild.get_member(opp_id) if interaction.guild else None
+            opp_name = opp.display_name if opp else "Inconnu"
+            res = "🟢" if d["gagnant"] == target.id else "⚪" if d["gagnant"] is None else "🔴"
+            mode = "🏆" if d["classe"] else "🤝"
+            delta = ""
+            if d["classe"] and d["elo1_after"] is not None:
+                diff = (d["elo1_after"] - d["elo1_before"]) if is_j1 else (d["elo2_after"] - d["elo2_before"])
+                delta = f" · {'+' if diff >= 0 else ''}{diff} Elo"
+            lines.append(f"{res} {mode} `{_fmt_date(d['created_at'])}` vs **{opp_name}** — "
+                         f"{my_score}-{opp_score}{delta}")
+        e = discord.Embed(title=f"📜 Derniers duels de {target.display_name}",
+                          description="\n".join(lines), color=discord.Color.blurple())
+        e.set_footer(text=f"Elo actuel : {database.get_user_elo(target.id)} · 🏆 classé · 🤝 amical")
+        await interaction.response.send_message(embed=e)
 
     @app_commands.command(name="classement_duel", description="Classement Elo des duels.")
     @beta_guard()

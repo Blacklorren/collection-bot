@@ -635,11 +635,13 @@ def get_journees_for_rappel():
     with sqlite3.connect(DB_NAME) as con:
         con.row_factory = sqlite3.Row
         cur = con.cursor()
-        tomorrow = datetime.now() + timedelta(days=1)
+        # Chaîne explicite (l'adaptateur datetime de sqlite3 est déprécié en 3.12+)
+        # et datetime() des deux côtés pour normaliser les formats ISO ('T' vs espace).
+        tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
         cur.execute("""
-            SELECT * FROM journees 
-            WHERE rappel_envoye = 0 
-            AND date_debut <= ? 
+            SELECT * FROM journees
+            WHERE rappel_envoye = 0
+            AND datetime(date_debut) <= datetime(?)
             AND is_active = 1
         """, (tomorrow,))
         return cur.fetchall()
@@ -947,6 +949,36 @@ def count_ranked_duels_for(user_id, since_iso):
             WHERE classe = 1 AND datetime(created_at) >= datetime(?)
               AND (joueur1 = ? OR joueur2 = ?)
         """, (since_iso, user_id, user_id)).fetchone()[0]
+
+def get_last_duel_lineup(user_id):
+    """Dernière compo alignée par le joueur : dict {slot: card_id | None}, ou None."""
+    import json as _json
+    with sqlite3.connect(DB_NAME) as con:
+        cur = con.cursor()
+        row = cur.execute("""
+            SELECT joueur1, lineup1, lineup2 FROM duels
+            WHERE joueur1 = ? OR joueur2 = ?
+            ORDER BY id DESC LIMIT 1
+        """, (user_id, user_id)).fetchone()
+    if not row:
+        return None
+    raw = row[1] if row[0] == user_id else row[2]
+    try:
+        return _json.loads(raw) if raw else None
+    except ValueError:
+        return None
+
+def get_user_duels(user_id, limit=10):
+    """Derniers duels d'un joueur (classés et amicaux), plus récents d'abord."""
+    with sqlite3.connect(DB_NAME) as con:
+        con.row_factory = sqlite3.Row
+        cur = con.cursor()
+        cur.execute("""
+            SELECT * FROM duels
+            WHERE joueur1 = ? OR joueur2 = ?
+            ORDER BY id DESC LIMIT ?
+        """, (user_id, user_id, limit))
+        return [dict(r) for r in cur.fetchall()]
 
 def get_duel_leaderboard(limit=10):
     """Classement Elo des joueurs ayant disputé au moins un duel classé."""

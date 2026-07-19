@@ -18,6 +18,9 @@ test, ouverture publique automatique le **1er août 2026**). Voir `beta.py`.
 | 5 | DB duels | `database.py` | ✅ testé |
 | 5 | Cog duel (baseline auto) | `cogs/duel_cog.py` | ✅ compile · ⚠️ à tester en vrai |
 | 5 | **Composition MANUELLE** | `cogs/duel_cog.py` (`DuelLineupView`/`LineupPicker`) | ✅ compile · ⚠️ à tester en vrai |
+| 6 | Corrections revue (verrous, annulation, off-by-one) | `cogs/duel_cog.py` | ✅ compile · ⚠️ à tester en vrai |
+| 6 | Bande Elo douce (hors bande = K et gains réduits) | `duel_engine.py`, `cogs/duel_cog.py` | ✅ testé hors-ligne |
+| 6 | UX : compo préremplie, narration, `/historique_duel` | `cogs/duel_cog.py`, `database.py` | ✅ compile · ⚠️ à tester en vrai |
 
 **Postes : déjà présents dans `cards.json`** (champ `poste` en toutes lettres, ex.
 « Gardien », « Demi Centre »). `duel_engine.normalize_poste()` les mappe vers les
@@ -39,10 +42,15 @@ pas de bonus de poste pour elles, sans gravité.
 - **Puissance équipe** = (Σ notes) × synergie.
 - **Simulation** : 50 possessions, conversion ~55 % modulée par la puissance
   relative, variance « forme du jour » (±12 %), mort subite si égalité.
-- **Elo** : départ 1000, K=32, bande classé ±150 (env `DUEL_ELO_BAND`).
+- **Elo** : départ 1000, K=32, **bande DOUCE** ±150 (env `DUEL_ELO_BAND`) —
+  un classé hors bande reste possible mais K passe à 8 (env `DUEL_SOFT_K`,
+  const `ELO_K_SOFT`) et les récompenses sont réduites de moitié
+  (`SOFT_REWARD_FACTOR = 0.5`). Plus de blocage sec.
 - **Récompenses** (classé) : vainqueur +100 pts scalés ×0.25→×2 selon l'écart
-  d'Elo ; perdant +20. Anti-farm : max 3 classés/jour entre 2 mêmes joueurs
-  (`DUEL_DAILY_PAIR_CAP`), max 10 récompensés/jour/joueur (`DUEL_DAILY_REWARD_CAP`).
+  d'Elo ; perdant +20 (le tout ×0.5 hors bande). Anti-farm : max 3 classés/jour
+  entre 2 mêmes joueurs (`DUEL_DAILY_PAIR_CAP`), max 10 récompensés/jour/joueur
+  (`DUEL_DAILY_REWARD_CAP`, comparaison stricte `<` : le compte exclut le duel
+  en cours).
 
 **Équilibrage validé** (`py -3 tools/test_duel_balance.py`, 10 000 matchs) :
 7 Lég dépareillées battent 1 Lég+mixte même club seulement ~63 % du temps ;
@@ -59,7 +67,10 @@ Implémenté dans `cogs/duel_cog.py` (pattern repris de `TradePicker`).
 ### Flux
 - Après acceptation du défi, le message de défi se transforme en **phase de
   composition** (`DuelLineupView`) : statut des deux joueurs + boutons
-  **« Composer mon équipe »** et **« Annuler »**.
+  **« Composer mon équipe »**, **« Prêt »** et **« Annuler »**.
+- Les équipes sont **préremplies** (`initial_lineup`) : dernière compo jouée
+  (cartes encore possédées, via `database.get_last_duel_lineup`), sinon compo
+  auto. Le joueur pressé clique directement « Prêt » sur le message partagé.
 - Chaque joueur ouvre son **sélecteur privé** (`LineupPicker`, éphémère) :
   - **select de poste** (`GB…ALD`) — choisit quel slot éditer (montre la carte
     actuelle par slot),
@@ -77,8 +88,17 @@ Implémenté dans `cogs/duel_cog.py` (pattern repris de `TradePicker`).
 - Slots laissés vides autorisés (note plancher Commun via `team_power`).
 - Cartes Noël exclues ; dédup par carte (`get_user_collection`).
 - Toute modif d'une lineup ré-arme le bouton « Prêt » de ce joueur.
-- Verrou `ACTIVE_DUELISTS` conservé pendant toute la composition ; libéré sur
-  annulation, timeout (300 s) ou fin de match.
+- Verrou `ACTIVE_DUELISTS` : le challenger est verrouillé au `/defi`,
+  **l'adversaire seulement à l'acceptation** (un défi ignoré ne bloque
+  personne). Libéré sur refus, annulation, timeout (300 s) ou fin de match
+  (`try/finally` dans `play_match` : plus de fuite en cas d'exception).
+- Annulation/expiration : `DuelSession.cancelled` invalide les sélecteurs
+  éphémères encore ouverts (plus de « match fantôme » après Annuler).
+- **Narration** : le match s'affiche en trois temps (coup d'envoi → mi-temps →
+  résultat, via `duel_engine.simulate_match` qui expose le score à la mi-temps
+  et le flag mort subite).
+- **`/historique_duel [membre]`** : 10 derniers duels (V/N/D, score, mode,
+  delta Elo), via `database.get_user_duels`.
 
 ---
 
@@ -88,9 +108,13 @@ Implémenté dans `cogs/duel_cog.py` (pattern repris de `TradePicker`).
 2. `/echange @autre_compte` — panier des deux côtés, double validation.
 3. `/recycler` — version sélective (liste + « Tout recycler »).
 4. `/defi @autre_compte` (classé) et `/defi @autre amical:True`. Après acceptation :
-   chaque joueur clique **« Composer mon équipe »**, aligne ses cartes (ou **« Compo
-   automatique »**), puis **« Prêt »** ; le match se lance quand les deux sont prêts.
-5. `/classement_duel`.
+   compos **préremplies** → cliquer directement **« Prêt »** (ou ajuster via
+   **« Composer mon équipe »**) ; le match se lance quand les deux sont prêts,
+   avec narration coup d'envoi → mi-temps → résultat.
+   Cas à tester : annuler pendant qu'un picker est ouvert (il doit répondre
+   « duel annulé »), défi hors bande Elo (note « gains réduits » dans le défi
+   et l'embed final).
+5. `/classement_duel` et `/historique_duel`.
 6. Hors testeurs / hors salon → message « arrive la saison prochaine ».
 
 Tests logiques hors-ligne (sans Discord) :
@@ -103,14 +127,18 @@ Tests logiques hors-ligne (sans Discord) :
 - **`.env`** (valeurs par défaut déjà câblées sur l'admin) :
   `PUBLIC_LAUNCH=2026-08-01`, `BETA_TESTER_IDS=133711821214449665`,
   `BETA_CHANNEL_ID=441230079100715008`, et options
-  `DUEL_ELO_BAND`, `DUEL_DAILY_PAIR_CAP`, `DUEL_DAILY_REWARD_CAP`.
+  `DUEL_ELO_BAND`, `DUEL_SOFT_K`, `DUEL_DAILY_PAIR_CAP`, `DUEL_DAILY_REWARD_CAP`.
 - **Postes** : déjà dans `cards.json` (rien à faire ; l'outil xlsx reste dispo au cas où).
 - **Dépendance dev uniquement** : `openpyxl` (scripts `tools/`, pas le runtime).
 - Le **1er août**, tout s'ouvre au public automatiquement (aucune manip).
 
-### Bug latent repéré (hors périmètre, non corrigé)
-`database.get_journees_for_rappel` utilise `datetime.datetime.now()` alors que
-l'import est `from datetime import datetime` → exception au déclenchement. À corriger.
+### Bug latent — ✅ traité
+Le `datetime.datetime.now()` signalé dans `database.get_journees_for_rappel`
+n'existait pas (le code utilisait déjà `datetime.now()`, correct avec l'import
+du fichier). La fonction a néanmoins été blindée : paramètre passé en chaîne
+(l'adaptateur datetime de sqlite3 est déprécié en Python 3.12+) et
+`datetime()` SQLite des deux côtés de la comparaison pour normaliser les
+formats ISO. NB : la fonction n'est appelée par aucun cog à ce jour.
 
 ---
 
@@ -120,6 +148,7 @@ l'import est `from datetime import datetime` → exception au déclenchement. À
 > Lis `SAISON2.md`. **Tout le code est en place** (échanges, recyclage, duels avec
 > composition manuelle — `DuelLineupView`/`LineupPicker` dans `cogs/duel_cog.py`).
 > Il reste à **tester en vrai sur Discord** dans le salon bêta (§4), notamment le
-> nouveau flux de composition des duels à deux joueurs (sélecteurs éphémères,
-> bouton « Prêt » de chaque côté, lancement auto du match). Et corriger le bug
-> latent `database.get_journees_for_rappel` (§5).
+> nouveau flux de composition des duels à deux joueurs (compos préremplies,
+> bouton « Prêt » sur le message partagé, narration mi-temps, lancement auto du
+> match), l'annulation avec picker ouvert, et un défi classé hors bande Elo
+> (gains réduits). Le bug latent `get_journees_for_rappel` est traité (§5).
