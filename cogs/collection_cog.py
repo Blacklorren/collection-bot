@@ -36,11 +36,18 @@ FRAGMENT_VALUES = {
 }
 
 JOKER_COSTS = {
-    "rare": 250,
-    "epique": 800,
-    "legendaire": 3000,
+    "rare": 200,
+    "epique": 400,      # 600 → 400
+    "legendaire": 1400, # recalibré avec le boost ×3 C/PC pour garder ~6 mois de complétion
     "noel": 100
 }
+
+# Taux de drop par slot (Saison 2) — appliqués PAR RARETÉ, pas par carte.
+# Calibrés pour : 1 Légendaire tirée ~tous les 20 j à 3 packs/jour,
+# et complétion totale médiane ~180 j (6 mois) craft compris.
+SLOT1_RATES = {"Commun": 70, "Peu Commun": 30}
+SLOT2_RATES = {"Commun": 40, "Peu Commun": 50, "Rare": 10}
+SLOT3_RATES = {"Rare": 81.5, "Épique": 17, "Légendaire": 1.5}
 
 # Ordre de rareté pour le crescendo de révélation (la meilleure carte en dernier)
 RARITY_ORDER = {"Commun": 0, "Peu Commun": 1, "Rare": 2, "Épique": 3, "Légendaire": 4, "Noël": 5}
@@ -69,9 +76,13 @@ POINTS_PER_MESSAGE = 20
 MAX_DAILY_MESSAGE_POINTS = 300
 MESSAGE_COOLDOWN = 10
 LEADERBOARD_EXCLUDED_IDS = [133711821214449665]
-MISSING_CARD_WEIGHT = 3
-HIGH_COMPLETION_WEIGHT = 5
-HIGH_COMPLETION_THRESHOLD = 0.95
+# Boost de fin de collection basse rareté (Saison 2) :
+# les cartes Commun / Peu Commun MANQUANTES pèsent ×3 dans le tirage
+# dès que le joueur possède ≥ 80% de l'ensemble Commun + Peu Commun.
+# Les autres raretés restent en tirage uniforme (leur pity passe par le craft /creer).
+LOW_TIER_RARITIES = ("Commun", "Peu Commun")
+LOW_TIER_MISSING_WEIGHT = 3
+LOW_TIER_THRESHOLD = 0.80
 
 def load_cards_data():
     """Charge les cartes en mémoire."""
@@ -217,28 +228,33 @@ class CollectionCog(commands.Cog):
             self.card_map[str(card['id'])] = card  # Clé en string
 
     def get_weighted_pool(self, user_id: int, cards_pool: list) -> tuple:
-        """Retourne (cards, weights) où les cartes manquantes ont un poids plus élevé."""
+        """Retourne (cards, weights) pour le tirage dans une rareté.
+        Poids ×3 sur les Commun/Peu Commun manquantes une fois que le joueur
+        possède ≥ 80% de l'ensemble Commun + Peu Commun ; uniforme sinon."""
         user_collection = database.get_user_collection(user_id)
         user_collection_set = set(str(cid) for cid in user_collection)
-        
+
         unique_cards = {c['id']: c for c in cards_pool}.values()
-        
-        total_cards = len(self.all_cards)
-        unique_owned = len(set(user_collection))
-        completion_ratio = unique_owned / total_cards if total_cards > 0 else 0
-        
-        weight = HIGH_COMPLETION_WEIGHT if completion_ratio >= HIGH_COMPLETION_THRESHOLD else MISSING_CARD_WEIGHT
-        
+
+        # Complétion calculée sur le sous-ensemble Commun + Peu Commun uniquement
+        low_tier_total = sum(len(self.cards_by_rarity.get(r, [])) for r in LOW_TIER_RARITIES)
+        low_tier_owned = 0
+        for cid in user_collection_set:
+            card = self.card_map.get(cid)
+            if card and card.get('rarete') in LOW_TIER_RARITIES:
+                low_tier_owned += 1
+        boost_active = low_tier_total > 0 and (low_tier_owned / low_tier_total) >= LOW_TIER_THRESHOLD
+
         cards = []
         weights = []
         for card in unique_cards:
             cards.append(card)
-            card_id_str = str(card['id'])
-            if card_id_str not in user_collection_set:
-                weights.append(weight)
+            is_missing = str(card['id']) not in user_collection_set
+            if boost_active and is_missing and card.get('rarete') in LOW_TIER_RARITIES:
+                weights.append(LOW_TIER_MISSING_WEIGHT)
             else:
                 weights.append(1)
-        
+
         return cards, weights
 
     # === ÉVÉNEMENTS ===
@@ -419,20 +435,20 @@ class CollectionCog(commands.Cog):
         view.refresh(packs_owned - count)
         await interaction.edit_original_response(view=view)
 
+    def _draw_slot(self, uid, rarity_weights: dict):
+        """Tire d'abord la rareté selon les taux exacts, puis une carte dans cette rareté
+        (bonus ×3 pour les cartes manquantes, sans déformer les taux entre raretés)."""
+        rarities = list(rarity_weights.keys())
+        rarity = random.choices(rarities, weights=[rarity_weights[r] for r in rarities], k=1)[0]
+        pool, w = self.get_weighted_pool(uid, self.cards_by_rarity[rarity])
+        return random.choices(pool, weights=w, k=1)[0]
+
     def _draw_pack(self, uid):
-        """Tire les 3 cartes d'un pack (pondérations rareté + cartes manquantes)."""
-        pool1, w1 = self.get_weighted_pool(uid, [*self.cards_by_rarity["Commun"], *self.cards_by_rarity["Peu Commun"]])
-        base1 = [70 if c['rarete'] == 'Commun' else 30 for c in pool1]
-        slot1 = random.choices(pool1, weights=[b * w for b, w in zip(base1, w1)], k=1)[0]
-
-        pool2, w2 = self.get_weighted_pool(uid, [*self.cards_by_rarity["Commun"], *self.cards_by_rarity["Peu Commun"], *self.cards_by_rarity["Rare"]])
-        base2 = [30 if c['rarete'] == 'Commun' else 50 if c['rarete'] == 'Peu Commun' else 20 for c in pool2]
-        slot2 = random.choices(pool2, weights=[b * w for b, w in zip(base2, w2)], k=1)[0]
-
-        pool3, w3 = self.get_weighted_pool(uid, [*self.cards_by_rarity["Rare"], *self.cards_by_rarity["Épique"], *self.cards_by_rarity["Légendaire"]])
-        base3 = [45 if c['rarete'] == 'Rare' else 35 if c['rarete'] == 'Épique' else 20 for c in pool3]
-        slot3 = random.choices(pool3, weights=[b * w for b, w in zip(base3, w3)], k=1)[0]
-
+        """Tire les 3 cartes d'un pack. Taux calibrés Saison 2 :
+        1 Légendaire ~tous les 20 jours, complétion ~7 mois à 3 packs/jour."""
+        slot1 = self._draw_slot(uid, SLOT1_RATES)
+        slot2 = self._draw_slot(uid, SLOT2_RATES)
+        slot3 = self._draw_slot(uid, SLOT3_RATES)
         return [slot1, slot2, slot3]
 
     def _maybe_advent(self, uid):
