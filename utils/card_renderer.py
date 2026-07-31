@@ -1,6 +1,7 @@
-"""Rendu de carte style TCG (layout v2) : silhouette noire a coins biseautes, fond degrade
-couleur de rarete + joueur detoure pose dessus, ecusson du club sur disque blanc (bas-gauche),
-nom (Anton) + poste (Oswald) alignes a droite (bas-droite).
+"""Rendu de carte style TCG (layout v2) : silhouette noire a coins biseautes, fond radial
+couleur de rarete + joueur detoure pose dessus (fondu en pied), ecusson du club sur disque
+blanc (bas-gauche, omis si le club n'a pas de logo), nom (Anton) + poste (Oswald) alignes
+a droite (bas-droite).
 
 Expose :
 - compose_v2(cutout, nom, club, rarete, poste) -> PIL.Image  (rendu pur, synchrone, layout actif)
@@ -22,7 +23,7 @@ CUTOUTS = os.path.join(ROOT, "assets", "cutouts")
 CACHE_DIR = os.path.join(ROOT, "assets", "card_cache")
 
 # Incrementer pour invalider le cache disque quand le design change
-DESIGN_VERSION = "v5"
+DESIGN_VERSION = "v7"
 
 W, H = 992, 1240
 R = 40          # rayon des coins (carte, layout v1)
@@ -33,10 +34,21 @@ CHAMFER = 140   # taille du coin biseaute (bas-gauche + haut-droite, v2)
 BORDER = 42     # epaisseur de la bordure noire (v2)
 
 # Reglages design v2 (bandeau bas + cadrage joueur)
-PLAYER_ZOOM = 0.87   # echelle du joueur detoure (haut cale sur le liseré superieur)
-BAND_TOP = 1012      # y du haut du bandeau noir / du separateur de couleur
-LOGO_SIZE = 180      # taille de l'ecusson dans le bandeau
-DISC_R = 108         # rayon du disque blanc sous l'ecusson (suit la taille du logo)
+PLAYER_ZOOM = 0.78        # echelle du joueur detoure (dezoom : on retrouve les epaules)
+PLAYER_TOP_MARGIN = 54    # air entre le liseré superieur et le sommet du crane
+BAND_TOP = 1028           # y du haut du bandeau noir / du separateur de couleur
+LOGO_SIZE = 180           # taille de l'ecusson dans le bandeau
+DISC_R = 108              # rayon du disque blanc sous l'ecusson (suit la taille du logo)
+
+# Bloc texte du bandeau (nom + poste, alignes a droite)
+NAME_SIZE = 80            # corps max du nom, auto-reduit si trop long ou trop haut
+NAME_MIN_SIZE = 40        # plancher de l'auto-reduction
+POSTE_SIZE = 62           # corps du poste, sous le nom
+# Le bloc texte est cale sur les LIGNES DE BASE (cf compose_v2), pas sur les boites
+# d'encre : c'est ce qui garantit que tous les noms s'alignent, accentues ou non.
+POSTE_BASELINE_FROM_BOTTOM = 44   # ligne de base du poste, depuis le bas de la carte
+NAME_POSTE_GAP = 19       # base du nom -> haut des capitales du poste
+TEXT_TOP_CLEARANCE = 6    # garde entre le haut de l'encre du nom et le separateur
 
 RARITY_RGB = {
     "Commun": (150, 154, 162),
@@ -221,6 +233,38 @@ def _poly_mask(size, points, ss=3):
     return big.resize(size, Image.Resampling.LANCZOS)
 
 
+def _crop_to_ratio(img, target_ratio):
+    """Recadre `img` (centre) au ratio largeur/hauteur `target_ratio`, sans deformer.
+    Rogne la dimension en trop (largeur ou hauteur) au lieu d'etirer au resize."""
+    w, h = img.size
+    cur_ratio = w / h
+    if abs(cur_ratio - target_ratio) < 1e-3:
+        return img
+    if cur_ratio > target_ratio:
+        new_w = max(1, round(h * target_ratio))
+        x0 = (w - new_w) // 2
+        return img.crop((x0, 0, x0 + new_w, h))
+    new_h = max(1, round(w / target_ratio))
+    y0 = (h - new_h) // 2
+    return img.crop((0, y0, w, y0 + new_h))
+
+
+def _radial(size, inner_rgb, outer_rgb, cx, cy, radius):
+    """Degrade radial : eclaire le fond derriere la tete pour detacher le joueur.
+    Calcule en basse resolution puis agrandi (le degrade est doux, aucune perte visible)."""
+    w, h = size
+    ss = 6
+    small = Image.new("RGB", (max(1, w // ss), max(1, h // ss)), outer_rgb)
+    d = ImageDraw.Draw(small)
+    steps = 48
+    for i in range(steps, 0, -1):
+        t = i / steps
+        r = radius / ss * t
+        col = tuple(int(outer_rgb[k] + (inner_rgb[k] - outer_rgb[k]) * (1 - t) ** 1.6) for k in range(3))
+        d.ellipse([cx / ss - r, cy / ss - r, cx / ss + r, cy / ss + r], fill=col)
+    return small.resize(size, Image.Resampling.LANCZOS).convert("RGBA")
+
+
 def _bottom_shade(size, start=0.5, max_a=210):
     w, h = size
     g = Image.new("L", (1, h), 0)
@@ -233,9 +277,10 @@ def _bottom_shade(size, start=0.5, max_a=210):
 
 
 def compose_v2(cutout, nom, club, rarete, poste="", zoom=PLAYER_ZOOM):
-    """Compose la carte (PIL RGBA) layout v2 : joueur detoure (dezoom `zoom`, centre
-    en X, haut cale sur le liseré superieur) sur fond degrade de rarete, puis bandeau
-    noir pleine largeur en pied englobant l'ecusson (a cheval sur le separateur de
+    """Compose la carte (PIL RGBA) layout v2 : joueur detoure (dezoom `zoom`, cale
+    sur sa bbox alpha — centre sur le joueur et non sur l'image, sommet du crane a
+    PLAYER_TOP_MARGIN sous le liseré) sur fond radial de rarete, fondu en pied, puis
+    bandeau noir pleine largeur englobant l'ecusson (a cheval sur le separateur de
     couleur) + le nom + le poste. `cutout` : portrait detoure (fond transparent) ;
     un portrait brut plein cadre marche en fallback (passer zoom=1.0)."""
     rgb = RARITY_RGB.get(rarete, (150, 150, 150))
@@ -246,17 +291,23 @@ def compose_v2(cutout, nom, club, rarete, poste="", zoom=PLAYER_ZOOM):
     card = Image.new("RGBA", (W, H), (12, 13, 16, 255))
     card.putalpha(_poly_mask((W, H), out))
 
-    # Fond degrade de rarete + joueur, clippe au polygone interieur
-    bg = _vgradient((W, H), darken(rgb, 0.15), darken(rgb, 0.6))
-    art_src = cutout.convert("RGBA")
+    # Fond radial de rarete + joueur, clippe au polygone interieur
+    bg = _radial((W, H), lighten(rgb, 0.10), darken(rgb, 0.62), W * 0.5, H * 0.34, H * 0.78)
+    art_src = _crop_to_ratio(cutout.convert("RGBA"), W / H)
     if zoom >= 1.0:
         art = art_src.resize((W, H), Image.Resampling.LANCZOS)
     else:
         sw, sh = max(1, int(W * zoom)), max(1, int(H * zoom))
         scaled = art_src.resize((sw, sh), Image.Resampling.LANCZOS)
+        # Calage sur le contenu reel (bbox alpha), pas sur le cadre de l'image :
+        # sinon les chevelures volumineuses sont tranchees par le liseré superieur.
+        bb = scaled.getchannel("A").getbbox() or (0, 0, sw, sh)
         art = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-        art.alpha_composite(scaled, ((W - sw) // 2, BORDER))  # centre X, haut au liseré
+        art.alpha_composite(scaled, ((W - (bb[2] - bb[0])) // 2 - bb[0],
+                                     (BORDER + PLAYER_TOP_MARGIN) - bb[1]))
     bg.alpha_composite(art)
+    # Ombre en pied : la nuque se fond dans le bandeau au lieu d'etre tranchee net
+    bg.alpha_composite(_bottom_shade((W, H), start=0.58, max_a=225))
     bg.putalpha(_poly_mask((W, H), inn))
     card.alpha_composite(bg)
 
@@ -273,15 +324,18 @@ def compose_v2(cutout, nom, club, rarete, poste="", zoom=PLAYER_ZOOM):
     # Seul liseré conserve : le separateur entre la partie haute et le bandeau
     cd.line([(BORDER, BAND_TOP), (W - BORDER, BAND_TOP)], fill=rgb, width=3)
 
-    # Ecusson sur disque blanc, a cheval sur le separateur (bas-gauche)
+    # Ecusson sur disque blanc, a cheval sur le separateur (bas-gauche).
+    # Rien du tout si le club n'a pas de logo : sinon un disque blanc VIDE
+    # (cas du set « Legendes Starligue », qui n'a pas de fichier d'ecusson).
     r = DISC_R
     disc_c = (BORDER + 118, BAND_TOP)
-    disc = Image.new("RGBA", (r * 2 + 8, r * 2 + 8), (0, 0, 0, 0))
-    ImageDraw.Draw(disc).ellipse([4, 4, r * 2 + 3, r * 2 + 3], fill=(248, 249, 250, 255),
-                                 outline=(12, 13, 16, 255), width=4)
-    card.alpha_composite(disc, (disc_c[0] - r - 4, disc_c[1] - r - 4))
     logo_path = os.path.join(LOGOS, slugify(club) + ".png")
-    if os.path.exists(logo_path):
+    has_logo = os.path.exists(logo_path)
+    if has_logo:
+        disc = Image.new("RGBA", (r * 2 + 8, r * 2 + 8), (0, 0, 0, 0))
+        ImageDraw.Draw(disc).ellipse([4, 4, r * 2 + 3, r * 2 + 3], fill=(248, 249, 250, 255),
+                                     outline=(12, 13, 16, 255), width=4)
+        card.alpha_composite(disc, (disc_c[0] - r - 4, disc_c[1] - r - 4))
         ls = LOGO_SIZE
         logo = Image.open(logo_path).convert("RGBA").resize((ls, ls), Image.Resampling.LANCZOS)
         card.alpha_composite(logo, (disc_c[0] - ls // 2, disc_c[1] - ls // 2))
@@ -289,25 +343,40 @@ def compose_v2(cutout, nom, club, rarete, poste="", zoom=PLAYER_ZOOM):
     # Nom (grand) + poste (dessous), alignes a droite, bas-droite
     x_r = W - BORDER - 36
     name = nom.upper()
-    size = 80
-    nf = anton(size)
-    max_w = x_r - (disc_c[0] + r + 28)
-    while cd.textlength(name, font=nf) > max_w and size > 40:
-        size -= 3
-        nf = anton(size)
-    pf = oswald(57, 500)
-    nb = cd.textbbox((0, 0), name, font=nf, anchor="ra")
-    pb = cd.textbbox((0, 0), (poste or "").upper(), font=pf, anchor="ra")
-    nh, ph = nb[3] - nb[1], pb[3] - pb[1]
-    gap = 8
-    bottom_y = H - BORDER - 46
-    if poste:
-        poste_top = bottom_y - ph
-        name_top = poste_top - gap - nh
-        cd.text((x_r, name_top), name, font=nf, fill=(255, 255, 255), anchor="ra")
-        cd.text((x_r, poste_top), poste.upper(), font=pf, fill=lighten(rgb, 0.55), anchor="ra")
+    max_w = x_r - (disc_c[0] + (r if has_logo else 0) + 28)
+    plabel = (poste or "").upper()
+    pf = oswald(POSTE_SIZE, 500)
+
+    # Calage sur les LIGNES DE BASE (ancre "s"), jamais sur la boite d'encre : celle-ci
+    # grandit avec les accents, si bien qu'un nom accentue (RÉMI) remontait de la
+    # hauteur de son accent et une cedille (GONÇALO) de sa descendante — les deux
+    # finissaient reduits sans raison. Avec la ligne de base, tous les noms s'alignent
+    # et seule l'encre reellement plus haute est prise en compte par la garde.
+    poste_baseline = H - POSTE_BASELINE_FROM_BOTTOM
+    if plabel:
+        # Hauteur de capitale mesuree sur un glyphe de REFERENCE et non sur le libelle :
+        # « ARRIÈRE DROIT » a une encre plus haute que « PIVOT » a cause du E accent
+        # grave, ce qui decalerait la ligne de base du nom d'une carte a l'autre.
+        cap = -cd.textbbox((0, 0), "H", font=pf, anchor="rs")[1]
+        name_baseline = poste_baseline - cap - NAME_POSTE_GAP
     else:
-        cd.text((x_r, bottom_y - nh), name, font=nf, fill=(255, 255, 255), anchor="ra")
+        name_baseline = poste_baseline
+
+    # Auto-reduction sur DEUX contraintes : la largeur dispo, et le fait que l'encre
+    # du nom ne vienne pas toucher le separateur de couleur.
+    size = NAME_SIZE
+    while True:
+        nf = anton(size)
+        nb = cd.textbbox((0, 0), name, font=nf, anchor="rs")
+        fits_w = cd.textlength(name, font=nf) <= max_w
+        fits_h = (name_baseline + nb[1]) >= BAND_TOP + TEXT_TOP_CLEARANCE
+        if (fits_w and fits_h) or size <= NAME_MIN_SIZE:
+            break
+        size -= 3
+
+    cd.text((x_r, name_baseline), name, font=nf, fill=(255, 255, 255), anchor="rs")
+    if plabel:
+        cd.text((x_r, poste_baseline), plabel, font=pf, fill=lighten(rgb, 0.55), anchor="rs")
     return card
 
 
