@@ -15,11 +15,15 @@ Duels entre joueurs (Saison 2).
   ✅ Bande Elo DOUCE       -> classé hors bande autorisé, mais K et récompenses réduits
   ✅ Compo préremplie      -> dernière compo jouée (cartes encore possédées), sinon compo auto
   ✅ Narration             -> coup d'envoi → mi-temps → résultat (éditions successives)
+  ✅ Entraînement solo     -> /defi en visant le BOT (testeurs uniquement) : il accepte d'office,
+     joue une équipe synthétique tirée de cards.json (paramètre `difficulte`), et RIEN n'est
+     écrit en base — ni Elo, ni historique, ni ligne `users` pour le bot.
 
-Gating : beta_guard (visible-mais-bloqué jusqu'au 1er août, cf beta.py).
+Gating : beta_guard (visible-mais-bloqué jusqu'au 25 août, cf beta.py).
 """
 import asyncio
 import os
+import random
 from datetime import datetime
 
 import discord
@@ -29,7 +33,7 @@ from discord.ext import commands
 
 import database
 import duel_engine as E
-from beta import beta_guard, BetaLocked
+from beta import beta_guard, BetaLocked, is_tester
 from cogs.collection_cog import load_cards_data, RARITY_EMOJI
 
 PARIS = pytz.timezone("Europe/Paris")
@@ -39,6 +43,11 @@ DUEL_ELO_BAND = int(os.getenv("DUEL_ELO_BAND", str(E.ELO_BAND)))   # au-delà : 
 DUEL_SOFT_K = int(os.getenv("DUEL_SOFT_K", str(E.ELO_K_SOFT)))     # K réduit hors bande
 DAILY_PAIR_CAP = int(os.getenv("DUEL_DAILY_PAIR_CAP", "3"))        # duels classés/jour entre 2 mêmes joueurs
 DAILY_REWARD_CAP = int(os.getenv("DUEL_DAILY_REWARD_CAP", "10"))   # duels récompensés/jour/joueur
+
+# --- Entraînement solo : /defi en visant le bot (testeurs uniquement, cf beta.is_tester).
+# Le bot n'est pas un joueur : son équipe est synthétique et RIEN n'est écrit en base.
+SPAR_RARITIES = ["Commun", "Peu Commun", "Rare", "Épique", "Légendaire"]
+SPAR_DEFAULT_RARITY = "Rare"
 
 # Verrou : un joueur ne peut être que dans un duel à la fois.
 ACTIVE_DUELISTS = set()
@@ -125,10 +134,11 @@ class DuelSession:
     """État partagé d'un duel pendant la phase de composition.
     lineup_x : dict {slot: card_dict | None}. ready_x : bool."""
 
-    def __init__(self, challenger, opponent, ranked, lineup_c=None, lineup_o=None):
+    def __init__(self, challenger, opponent, ranked, lineup_c=None, lineup_o=None, sparring=False):
         self.challenger = challenger      # discord.Member
         self.opponent = opponent          # discord.Member
         self.ranked = ranked
+        self.sparring = sparring          # adversaire = le bot : aucune lecture/écriture en base
         self.lineup_c = lineup_c if lineup_c is not None else {s: None for s in E.SLOTS}
         self.lineup_o = lineup_o if lineup_o is not None else {s: None for s in E.SLOTS}
         self.ready_c = False
@@ -348,16 +358,24 @@ class DuelLineupView(discord.ui.View):
 
     def build_embed(self):
         s = self.s
-        e = discord.Embed(
-            title="⚔️ Composez vos équipes",
-            description="Vos équipes sont **préremplies** (dernière compo jouée, sinon compo auto).\n"
-                        "Cliquez **Prêt** pour la valider telle quelle, ou **Composer mon équipe** "
-                        "pour l'ajuster dans un menu privé.\n"
-                        "Le match se lance dès que les deux joueurs sont prêts.",
-            color=discord.Color.blurple())
+        if s.sparring:
+            title = "🤖 Entraînement"
+            desc = ("L'équipe du bot est déjà prête.\n"
+                    "Clique **Prêt** pour valider ta compo préremplie, ou **Composer mon équipe** "
+                    "pour l'ajuster dans un menu privé.\n"
+                    "Le match se lance dès que tu es prêt.")
+            mode = "🤖 Entraînement — rien n'est enregistré"
+        else:
+            title = "⚔️ Composez vos équipes"
+            desc = ("Vos équipes sont **préremplies** (dernière compo jouée, sinon compo auto).\n"
+                    "Cliquez **Prêt** pour la valider telle quelle, ou **Composer mon équipe** "
+                    "pour l'ajuster dans un menu privé.\n"
+                    "Le match se lance dès que les deux joueurs sont prêts.")
+            mode = f"Mode : {'🏆 Classé' if s.ranked else '🤝 Amical'}"
+        e = discord.Embed(title=title, description=desc, color=discord.Color.blurple())
         e.add_field(name=s.challenger.display_name, value=self._status("c"), inline=True)
         e.add_field(name=s.opponent.display_name, value=self._status("o"), inline=True)
-        e.set_footer(text=f"Mode : {'🏆 Classé' if s.ranked else '🤝 Amical'}")
+        e.set_footer(text=mode)
         return e
 
     def _cleanup(self):
@@ -482,6 +500,25 @@ class DuelCog(commands.Cog):
                 used.add(best_key)
         return lineup
 
+    def sparring_lineup(self, rarete):
+        """Équipe synthétique du bot pour un entraînement : une carte de `rarete`
+        par poste, à son poste naturel quand le pool le permet (donc bonus ×1.4).
+        Les cartes sortent de cards.json, pas d'une collection : rien en base."""
+        pool = [c for c in self.all_cards if c.get("rarete") == rarete]
+        lineup = {s: None for s in E.SLOTS}
+        used = set()
+        for slot in E.SLOTS:
+            # d'abord une carte dont c'est le poste naturel, sinon n'importe laquelle
+            for natural in (True, False):
+                picks = [c for c in pool if id(c) not in used
+                         and (E.normalize_poste(c.get("poste")) == slot) == natural]
+                if picks:
+                    card = random.choice(picks)
+                    lineup[slot] = card
+                    used.add(id(card))
+                    break
+        return lineup
+
     def initial_lineup(self, user_id):
         """Compo préremplie : dernière compo jouée (cartes encore possédées), sinon compo auto."""
         last = database.get_last_duel_lineup(user_id) or {}
@@ -510,21 +547,42 @@ class DuelCog(commands.Cog):
         return best
 
     @app_commands.command(name="defi", description="Défier un autre joueur en duel de cartes.")
-    @app_commands.describe(membre="Le joueur à défier", amical="Match amical (sans Elo ni récompense)")
+    @app_commands.describe(membre="Le joueur à défier (les testeurs peuvent viser le bot pour s'entraîner)",
+                           amical="Match amical (sans Elo ni récompense)",
+                           difficulte="Entraînement contre le bot : rareté de son équipe")
+    @app_commands.choices(difficulte=[app_commands.Choice(name=r, value=r) for r in SPAR_RARITIES])
     @beta_guard()
-    async def defi(self, interaction: discord.Interaction, membre: discord.Member, amical: bool = False):
+    async def defi(self, interaction: discord.Interaction, membre: discord.Member,
+                   amical: bool = False, difficulte: app_commands.Choice[str] = None):
         challenger, opponent = interaction.user, membre
-        if opponent.bot:
+        # Viser le bot lance un ENTRAÎNEMENT solo, réservé aux testeurs : le bot
+        # accepte d'office, joue une équipe synthétique, et rien n'est enregistré.
+        sparring = opponent.id == self.bot.user.id and is_tester(challenger.id)
+        if opponent.bot and not sparring:
             return await interaction.response.send_message("Tu ne peux pas défier un bot.", ephemeral=True)
         if opponent.id == challenger.id:
             return await interaction.response.send_message("Tu ne peux pas te défier toi-même.", ephemeral=True)
-        if challenger.id in ACTIVE_DUELISTS or opponent.id in ACTIVE_DUELISTS:
+        if challenger.id in ACTIVE_DUELISTS or (not sparring and opponent.id in ACTIVE_DUELISTS):
             return await interaction.response.send_message("Un des deux joueurs a déjà un duel en cours.", ephemeral=True)
 
         # Faut-il au moins quelques cartes jouables ?
         if not any(self.get_card(c) and self.get_card(c).get("rarete") != "Noël"
                    for c in database.get_user_collection(challenger.id)):
             return await interaction.response.send_message("Tu n'as pas encore de cartes jouables.", ephemeral=True)
+
+        if sparring:
+            # Pas de phase de défi : on entre directement en composition, côté bot déjà prêt.
+            rarete = difficulte.value if difficulte else SPAR_DEFAULT_RARITY
+            session = DuelSession(challenger, opponent, ranked=False,
+                                  lineup_c=self.initial_lineup(challenger.id),
+                                  lineup_o=self.sparring_lineup(rarete),
+                                  sparring=True)
+            session.ready_o = True
+            ACTIVE_DUELISTS.add(challenger.id)   # seul le joueur est verrouillé
+            view = DuelLineupView(self, session)
+            await interaction.response.send_message(embed=view.build_embed(), view=view)
+            view.message = await interaction.original_response()
+            return
 
         ranked = not amical
         soft_note = ""
@@ -565,7 +623,7 @@ class DuelCog(commands.Cog):
 
             s_c, s_o, half, overtime = E.simulate_match(pow_c, pow_o, allow_draw=False)
             winner = c.id if s_c > s_o else o.id if s_o > s_c else None
-            mode = "🏆 Classé" if s.ranked else "🤝 Amical"
+            mode = "🤖 Entraînement" if s.sparring else ("🏆 Classé" if s.ranked else "🤝 Amical")
 
             # --- Narration : coup d'envoi → mi-temps → résultat ---
             kick = discord.Embed(
@@ -585,7 +643,12 @@ class DuelCog(commands.Cog):
             await view.message.edit(embed=ht, view=view)
             await asyncio.sleep(2.5)
 
-            elo_c0, elo_o0 = database.get_user_elo(c.id), database.get_user_elo(o.id)
+            if s.sparring:
+                # Entraînement : on ne touche pas à la base (get_user_elo créerait
+                # une ligne `users` pour le bot via check_user()).
+                elo_c0 = elo_o0 = E.ELO_START
+            else:
+                elo_c0, elo_o0 = database.get_user_elo(c.id), database.get_user_elo(o.id)
             elo_c1, elo_o1 = elo_c0, elo_o0
             reward_line = ""
             soft = False
@@ -600,9 +663,10 @@ class DuelCog(commands.Cog):
                 database.set_user_elo(o.id, elo_o1)
                 reward_line = self._apply_rewards(c, o, winner, elo_c0, elo_o0, soft)
 
-            database.record_duel(c.id, o.id, s_c, s_o, winner, s.ranked,
-                                 elo_c0, elo_o0, elo_c1, elo_o1,
-                                 self._lineup_card_ids(lu_c), self._lineup_card_ids(lu_o))
+            if not s.sparring:
+                database.record_duel(c.id, o.id, s_c, s_o, winner, s.ranked,
+                                     elo_c0, elo_o0, elo_c1, elo_o1,
+                                     self._lineup_card_ids(lu_c), self._lineup_card_ids(lu_o))
 
             # --- Embed résultat ---
             ms = " (mort subite)" if overtime else ""
@@ -628,7 +692,8 @@ class DuelCog(commands.Cog):
                 if reward_line:
                     e.add_field(name="🎁 Récompenses", value=reward_line, inline=False)
             else:
-                e.set_footer(text="Match amical — aucun impact sur l'Elo.")
+                e.set_footer(text="🤖 Entraînement — rien n'est enregistré (ni Elo, ni historique)."
+                                  if s.sparring else "Match amical — aucun impact sur l'Elo.")
             await view.message.edit(embed=e, view=view)
             view.stop()
         finally:

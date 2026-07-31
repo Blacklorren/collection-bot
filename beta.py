@@ -8,7 +8,7 @@ Tant qu'on est AVANT la date d'ouverture publique :
 sans aucune intervention.
 
 Les IDs et la date sont surchargeables via le .env :
-  PUBLIC_LAUNCH=2026-08-01
+  PUBLIC_LAUNCH=2026-08-25
   BETA_TESTER_IDS=133711821214449665,autre_id
   BETA_CHANNEL_ID=441230079100715008
 """
@@ -27,7 +27,7 @@ def _parse_launch(raw):
             return PARIS.localize(datetime.strptime(raw.strip(), "%Y-%m-%d"))
         except ValueError:
             pass
-    return PARIS.localize(datetime(2026, 8, 1, 0, 0, 0))
+    return PARIS.localize(datetime(2026, 8, 25, 0, 0, 0))
 
 
 def _parse_ids(raw, default):
@@ -55,6 +55,13 @@ def is_live(now=None):
     """True si la date d'ouverture publique est atteinte."""
     now = now or datetime.now(PARIS)
     return now >= PUBLIC_LAUNCH
+
+
+def is_tester(user_id):
+    """True si l'utilisateur est un testeur déclaré, indépendamment de la date.
+    Sert aux outils réservés au test (ex. l'entraînement contre le bot), qui
+    restent fermés au public même après l'ouverture."""
+    return user_id in BETA_TESTER_IDS
 
 
 def beta_access(interaction):

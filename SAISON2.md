@@ -1,7 +1,7 @@
 # Saison 2 — Échanges, Recyclage sélectif & Duels
 
 Document de reprise. Tout est **bêta-gaté** (testable par l'admin dans le salon de
-test, ouverture publique automatique le **1er août 2026**). Voir `beta.py`.
+test, ouverture publique automatique le **25 août 2026**). Voir `beta.py`.
 
 ---
 
@@ -117,6 +117,29 @@ Implémenté dans `cogs/duel_cog.py` (pattern repris de `TradePicker`).
 5. `/classement_duel` et `/historique_duel`.
 6. Hors testeurs / hors salon → message « arrive la saison prochaine ».
 
+### Tester SEUL (sans second compte)
+
+`/defi` en visant **le bot lui-même** lance un **entraînement** : il accepte d'office,
+son équipe est déjà prête, et le match part dès que tu cliques « Prêt ». Réservé aux
+`BETA_TESTER_IDS` (`beta.is_tester`, indépendant de la date : reste fermé au public
+après le 25 août). Le paramètre `difficulte` fixe la rareté de son équipe :
+
+| `difficulte` | Puissance moyenne du bot |
+|---|---|
+| Commun | ~31 |
+| Peu Commun | ~51 |
+| Rare *(défaut)* | ~83 |
+| Épique | ~123 |
+| Légendaire | ~161 |
+
+Couvre : picker de composition, compo préremplie, « Compo automatique », narration
+mi-temps, embed de résultat, MVP, annulation avec picker ouvert. **Aucune écriture en
+base** (pas d'Elo, pas d'historique, pas de ligne `users` pour le bot).
+
+Ne couvre **pas** (il faut un second compte) : accepter/refuser un défi, la
+synchronisation « les deux joueurs prêts », le classé (Elo, bande douce, récompenses,
+plafonds anti-farm) et tout `/echange`.
+
 Tests logiques hors-ligne (sans Discord) :
 `py -3 tools/test_duel_balance.py` (équilibrage + Elo).
 
@@ -125,12 +148,12 @@ Tests logiques hors-ligne (sans Discord) :
 ## 5. Mise en production / config
 
 - **`.env`** (valeurs par défaut déjà câblées sur l'admin) :
-  `PUBLIC_LAUNCH=2026-08-01`, `BETA_TESTER_IDS=133711821214449665`,
+  `PUBLIC_LAUNCH=2026-08-25`, `BETA_TESTER_IDS=133711821214449665`,
   `BETA_CHANNEL_ID=441230079100715008`, et options
   `DUEL_ELO_BAND`, `DUEL_SOFT_K`, `DUEL_DAILY_PAIR_CAP`, `DUEL_DAILY_REWARD_CAP`.
 - **Postes** : déjà dans `cards.json` (rien à faire ; l'outil xlsx reste dispo au cas où).
 - **Dépendance dev uniquement** : `openpyxl` (scripts `tools/`, pas le runtime).
-- Le **1er août**, tout s'ouvre au public automatiquement (aucune manip).
+- Le **25 août**, tout s'ouvre au public automatiquement (aucune manip).
 
 ### Bug latent — ✅ traité
 Le `datetime.datetime.now()` signalé dans `database.get_journees_for_rappel`
