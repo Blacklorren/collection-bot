@@ -7,6 +7,7 @@ Expose :
 - compose(portrait, nom, club, rarete) -> PIL.Image          (ancien layout v1, conserve)
 - get_card_bytes(card, session=None) -> bytes | None          (cutout/portrait + rend + cache disque)
 """
+import asyncio
 import io
 import math
 import os
@@ -19,7 +20,13 @@ ROOT = os.path.dirname(HERE)
 FONTS = os.path.join(ROOT, "assets", "fonts")
 LOGOS = os.path.join(ROOT, "assets", "logos")
 CUTOUTS = os.path.join(ROOT, "assets", "cutouts")
-CACHE_DIR = os.path.join(ROOT, "assets", "card_cache")
+
+# Cache sur le volume persistant si dispo : sinon il est vide a chaque deploiement
+# et on repaie ~350 ms de rendu par carte.
+_DATA_DIR = "/data"
+CACHE_DIR = (os.path.join(_DATA_DIR, "card_cache")
+             if os.path.isdir(_DATA_DIR)
+             else os.path.join(ROOT, "assets", "card_cache"))
 
 # Incrementer pour invalider le cache disque quand le design change
 DESIGN_VERSION = "v5"
@@ -315,6 +322,15 @@ def _cache_path(card_id):
     return os.path.join(CACHE_DIR, f"{DESIGN_VERSION}_{card_id}.png")
 
 
+def _read_cache(path):
+    """Lit le PNG en cache, ou None. Synchrone : appele via asyncio.to_thread."""
+    try:
+        with open(path, "rb") as f:
+            return f.read()
+    except OSError:
+        return None
+
+
 async def _fetch_portrait(session, url):
     headers = {"User-Agent": "Mozilla/5.0"}
     try:
@@ -342,13 +358,18 @@ async def get_card_bytes(card, session=None):
 
     Utilise le portrait detoure `assets/cutouts/<id>.webp` s'il existe ; sinon retombe
     sur le portrait brut telecharge (plein cadre). `session` : aiohttp.ClientSession
-    optionnelle (ouverte a la volee au besoin). Retourne None si aucune image dispo."""
-    path = _cache_path(card["id"])
-    if os.path.exists(path):
-        with open(path, "rb") as f:
-            return f.read()
+    optionnelle (ouverte a la volee au besoin). Retourne None si aucune image dispo.
 
-    art = _load_cutout(card["id"])
+    Tout le travail PIL (~350 ms par carte) et les I/O disque partent dans un thread :
+    sinon ils bloquent l'event loop et le bot ne repond plus a personne pendant
+    l'ouverture d'un lot de packs.
+    """
+    path = _cache_path(card["id"])
+    cached = await asyncio.to_thread(_read_cache, path)
+    if cached is not None:
+        return cached
+
+    art = await asyncio.to_thread(_load_cutout, card["id"])
     is_cutout = art is not None
     if art is None:
         # Fallback : pas de cutout -> portrait brut
@@ -366,6 +387,11 @@ async def get_card_bytes(card, session=None):
 
     # Detoure -> dezoom design ; portrait brut -> plein cadre (evite l'effet "flottant")
     zoom = PLAYER_ZOOM if is_cutout else 1.0
+    return await asyncio.to_thread(_render_and_cache, art, card, zoom, path)
+
+
+def _render_and_cache(art, card, zoom, path):
+    """Rendu + ecriture du cache. Synchrone : appele via asyncio.to_thread."""
     img = compose_v2(art, card["nom"], card["club"], card["rarete"], card.get("poste", ""), zoom=zoom)
     buf = io.BytesIO()
     img.convert("RGB").save(buf, format="PNG")
