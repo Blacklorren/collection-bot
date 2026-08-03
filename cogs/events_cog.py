@@ -604,12 +604,21 @@ class EventsCog(commands.Cog):
             try:
                 res = await self.get_match_result(match['event_id'])
                 if res:
-                    database.update_match_result(match['id'], res, res)
-                    if pronos_cog and match['discord_event_id']: pronos_cog.process_match_result(match['id'], res)
-                    await self.update_discord_event_with_result(match['discord_event_id'], match['equipe1'], match['equipe2'], res)
+                    # Les points d'abord : process_match_result enregistre le résultat
+                    # ET crédite les pronostiqueurs. L'appeler AVANT update_match_result
+                    # évite de marquer le match comme traité sans avoir payé personne.
+                    if pronos_cog:
+                        pronos_cog.process_match_result(match['id'], res)
+                    else:
+                        database.update_match_result(match['id'], res, res)
+
+                    await self.update_discord_event_with_result(
+                        match['discord_event_id'], match['equipe1'], match['equipe2'], res
+                    )
                     count += 1
                     await asyncio.sleep(5)
-            except Exception: pass
+            except Exception as e:
+                print(f"❌ (RESULTATS) Match {match.get('id')} : {type(e).__name__} : {e}")
         return count
 
     @tasks.loop(seconds=RESULTS_CHECK_INTERVAL)
