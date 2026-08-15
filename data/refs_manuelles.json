@@ -1,0 +1,8 @@
+{
+  "baradat-alexandre": "https://www.cesson-handball.com/storage/cache/99deb4a998a39929ca329fe463c42cda.png",
+  "claude-dimitri": {
+    "url": "https://www.teamchambe.com/wp-content/uploads/2025/11/Dimitri-signature-16-scaled.jpg",
+    "crop": [330, 40, 960, 820],
+    "note": "photo de signature, il n'est pas seul dessus -> recadrage sur lui. Il porte un t-shirt d'entrainement gris et non le maillot du club : le rendu risque de reprendre cette tenue. A remplacer des que la LNH publie le portrait officiel de Chambery (ce repli s'efface tout seul a ce moment-la)."
+  }
+}

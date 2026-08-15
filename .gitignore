@@ -17,6 +17,13 @@ assets/card_cache/
 # Prototypes jetables
 proto_out/
 
+# Prompts Midjourney générés (régénérables depuis data/roster_s2.json)
+out/
+
+# NB: refs/ (portraits officiels LNH, récupérés par tools/fetch_lnh_s2.py) est
+# VERSIONNÉ volontairement : Midjourney lit les --oref par URL publique, et le
+# raw GitHub du repo sert d'hébergement.
+
 # Fichiers cache et compilés de Python
 __pycache__/
 *.pyc

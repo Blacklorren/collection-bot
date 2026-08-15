@@ -1,0 +1,33 @@
+{
+  "_doc": "Joueurs a inclure dans la S2 qui ne sont pas dans l'onglet Starligue27 du xlsx. Fusionnes par tools/build_manifest_s2.py, donc ils survivent a un rebuild. 'ignores' documente les joueurs vus dans l'effectif LNH mais volontairement ecartes, pour ne pas avoir a re-trancher a chaque comparaison.",
+  "ajouts": [
+    {
+      "nom_famille": "ILIC",
+      "prenom": "Vanja",
+      "club": "Aix",
+      "rarete": "Rare",
+      "note": "transfere de Chartres a Aix pendant l'intersaison"
+    },
+    {
+      "nom_famille": "BZDYNGA",
+      "prenom": "Antoine",
+      "club": "Caen",
+      "rarete": "Commun"
+    },
+    {
+      "nom_famille": "VEDIE-MARCONNES",
+      "prenom": "Samuel",
+      "club": "Caen",
+      "rarete": "Commun"
+    },
+    {
+      "nom_famille": "ZAJA",
+      "prenom": "Josip",
+      "club": "Chambéry",
+      "rarete": "Commun"
+    }
+  ],
+  "ignores": {
+    "causse-theophile": "Theophile CAUSSE : encore liste par la LNH a Cesson-Rennes mais ne fait plus partie de l'equipe."
+  }
+}
