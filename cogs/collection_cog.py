@@ -388,14 +388,21 @@ class CollectionCog(commands.Cog):
     @app_commands.describe(nombre="Combien de packs ouvrir d'un coup (défaut : 1).")
     async def open_command(self, interaction: discord.Interaction, nombre: int = 1):
         uid = interaction.user.id
-        packs_owned = dict(database.get_user_data(uid))['packs']
+        packs_owned = database.get_packs(uid)
 
         if packs_owned <= 0:
             return await interaction.response.send_message("❌ Tu n'as pas de pack. Fais `/pack`.", ephemeral=True)
 
         count = max(1, min(nombre, packs_owned, MAX_BULK_OPEN))
         await interaction.response.defer(ephemeral=True)
-        database.remove_pack(uid, count)
+
+        # Débit ATOMIQUE : le solde lu plus haut peut déjà être périmé (le defer
+        # rend la main à l'event loop). Si un autre clic est passé entre-temps,
+        # consume_packs renvoie False et on n'ouvre rien.
+        if not database.consume_packs(uid, count):
+            return await interaction.followup.send(
+                "❌ Solde insuffisant (packs déjà ouverts ailleurs ?).", ephemeral=True
+            )
 
         msg = await interaction.followup.send(
             embed=discord.Embed(title="🎴 Préparation du pack…", color=discord.Color.dark_theme()),
@@ -417,14 +424,18 @@ class CollectionCog(commands.Cog):
     async def _run_button_open(self, interaction: discord.Interaction, view: "PackOpenView", requested: int):
         """Ouverture déclenchée par un bouton : ré-édite le message d'origine."""
         uid = interaction.user.id
-        packs_owned = dict(database.get_user_data(uid))['packs']
+        packs_owned = database.get_packs(uid)
         if packs_owned <= 0:
             view.refresh(0)
             return await interaction.response.edit_message(view=view)
 
         count = max(1, min(requested, packs_owned, MAX_BULK_OPEN))
         await interaction.response.defer()
-        database.remove_pack(uid, count)
+
+        # Débit ATOMIQUE : protège du double-clic sur le bouton.
+        if not database.consume_packs(uid, count):
+            view.refresh(database.get_packs(uid))
+            return await interaction.edit_original_response(view=view)
 
         async def edit(embed, file=None):
             await interaction.edit_original_response(embed=embed, attachments=[file] if file else [])

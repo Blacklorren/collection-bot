@@ -1,5 +1,6 @@
 import sqlite3
 import os
+import contextlib
 from datetime import datetime, date, timedelta, timezone
 from typing import List, Tuple, Dict, Any
 
@@ -10,13 +11,43 @@ DATA_DIR = '/data'
 DB_NAME = os.path.join(DATA_DIR, 'collection.db')
 # La valeur de DB_NAME est maintenant '/data/collection.db'
 
+# Attente max avant de lever "database is locked" (ms côté SQLite / s côté driver)
+BUSY_TIMEOUT_MS = 10000
+
+
+@contextlib.contextmanager
+def _connect():
+    """Connexion SQLite avec commit/rollback ET fermeture garantis.
+
+    ⚠️ `with sqlite3.connect(...)` ne ferme PAS la connexion (il ne fait que
+    commit/rollback), ce qui faisait fuir un descripteur de fichier à chaque appel.
+    On passe aussi un busy_timeout pour ne pas exploser en "database is locked"
+    quand les boucles de fond et les interactions Discord se croisent.
+    """
+    con = sqlite3.connect(DB_NAME, timeout=BUSY_TIMEOUT_MS / 1000)
+    try:
+        con.execute(f"PRAGMA busy_timeout = {BUSY_TIMEOUT_MS}")
+        yield con
+        con.commit()
+    except Exception:
+        con.rollback()
+        raise
+    finally:
+        con.close()
+
+
 def initialize_database():
     """Crée les tables de la base de données si elles n'existent pas."""
     # S'assurer que le dossier /data existe (au cas où)
     os.makedirs(DATA_DIR, exist_ok=True)
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         cur = con.cursor()
-        
+
+        # WAL : lectures concurrentes pendant une écriture. Réglage persistant,
+        # stocké dans le fichier .db, donc à poser une seule fois.
+        cur.execute("PRAGMA journal_mode = WAL")
+        cur.execute("PRAGMA synchronous = NORMAL")
+
         # Tables existantes pour le jeu de cartes
         cur.execute('''
             CREATE TABLE IF NOT EXISTS users (
@@ -180,7 +211,7 @@ def get_week_dates(for_date):
 
 def get_matches_in_date_range(start_date, end_date):
     """Récupère tous les matchs dans un intervalle de dates donné."""
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         con.row_factory = sqlite3.Row
         cur = con.cursor()
         # On s'assure que la date de fin inclut toute la journée
@@ -208,7 +239,7 @@ def get_leaderboard_for_matches(match_ids):
         GROUP BY p.user_id
         ORDER BY total_points DESC, bons_pronos DESC;
     """
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         con.row_factory = sqlite3.Row
         cur = con.cursor()
         cur.execute(query, match_ids)
@@ -222,7 +253,7 @@ def wipe_all_user_data():
     """
     print("⚠️  [DATABASE] Lancement de la procédure de remise à zéro des données...")
     try:
-        with sqlite3.connect(DB_NAME) as con:
+        with _connect() as con:
             cur = con.cursor()
 
             # Récupérer la liste de toutes les tables existantes pour éviter les erreurs
@@ -261,26 +292,32 @@ def wipe_all_user_data():
         print(f"❌  [DATABASE] Une erreur est survenue lors de la remise à zéro : {e}")
         return False # Indiquer que l'opération a échoué
 
-def check_user(user_id):
-    """Vérifie si un utilisateur existe dans la DB, sinon le crée."""
-    with sqlite3.connect(DB_NAME) as con:
-        cur = con.cursor()
-        cur.execute("SELECT user_id FROM users WHERE user_id = ?", (user_id,))
-        if cur.fetchone() is None:
-            cur.execute("INSERT INTO users (user_id, points, packs) VALUES (?, 100, 1)", (user_id,))
-            con.commit()
+def check_user(user_id, con=None):
+    """Crée l'utilisateur s'il n'existe pas (INSERT OR IGNORE : 1 requête au lieu de 2).
+
+    `con` permet de réutiliser une connexion existante et d'éviter d'en ouvrir
+    une seconde — utile dans les chemins chauds comme on_message.
+    """
+    sql = "INSERT OR IGNORE INTO users (user_id, points, packs) VALUES (?, 100, 1)"
+    if con is not None:
+        con.execute(sql, (user_id,))
+        return
+    with _connect() as c:
+        c.execute(sql, (user_id,))
 
 def set_onboarding_received(user_id):
     """Marque un utilisateur comme ayant reçu le message d'accueil."""
     check_user(user_id)
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         cur = con.cursor()
         cur.execute("UPDATE users SET has_received_onboarding = 1 WHERE user_id = ?", (user_id,))
         con.commit()
 
 def get_user_data(user_id):
-    check_user(user_id)
-    with sqlite3.connect(DB_NAME) as con:
+    # Une seule connexion pour la création + la lecture : get_user_data est appelée
+    # sur CHAQUE message du serveur via on_message.
+    with _connect() as con:
+        check_user(user_id, con)
         con.row_factory = sqlite3.Row
         cur = con.cursor()
         cur.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
@@ -288,7 +325,7 @@ def get_user_data(user_id):
 
 def update_points(user_id, amount):
     check_user(user_id)
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         cur = con.cursor()
         cur.execute("UPDATE users SET points = points + ? WHERE user_id = ?", (amount, user_id))
         con.commit()
@@ -296,7 +333,7 @@ def update_points(user_id, amount):
 def update_fragments(user_id, amount):
     """Ajoute ou retire des fragments à un utilisateur."""
     check_user(user_id)
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         cur = con.cursor()
         cur.execute("UPDATE users SET fragments = fragments + ? WHERE user_id = ?", (amount, user_id))
         con.commit()
@@ -307,7 +344,7 @@ def update_on_message_activity(user_id, points_to_add, current_iso_time):
     Version corrigée qui accepte le timestamp en argument.
     """
     check_user(user_id)
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         cur = con.cursor()
         cur.execute("""
             UPDATE users 
@@ -325,7 +362,7 @@ def reset_daily_and_add_first_bonus(user_id, bonus_points, message_points, curre
     Version corrigée qui accepte le timestamp en argument.
     """
     check_user(user_id)
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         cur = con.cursor()
         # On extrait la date de la chaîne de caractères ISO (ex: '2025-08-15')
         today_date = current_iso_time.split('T')[0]
@@ -343,28 +380,60 @@ def reset_daily_and_add_first_bonus(user_id, bonus_points, message_points, curre
 
 def add_pack(user_id, amount=1):
     check_user(user_id)
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         cur = con.cursor()
         cur.execute("UPDATE users SET packs = packs + ? WHERE user_id = ?", (amount, user_id))
         con.commit()
 
 def remove_pack(user_id, amount=1):
+    """⚠️ Décrémente sans vérifier le solde : le total peut devenir négatif.
+    Pour toute dépense déclenchée par un utilisateur, utiliser consume_packs()."""
     check_user(user_id)
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         cur = con.cursor()
-        cur.execute("UPDATE users SET packs = packs - ? WHERE user_id = ?", (amount, user_id))
+        cur.execute("UPDATE users SET packs = MAX(0, packs - ?) WHERE user_id = ?", (amount, user_id))
         con.commit()
-        
+
+
+def consume_packs(user_id, amount=1):
+    """Dépense ATOMIQUE de packs. Renvoie True si le solde a bien été débité.
+
+    Le UPDATE conditionnel fait office de verrou : deux clics simultanés sur le
+    bouton d'ouverture ne peuvent plus débiter deux fois le même pack (rowcount
+    vaut 0 pour le second).
+    """
+    if amount <= 0:
+        return False
+    check_user(user_id)
+    with _connect() as con:
+        cur = con.cursor()
+        cur.execute(
+            "UPDATE users SET packs = packs - ? WHERE user_id = ? AND packs >= ?",
+            (amount, user_id, amount)
+        )
+        con.commit()
+        return cur.rowcount > 0
+
+
+def get_packs(user_id):
+    """Solde de packs uniquement (évite un SELECT * sur toute la ligne users)."""
+    check_user(user_id)
+    with _connect() as con:
+        cur = con.cursor()
+        row = cur.execute("SELECT packs FROM users WHERE user_id = ?", (user_id,)).fetchone()
+        return row[0] if row else 0
+
+
 def add_card_to_collection(user_id, card_id):
     check_user(user_id)
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         cur = con.cursor()
         cur.execute("INSERT INTO user_cards (user_id, card_id) VALUES (?, ?)", (user_id, card_id))
         con.commit()
 
 def get_user_collection(user_id):
     check_user(user_id)
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         cur = con.cursor()
         cur.execute("SELECT card_id FROM user_cards WHERE user_id = ?", (user_id,))
         return [item[0] for item in cur.fetchall()]
@@ -372,7 +441,7 @@ def get_user_collection(user_id):
 def reset_and_set_collection(user_id, unique_card_ids):
     """Supprime la collection actuelle et la remplace par une nouvelle liste d'IDs (pour le recyclage)."""
     check_user(user_id)
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         cur = con.cursor()
         cur.execute("DELETE FROM user_cards WHERE user_id = ?", (user_id,))
         if unique_card_ids:
@@ -386,7 +455,7 @@ def get_leaderboard_data(valid_card_ids=None, limit=10):
     valid_card_ids: Liste d'IDs de cartes valides pour ne compter que celles-ci.
     limit: Nombre maximum de résultats.
     """
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         cur = con.cursor()
         
         query = """
@@ -415,7 +484,7 @@ def get_leaderboard_data(valid_card_ids=None, limit=10):
 
 def create_or_update_journee(numero, date_debut, date_fin):
     """Crée ou met à jour une journée."""
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         cur = con.cursor()
         # Vérifier si la journée existe déjà
         cur.execute("SELECT id FROM journees WHERE numero = ?", (numero,))
@@ -440,7 +509,7 @@ def create_or_update_journee(numero, date_debut, date_fin):
 
 def get_active_journee():
     """Récupère la journée active."""
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         con.row_factory = sqlite3.Row
         cur = con.cursor()
         cur.execute("""
@@ -453,7 +522,7 @@ def get_active_journee():
 
 def create_match(journee_id, event_id, discord_event_id, equipe1, equipe2, date_match, competition=None):
     """Crée un match dans la base de données."""
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         cur = con.cursor()
         cur.execute("""
             INSERT OR IGNORE INTO matchs 
@@ -465,7 +534,7 @@ def create_match(journee_id, event_id, discord_event_id, equipe1, equipe2, date_
 
 def get_match_by_event_id(event_id):
     """Récupère un match par son event_id Livescore."""
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         con.row_factory = sqlite3.Row
         cur = con.cursor()
         cur.execute("SELECT * FROM matchs WHERE event_id = ?", (event_id,))
@@ -473,7 +542,7 @@ def get_match_by_event_id(event_id):
 
 def get_match_by_id(match_id):
     """Récupère un match par son ID."""
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         con.row_factory = sqlite3.Row
         cur = con.cursor()
         cur.execute("SELECT * FROM matchs WHERE id = ?", (match_id,))
@@ -481,7 +550,7 @@ def get_match_by_id(match_id):
 
 def update_match_result(match_id, resultat, score):
     """Met à jour le résultat d'un match."""
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         cur = con.cursor()
         cur.execute("""
             UPDATE matchs 
@@ -492,14 +561,14 @@ def update_match_result(match_id, resultat, score):
 
 def update_match_competition(match_id, competition):
     """Met à jour la compétition d'un match (pour la migration)."""
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         cur = con.cursor()
         cur.execute("UPDATE matchs SET competition = ? WHERE id = ?", (competition, match_id))
         con.commit()
 
 def save_prono_message(match_id, message_id, channel_id):
     """Sauvegarde l'ID du message de pronostic."""
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         cur = con.cursor()
         cur.execute("""
             INSERT OR REPLACE INTO prono_messages 
@@ -510,7 +579,7 @@ def save_prono_message(match_id, message_id, channel_id):
 
 def get_prono_message(match_id):
     """Récupère les infos du message de pronostic."""
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         con.row_factory = sqlite3.Row
         cur = con.cursor()
         cur.execute("SELECT * FROM prono_messages WHERE match_id = ?", (match_id,))
@@ -519,7 +588,7 @@ def get_prono_message(match_id):
 def save_or_update_pronostic(user_id, match_id, pronostic):
     """Sauvegarde ou met à jour un pronostic."""
     check_user(user_id)
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         cur = con.cursor()
         # Vérifier si le pronostic existe déjà
         cur.execute("""
@@ -545,7 +614,7 @@ def save_or_update_pronostic(user_id, match_id, pronostic):
 
 def get_user_pronostic(user_id, match_id):
     """Récupère le pronostic d'un utilisateur pour un match."""
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         con.row_factory = sqlite3.Row
         cur = con.cursor()
         cur.execute("""
@@ -556,7 +625,7 @@ def get_user_pronostic(user_id, match_id):
 
 def get_match_pronostics(match_id):
     """Récupère tous les pronostics pour un match."""
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         cur = con.cursor()
         cur.execute("""
             SELECT user_id, pronostic FROM pronostics 
@@ -565,31 +634,37 @@ def get_match_pronostics(match_id):
         return cur.fetchall()
 
 def attribute_points_for_match(match_id, resultat, points_par_bon_prono=50):
-    """Attribue les points aux bons pronostiqueurs."""
-    with sqlite3.connect(DB_NAME) as con:
+    """Attribue les points aux bons pronostiqueurs. IDEMPOTENT.
+
+    Le garde-fou `points_gagnes = 0` évite le double crédit si la boucle
+    automatique et un !checkresults manuel traitent le même match en parallèle.
+    """
+    with _connect() as con:
         cur = con.cursor()
-        # Récupérer les bons pronostics
-        cur.execute("""
-            UPDATE pronostics 
-            SET points_gagnes = ?
-            WHERE match_id = ? AND pronostic = ?
-        """, (points_par_bon_prono, match_id, resultat))
-        
-        # Ajouter les points aux utilisateurs
+        # 1. Créditer les utilisateurs AVANT de marquer les pronos comme payés,
+        #    sinon la sous-requête ne trouve plus personne.
         cur.execute("""
             UPDATE users 
             SET points = points + ?
             WHERE user_id IN (
                 SELECT user_id FROM pronostics 
-                WHERE match_id = ? AND pronostic = ?
+                WHERE match_id = ? AND pronostic = ? AND points_gagnes = 0
             )
         """, (points_par_bon_prono, match_id, resultat))
-        
+
+        # 2. Marquer les pronos comme payés (verrou contre un second passage)
+        cur.execute("""
+            UPDATE pronostics 
+            SET points_gagnes = ?
+            WHERE match_id = ? AND pronostic = ? AND points_gagnes = 0
+        """, (points_par_bon_prono, match_id, resultat))
+
         con.commit()
+        return cur.rowcount
 
 def get_journee_leaderboard(journee_id):
     """Récupère le classement des pronostiqueurs pour une journée."""
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         cur = con.cursor()
         cur.execute("""
             SELECT 
@@ -606,7 +681,7 @@ def get_journee_leaderboard(journee_id):
 
 def get_matchs_journee(journee_id):
     """Récupère tous les matchs d'une journée."""
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         con.row_factory = sqlite3.Row
         cur = con.cursor()
         cur.execute("""
@@ -618,21 +693,21 @@ def get_matchs_journee(journee_id):
 
 def close_match_pronostics(match_id):
     """Ferme les pronostics pour un match."""
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         cur = con.cursor()
         cur.execute("UPDATE matchs SET pronos_fermes = 1 WHERE id = ?", (match_id,))
         con.commit()
 
 def mark_journee_rappel_sent(journee_id):
     """Marque qu'un rappel a été envoyé pour une journée."""
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         cur = con.cursor()
         cur.execute("UPDATE journees SET rappel_envoye = 1 WHERE id = ?", (journee_id,))
         con.commit()
 
 def get_journees_for_rappel():
     """Récupère les journées nécessitant un rappel (24h avant)."""
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         con.row_factory = sqlite3.Row
         cur = con.cursor()
         # Chaîne explicite (l'adaptateur datetime de sqlite3 est déprécié en 3.12+)
@@ -656,7 +731,7 @@ def determine_journee_from_matches(matches):
     min_date = min(match_dates)
     
     # Récupérer la dernière journée
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         cur = con.cursor()
         cur.execute("SELECT MAX(numero) FROM journees")
         last_numero = cur.fetchone()[0] or 0
@@ -679,7 +754,7 @@ def determine_journee_from_matches(matches):
 
 def get_matches_to_check_results(since_date):
     """Récupère les matchs PASSÉS sans résultat depuis une certaine date."""
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         con.row_factory = sqlite3.Row
         cur = con.cursor()
         # On ajoute la condition que la date du match doit être passée
@@ -697,7 +772,7 @@ def get_user_correct_pronostics(user_id):
     """
     Récupère tous les pronostics corrects d'un utilisateur avec les détails du match.
     """
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         con.row_factory = sqlite3.Row
         cur = con.cursor()
         # On retire la colonne points_obtenus qui n'existe pas
@@ -717,7 +792,7 @@ def get_user_correct_pronostics(user_id):
 def set_advent_pack_opened(user_id, date_str):
     """Enregistre que l'utilisateur a ouvert son pack de l'avent pour cette date."""
     check_user(user_id)
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         cur = con.cursor()
         cur.execute("UPDATE users SET last_advent_pack_date = ? WHERE user_id = ?", (date_str, user_id))
         con.commit()
@@ -733,7 +808,7 @@ def get_general_leaderboard(points_per_win, limit=10, competition=None):
     Returns:
         list: Une liste de dictionnaires contenant user_id, bons_pronos, et total_points.
     """
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         con.row_factory = sqlite3.Row
         cur = con.cursor()
         
@@ -771,14 +846,14 @@ def get_general_leaderboard(points_per_win, limit=10, competition=None):
 
 def update_match_discord_event_id(match_id, discord_event_id):
     """Met à jour l'ID de l'événement Discord pour un match existant."""
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         cur = con.cursor()
         cur.execute("UPDATE matchs SET discord_event_id = ? WHERE id = ?", (discord_event_id, match_id))
         con.commit()
 
 def update_match_time(match_id, new_time):
     """Met à jour l'horaire d'un match."""
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         cur = con.cursor()
         cur.execute("UPDATE matchs SET date_match = ? WHERE id = ?", (new_time.isoformat(), match_id))
         con.commit()
@@ -788,7 +863,7 @@ def fix_null_competitions(default_name="Starligue"):
     Attribue un nom de compétition par défaut à tous les matchs 
     qui n'en ont pas (pour récupérer l'historique).
     """
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         cur = con.cursor()
         # On met à jour les matchs où la compétition est NULL ou vide
         cur.execute("""
@@ -806,7 +881,7 @@ def mass_give_card_if_missing(card_id):
     qui ne possèdent pas encore cette carte.
     Retourne le nombre de cartes distribuées.
     """
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         cur = con.cursor()
         
         # Cette requête sélectionne tous les user_id de la table users
@@ -830,7 +905,7 @@ def get_user_cards_with_rowid(user_id):
     """Retourne la liste des exemplaires possédés : [(rowid, card_id), ...].
     Le rowid identifie un exemplaire précis (utile pour échanger un doublon donné)."""
     check_user(user_id)
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         cur = con.cursor()
         cur.execute("SELECT id, card_id FROM user_cards WHERE user_id = ? ORDER BY id", (user_id,))
         return cur.fetchall()
@@ -850,7 +925,7 @@ def execute_trade(user_a, rowids_a, user_b, rowids_b):
     if set(rowids_a) & set(rowids_b):
         return False
 
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         cur = con.cursor()
         # Revérifier la propriété de CHAQUE exemplaire dans la transaction
         for rid in rowids_a:
@@ -868,7 +943,7 @@ def execute_trade(user_a, rowids_a, user_b, rowids_b):
 def log_trade(user_a, card_ids_a, user_b, card_ids_b):
     """Enregistre un échange réalisé (pour traçabilité / gestion des litiges)."""
     import json as _json
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         cur = con.cursor()
         cur.execute(
             "INSERT INTO trade_log (user_a, user_b, cards_a, cards_b) VALUES (?, ?, ?, ?)",
@@ -881,7 +956,7 @@ def remove_extra_copies(user_id, card_ids):
     """Recyclage sélectif : pour chaque card_id donné, supprime tous les
     exemplaires SAUF UN. Retourne {card_id: nb_supprimés}."""
     removed = {}
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         cur = con.cursor()
         for cid in card_ids:
             rows = cur.execute(
@@ -900,7 +975,7 @@ def remove_extra_copies(user_id, card_ids):
 def get_user_elo(user_id):
     """Retourne l'Elo de l'utilisateur (1000 par défaut)."""
     check_user(user_id)
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         cur = con.cursor()
         row = cur.execute("SELECT elo FROM users WHERE user_id = ?", (user_id,)).fetchone()
         return row[0] if row and row[0] is not None else 1000
@@ -908,7 +983,7 @@ def get_user_elo(user_id):
 def set_user_elo(user_id, elo):
     """Fixe l'Elo d'un utilisateur."""
     check_user(user_id)
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         cur = con.cursor()
         cur.execute("UPDATE users SET elo = ? WHERE user_id = ?", (int(elo), user_id))
         con.commit()
@@ -917,7 +992,7 @@ def record_duel(joueur1, joueur2, score1, score2, gagnant, classe,
                 elo1_before, elo2_before, elo1_after, elo2_after, lineup1, lineup2):
     """Enregistre un duel joué. lineup1/lineup2 : dicts {slot: card_id} (sérialisés en JSON)."""
     import json as _json
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         cur = con.cursor()
         cur.execute("""
             INSERT INTO duels
@@ -932,7 +1007,7 @@ def record_duel(joueur1, joueur2, score1, score2, gagnant, classe,
 
 def count_ranked_duels_between(user_a, user_b, since_iso):
     """Nb de duels CLASSÉS entre deux joueurs depuis `since_iso` (anti-farm de paire)."""
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         cur = con.cursor()
         return cur.execute("""
             SELECT COUNT(*) FROM duels
@@ -942,7 +1017,7 @@ def count_ranked_duels_between(user_a, user_b, since_iso):
 
 def count_ranked_duels_for(user_id, since_iso):
     """Nb de duels CLASSÉS joués par un utilisateur depuis `since_iso` (plafond quotidien)."""
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         cur = con.cursor()
         return cur.execute("""
             SELECT COUNT(*) FROM duels
@@ -953,7 +1028,7 @@ def count_ranked_duels_for(user_id, since_iso):
 def get_last_duel_lineup(user_id):
     """Dernière compo alignée par le joueur : dict {slot: card_id | None}, ou None."""
     import json as _json
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         cur = con.cursor()
         row = cur.execute("""
             SELECT joueur1, lineup1, lineup2 FROM duels
@@ -970,7 +1045,7 @@ def get_last_duel_lineup(user_id):
 
 def get_user_duels(user_id, limit=10):
     """Derniers duels d'un joueur (classés et amicaux), plus récents d'abord."""
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         con.row_factory = sqlite3.Row
         cur = con.cursor()
         cur.execute("""
@@ -982,7 +1057,7 @@ def get_user_duels(user_id, limit=10):
 
 def get_duel_leaderboard(limit=10):
     """Classement Elo des joueurs ayant disputé au moins un duel classé."""
-    with sqlite3.connect(DB_NAME) as con:
+    with _connect() as con:
         con.row_factory = sqlite3.Row
         cur = con.cursor()
         cur.execute("""

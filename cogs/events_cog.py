@@ -9,6 +9,8 @@ import pytz
 import database
 import aiohttp
 import json
+import html as html_lib
+from urllib.parse import quote
 from bs4 import BeautifulSoup
 
 # --- CORRECTION : Variable remise pour éviter l'erreur dans test_cog ---
@@ -17,7 +19,71 @@ LIVESCORE_URL = "https://www.livescore.in/fr/handball/france/starligue/"
 # --- Configuration ---
 RSS_URL = "https://handnews.fr/feed"
 CHANNEL_ID = int(os.getenv('CHANNEL_ID')) if os.getenv('CHANNEL_ID') else None
-CHECK_INTERVAL = 1800 
+CHECK_INTERVAL = 1800
+
+# --- Rendu des articles Handnews ---
+# ⚠️ https://handnews.fr/favicon.ico renvoie un 404 (et Discord ne rend pas les .ico)
+HANDNEWS_ICON = "https://handnews.fr/wp-content/themes/handnews/assets/img/favicon/favicon_handnews_144.png"
+HANDNEWS_COLOR = 0xE8874F
+RSS_HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; CollectionBot/1.0)"}
+RSS_DESC_MAX = 400
+MAX_SEEN_ARTICLES = 500  # borne la mémoire du set seen_articles
+
+
+# --- Helpers RSS ---
+def clean_html_text(raw: str) -> str:
+    """Nettoie un champ RSS WordPress : entités doublement encodées (&#8217;),
+    balises résiduelles, espaces insécables et '[…]' de fin."""
+    if not raw:
+        return ""
+    text = raw
+    # WordPress encode deux fois : &amp;#8217; -> &#8217; -> ’
+    for _ in range(2):
+        new = html_lib.unescape(text)
+        if new == text:
+            break
+        text = new
+    text = BeautifulSoup(text, "html.parser").get_text(" ")
+    text = text.replace("\xa0", " ")
+    text = re.sub(r"\s+", " ", text).strip()
+    text = re.sub(r"\s*\[\s*(?:…|\.\.\.)\s*\]\s*$", "…", text)
+    return text
+
+
+def safe_url(url: str) -> str | None:
+    """Percent-encode les caractères non-ASCII des URLs d'images
+    (ex: '©AurelieNOTAR-2497.jpg') que Discord refuse parfois."""
+    if not url:
+        return None
+    if url.startswith("//"):
+        url = "https:" + url
+    if not url.startswith(("http://", "https://")):
+        return None
+    return quote(url, safe=":/?#[]@!$&'()*+,;=%~")
+
+
+def extract_article_image(entry) -> str | None:
+    """Image en pleine résolution : content:encoded contient le 900px,
+    media:content seulement la vignette 300x200."""
+    for content in entry.get("content", []) or []:
+        soup = BeautifulSoup(content.get("value", ""), "html.parser")
+        img = soup.find("img")
+        if img and img.get("src"):
+            return safe_url(img["src"])
+    for media in entry.get("media_content", []) or []:
+        url = media.get("url")
+        if url:
+            # -300x200.jpg -> .jpg
+            return safe_url(re.sub(r"-\d+x\d+(?=\.(?:jpg|jpeg|png|webp)$)", "", url))
+    return None
+
+
+def entry_datetime(entry):
+    """Date réelle de publication de l'article (pas l'heure du check du bot)."""
+    parsed = entry.get("published_parsed") or entry.get("updated_parsed")
+    if parsed:
+        return datetime(*parsed[:6], tzinfo=timezone.utc)
+    return datetime.now(timezone.utc)
 
 # --- CONFIGURATION SLACK ---
 SLACK_WEBHOOK_URL = os.getenv('SLACK_WEBHOOK_URL')
@@ -70,33 +136,92 @@ class EventsCog(commands.Cog):
     async def check_rss_loop(self):
         if CHANNEL_ID is None: return
         channel = self.bot.get_channel(CHANNEL_ID)
-        if not channel: return
+        if not channel:
+            print("❌ (RSS) Salon introuvable")
+            return
         try:
-            async with aiohttp.ClientSession() as session:
+            timeout = aiohttp.ClientTimeout(total=30)
+            async with aiohttp.ClientSession(timeout=timeout, headers=RSS_HEADERS) as session:
                 async with session.get(RSS_URL) as response:
-                    if response.status == 200:
-                        content = await response.text()
-                        feed = feedparser.parse(content)
-                    else: return
-            if not feed.bozo:
-                for entry in reversed(feed.entries):
-                    if entry.link not in self.seen_articles:
-                        if not self.first_check: await self.send_article_to_discord(channel, entry)
-                        self.seen_articles.add(entry.link)
-                if self.first_check: self.first_check = False
-        except Exception: pass
+                    if response.status != 200:
+                        print(f"❌ (RSS) HTTP {response.status}")
+                        return
+                    # .read() : on laisse feedparser gérer l'encodage déclaré dans le XML
+                    content = await response.read()
+
+            feed = feedparser.parse(content)
+
+            # On ne bloque PAS sur feed.bozo : il passe à True pour des broutilles
+            # (namespace inconnu, BOM...) alors que les entrées restent exploitables.
+            if not feed.entries:
+                print(f"⚠️ (RSS) Aucune entrée (bozo={feed.bozo} {feed.get('bozo_exception')})")
+                return
+
+            nouveaux = 0
+            for entry in reversed(feed.entries):
+                link = entry.get('link')
+                if not link or link in self.seen_articles:
+                    continue
+                self.seen_articles.add(link)
+                if not self.first_check:
+                    await self.send_article_to_discord(channel, entry)
+                    nouveaux += 1
+                    await asyncio.sleep(1)  # évite le rate-limit Discord
+
+            if len(self.seen_articles) > MAX_SEEN_ARTICLES:
+                self.seen_articles = set(list(self.seen_articles)[-MAX_SEEN_ARTICLES:])
+
+            if self.first_check:
+                self.first_check = False
+                print(f"✅ (RSS) Amorçage : {len(self.seen_articles)} articles marqués comme vus")
+            elif nouveaux:
+                print(f"📰 (RSS) {nouveaux} nouvel(s) article(s) publié(s)")
+
+        except asyncio.TimeoutError:
+            print("❌ (RSS) Timeout sur handnews.fr")
+        except Exception as e:
+            print(f"❌ (RSS) Erreur : {type(e).__name__} : {e}")
 
     async def send_article_to_discord(self, channel, entry):
         try:
-            embed = discord.Embed(title=entry.title[:256], url=entry.link, color=0xe8874f, timestamp=datetime.now(timezone.utc))
-            if hasattr(entry, 'summary'):
-                desc = re.sub('<[^<]+?>', '', entry.summary)
-                embed.description = desc[:2045] + "..." if len(desc) > 2048 else desc
-            if 'media_content' in entry and entry.media_content:
-                embed.set_image(url=entry.media_content[0]['url'])
-            embed.set_author(name="📰 Handnews.fr", icon_url="https://handnews.fr/favicon.ico")
+            titre = clean_html_text(entry.get('title', 'Sans titre'))
+
+            embed = discord.Embed(
+                title=titre[:256],
+                url=entry.get('link'),
+                color=HANDNEWS_COLOR,
+                timestamp=entry_datetime(entry)
+            )
+
+            resume = clean_html_text(entry.get('summary', ''))
+            if resume:
+                if len(resume) > RSS_DESC_MAX:
+                    resume = resume[:RSS_DESC_MAX].rsplit(' ', 1)[0] + "…"
+                embed.description = resume
+
+            image = extract_article_image(entry)
+            if image:
+                embed.set_image(url=image)
+
+            embed.set_author(
+                name="Handnews.fr",
+                url="https://handnews.fr",
+                icon_url=HANDNEWS_ICON
+            )
+
+            # Auteur + catégories de l'article en pied d'embed
+            tags = [clean_html_text(t.get('term', '')) for t in (entry.get('tags') or [])]
+            tags = [t for t in tags if t][:3]
+            auteur = clean_html_text(entry.get('author', ''))
+            pied = " • ".join(p for p in (auteur, " · ".join(tags)) if p)
+            embed.set_footer(text=(pied[:2048] or "Handnews.fr"))
+
             await channel.send(embed=embed)
-        except Exception: pass
+
+        except discord.HTTPException as e:
+            print(f"❌ (RSS) Discord a refusé l'embed : {e}")
+        except Exception as e:
+            print(f"❌ (RSS) Envoi impossible : {type(e).__name__} : {e}")
 
     # --- SCRAPING ---
 
@@ -479,12 +604,21 @@ class EventsCog(commands.Cog):
             try:
                 res = await self.get_match_result(match['event_id'])
                 if res:
-                    database.update_match_result(match['id'], res, res)
-                    if pronos_cog and match['discord_event_id']: pronos_cog.process_match_result(match['id'], res)
-                    await self.update_discord_event_with_result(match['discord_event_id'], match['equipe1'], match['equipe2'], res)
+                    # Les points d'abord : process_match_result enregistre le résultat
+                    # ET crédite les pronostiqueurs. L'appeler AVANT update_match_result
+                    # évite de marquer le match comme traité sans avoir payé personne.
+                    if pronos_cog:
+                        pronos_cog.process_match_result(match['id'], res)
+                    else:
+                        database.update_match_result(match['id'], res, res)
+
+                    await self.update_discord_event_with_result(
+                        match['discord_event_id'], match['equipe1'], match['equipe2'], res
+                    )
                     count += 1
                     await asyncio.sleep(5)
-            except Exception: pass
+            except Exception as e:
+                print(f"❌ (RESULTATS) Match {match.get('id')} : {type(e).__name__} : {e}")
         return count
 
     @tasks.loop(seconds=RESULTS_CHECK_INTERVAL)
