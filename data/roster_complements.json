@@ -1,5 +1,5 @@
 {
-  "_doc": "Joueurs a inclure dans la S2 qui ne sont pas dans l'onglet Starligue27 du xlsx. Fusionnes par tools/build_manifest_s2.py, donc ils survivent a un rebuild. 'ignores' documente les joueurs vus dans l'effectif LNH mais volontairement ecartes, pour ne pas avoir a re-trancher a chaque comparaison.",
+  "_doc": "Joueurs a inclure dans la S2 qui ne sont pas dans l'onglet Starligue27 du xlsx. Fusionnes par tools/build_manifest_s2.py, donc ils survivent a un rebuild. 'ignores' documente les joueurs vus dans l'effectif LNH mais volontairement ecartes, pour ne pas avoir a re-trancher a chaque comparaison. 'postes' corrige un poste mal renseigne par la LNH : applique apres chaque scrape par tools/fetch_lnh_s2.py, donc il survit a un rerun.",
   "ajouts": [
     {
       "nom_famille": "ILIC",
@@ -29,5 +29,8 @@
   ],
   "ignores": {
     "causse-theophile": "Theophile CAUSSE : encore liste par la LNH a Cesson-Rennes mais ne fait plus partie de l'equipe."
+  },
+  "postes": {
+    "antonsen-rene": "Pivot"
   }
 }

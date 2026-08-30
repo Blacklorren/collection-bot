@@ -75,6 +75,7 @@ def build_state():
     order = load_json(ORDER, {})
     offsets = load_json(OFFSETS, {})
     n = CFG["per_player"]
+    pool = CFG["pool"]
 
     out = []
     for club in sorted(order):
@@ -82,12 +83,25 @@ def build_state():
         if not files and not CFG["show_empty"]:
             continue
         off = int(offsets.get(club, 0))
+        # En mode pool (une seule image par joueur, deja triee dans Midjourney), on
+        # propose TOUTE la banque du club a chaque joueur : l'ordre de telechargement
+        # n'a alors plus besoin de correspondre a l'ordre de collage.
+        pris = {}
+        if pool:
+            for pid in order[club]:
+                choix = (players.get(pid) or {}).get("image_file")
+                if choix:
+                    pris[choix] = (players[pid]["nom"], pid)
+
         for i, pid in enumerate(order[club]):
             p = players.get(pid)
             if not p:
                 continue
-            start = (i + off) * n
-            cands = files[start:start + n] if start >= 0 else []
+            if pool:
+                cands = files
+            else:
+                start = (i + off) * n
+                cands = files[start:start + n] if start >= 0 else []
             out.append({
                 "id": pid,
                 "nom": p["nom"],
@@ -95,12 +109,38 @@ def build_state():
                 "poste": p.get("poste") or "",
                 "rarete": p.get("rarete") or "",
                 "ref": p.get("ref_file") or "",
-                "candidats": [os.path.relpath(c, ROOT).replace("\\", "/") if c.startswith(ROOT)
-                              else c for c in cands],
+                "candidats": [rel(c) for c in cands],
+                "pris": {rel(f): v[0] for f, v in pris.items()} if pool else {},
                 "choisi": p.get("image_file") or "",
                 "offset": off,
+                "pool": pool,
             })
     return out
+
+
+def rel(chemin):
+    return (os.path.relpath(chemin, ROOT).replace("\\", "/")
+            if chemin.startswith(ROOT) else chemin)
+
+
+def prefill(club):
+    """Pre-affecte les images du club aux joueurs sans choix, dans l'ordre. Sert de
+    point de depart quand l'ordre de telechargement suit l'ordre de collage ; il ne
+    reste alors qu'a corriger les quelques decalages."""
+    players = load_json(MANIFEST, [])
+    par_id = {p["id"]: p for p in players}
+    ids = load_json(ORDER, {}).get(club, [])
+    libres = [f for f in club_files(club)
+              if rel(f) not in {par_id[i].get("image_file") for i in ids if i in par_id}]
+    n = 0
+    for pid in ids:
+        p = par_id.get(pid)
+        if not p or p.get("image_file") or not libres:
+            continue
+        p["image_file"] = rel(libres.pop(0))
+        n += 1
+    save_json(MANIFEST, players)
+    return n
 
 
 def set_choice(pid, path):
@@ -141,9 +181,17 @@ kbd{background:#2c313a;border:1px solid #3a4150;border-radius:4px;padding:1px 5p
 .cand{position:relative;cursor:pointer;border:2px solid transparent;border-radius:8px;
  overflow:hidden;background:#0e1013;line-height:0}
 .cand img{width:132px;display:block}
+.pool .cand img{width:92px}
 .cand.sel{border-color:#4ea1ff}
+.cand.pris{opacity:.28}
+.cand.pris.sel{opacity:1}
 .cand em{position:absolute;top:3px;left:3px;background:#000a;border-radius:4px;
  padding:0 5px;font:11px/18px monospace;font-style:normal}
+.cand b{position:absolute;bottom:0;left:0;right:0;background:#000c;font:10px/14px sans-serif;
+ font-weight:400;text-align:center;overflow:hidden;white-space:nowrap}
+button{background:#2c313a;color:#e8eaed;border:1px solid #3a4150;border-radius:5px;
+ padding:4px 10px;font:13px system-ui;cursor:pointer}
+button:hover{background:#3a4150}
 .empty{color:#6b7280;font-style:italic;padding:8px 0}
 .rar{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
 </style>
@@ -151,6 +199,8 @@ kbd{background:#2c313a;border:1px solid #3a4150;border-radius:4px;padding:1px 5p
  <h1>Picker rendus S2</h1>
  <div class=bar><i id=bar></i></div>
  <div class=stat id=stat></div>
+ <button onclick="prefill()" title="Affecte les images restantes du club dans l'ordre">
+  Pre-affecter ce club <kbd>P</kbd></button>
  <div class=stat><kbd>1-9</kbd> choisir <kbd>&larr;&rarr;</kbd> naviguer
   <kbd>0</kbd> effacer <kbd>[ ]</kbd> recaler le club <kbd>&crarr;</kbd> prochain non traite</div>
 </header>
@@ -165,7 +215,12 @@ async function load(){S=await (await fetch("/api/state")).json();draw();}
 function draw(){
  const done=S.filter(p=>p.choisi).length;
  bar.style.width=(S.length?done/S.length*100:0)+"%";
- stat.textContent=done+" / "+S.length+" choisis";
+ // 16 images pour 16 joueurs : toute image affectee deux fois est une erreur,
+ // et elle laisse forcement un autre joueur sans rendu.
+ const vus={},dbl=new Set();
+ S.filter(p=>p.choisi).forEach(p=>{if(vus[p.choisi])dbl.add(p.choisi);vus[p.choisi]=1;});
+ stat.innerHTML=done+" / "+S.length+" choisis"
+  +(dbl.size?` &nbsp;<span style="color:#ff8080">${dbl.size} image${dbl.size>1?"s":""} affectee${dbl.size>1?"s":""} a plusieurs joueurs</span>`:"");
  list.innerHTML=S.map((p,i)=>`
   <div class="row${i==cur?" cur":""}${p.choisi?" done":""}" id="r${i}">
    <div class=meta>
@@ -174,9 +229,11 @@ function draw(){
     <span style="color:#6b7280">${p.rarete}${p.offset?" · recal "+p.offset:""}</span>
    </div>
    <div class=ref>${p.ref?`<img src="${src(p.ref)}">`:""}</div>
-   <div class=cands>${p.candidats.length?p.candidats.map((c,j)=>
-     `<div class="cand${p.choisi==c?" sel":""}" onclick="pick(${i},${j})">
-       <em>${j+1}</em><img loading=lazy src="${src(c)}"></div>`).join("")
+   <div class="cands${p.pool?" pool":""}">${p.candidats.length?p.candidats.map((c,j)=>{
+     const autre=p.pris&&p.pris[c]&&p.pris[c]!=p.nom;
+     return `<div class="cand${p.choisi==c?" sel":""}${autre?" pris":""}" onclick="pick(${i},${j})">
+       <em>${j+1}</em><img loading=lazy src="${src(c)}">${autre?`<b>${p.pris[c]}</b>`:""}</div>`;
+    }).join("")
      :'<div class=empty>aucun rendu telecharge pour ce joueur</div>'}</div>
   </div>`).join("");
  document.getElementById("r"+cur)?.scrollIntoView({block:"center",behavior:"smooth"});
@@ -188,6 +245,14 @@ async function pick(i,j){
  await fetch("/api/select",{method:"POST",body:JSON.stringify({id:p.id,file:f})});
  if(j!==null&&i===cur&&cur<S.length-1)cur++;
  draw();
+}
+
+async function prefill(){
+ const club=S[cur].club;
+ const r=await (await fetch("/api/prefill",{method:"POST",
+   body:JSON.stringify({club:club})})).json();
+ await load();
+ stat.textContent=`${r.n} images affectees a ${club}`;
 }
 
 async function shift(d){
@@ -204,6 +269,7 @@ addEventListener("keydown",e=>{
  else if(e.key==="ArrowLeft"||e.key==="ArrowUp"){cur=Math.max(cur-1,0);draw();}
  else if(e.key==="[")shift(-1);
  else if(e.key==="]")shift(1);
+ else if(e.key==="p"||e.key==="P")prefill();
  else if(e.key==="Enter"){const n=S.findIndex((p,i)=>i>cur&&!p.choisi);
    if(n>=0){cur=n;draw();}}
  else return;
@@ -251,6 +317,8 @@ class Handler(BaseHTTPRequestHandler):
             set_choice(data["id"], data.get("file", ""))
         elif self.path == "/api/offset":
             set_offset(data["club"], data["offset"])
+        elif self.path == "/api/prefill":
+            return self._send(200, json.dumps({"ok": True, "n": prefill(data["club"])}))
         else:
             return self._send(404, b"", "text/plain")
         return self._send(200, json.dumps({"ok": True}))
@@ -261,7 +329,9 @@ def main():
     ap.add_argument("--downloads", required=True, help="dossier des rendus Midjourney")
     ap.add_argument("--club", default="", help="si le dossier ne contient qu'un club")
     ap.add_argument("--per-player", type=int, default=4,
-                    help="images par joueur : 4 (upscales separes) ou 1 (grille 2x2)")
+                    help="images par joueur : 4 (les 4 rendus d'un job) ou 1 (deja trie dans MJ)")
+    ap.add_argument("--pool", action="store_true",
+                    help="propose toute la banque du club a chaque joueur (auto si --per-player 1)")
     ap.add_argument("--show-empty", action="store_true",
                     help="affiche aussi les clubs sans rendu telecharge")
     ap.add_argument("--port", type=int, default=8765)
@@ -273,7 +343,8 @@ def main():
         raise SystemExit("out/paste_order.json absent : lance d'abord tools/build_prompts_s2.py")
 
     CFG.update(downloads=os.path.abspath(args.downloads), club=args.club,
-               per_player=args.per_player, show_empty=args.show_empty)
+               per_player=args.per_player, show_empty=args.show_empty,
+               pool=args.pool or args.per_player == 1)
 
     state = build_state()
     avec = sum(1 for p in state if p["candidats"])
@@ -289,8 +360,11 @@ def main():
         HTTPServer(("127.0.0.1", args.port), Handler).serve_forever()
     except KeyboardInterrupt:
         players = load_json(MANIFEST, [])
-        done = sum(1 for p in players if p.get("image_file"))
-        print(f"\nArret. {done} rendus choisis dans data/roster_s2.json")
+        choix = [p["image_file"] for p in players if p.get("image_file")]
+        print(f"\nArret. {len(choix)} rendus affectes dans data/roster_s2.json")
+        doublons = len(choix) - len(set(choix))
+        if doublons:
+            print(f"ATTENTION {doublons} image(s) affectee(s) a plusieurs joueurs.")
 
 
 if __name__ == "__main__":

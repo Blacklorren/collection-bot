@@ -42,6 +42,7 @@ from PIL import Image
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MANIFEST = os.path.join(ROOT, "data", "roster_s2.json")
 ALIASES = os.path.join(ROOT, "data", "lnh_aliases.json")
+COMPLEMENTS = os.path.join(ROOT, "data", "roster_complements.json")
 REFS_MANUELLES = os.path.join(ROOT, "data", "refs_manuelles.json")
 REFS_DIR = os.path.join(ROOT, "refs")
 
@@ -329,6 +330,18 @@ def main():
             print(f"  ref manuelle OK : {p['nom']}")
         else:
             print(f"  ref manuelle EN ECHEC : {p['nom']} -> {url}")
+
+    # Postes corriges a la main : la LNH en donne parfois un faux (Antonsen liste
+    # ailier droit alors qu'il est pivot). Applique APRES le scrape, sinon la valeur
+    # scrapee reprendrait la main a chaque run.
+    if os.path.exists(COMPLEMENTS):
+        corr = json.load(open(COMPLEMENTS, encoding="utf-8")).get("postes", {})
+        par_id2 = {p["id"]: p for p in actifs}
+        for pid, poste in corr.items():
+            p = par_id2.get(pid)
+            if p and p.get("poste") != poste:
+                print(f"  poste corrige : {p['nom']} '{p.get('poste')}' -> '{poste}'")
+                p["poste"] = poste
 
     if not args.dry_run:
         json.dump(players, open(MANIFEST, "w", encoding="utf-8"), ensure_ascii=False, indent=2)

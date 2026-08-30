@@ -1,22 +1,37 @@
 # Génération des portraits Saison 2 — mode d'emploi
 
-État au 15 août 2026 : **115 refs disponibles sur 259 joueurs**, dont 7 clubs complets.
+État au 30 août 2026 : **210 refs disponibles sur 259 joueurs**, 12 clubs complets.
+La LNH a publié 95 portraits entre le 18 et le 30 août — six clubs d'un coup.
 
-| Club | Refs | Prompts |
+**112 prompts sont en attente de collage**, tous regénérés le 30 août avec `--ow 300`
+(voir plus bas) et la couleur de maillot corrigée :
+
+| Club | Refs | Prompts en attente |
 |---|---|---|
-| Aix | 16/16 | `out/prompts/aix.txt` |
-| Limoges | 16/16 | `out/prompts/limoges.txt` |
-| Nantes | 17/17 | `out/prompts/nantes.txt` |
-| Paris | 18/18 | `out/prompts/paris.txt` |
-| Saint-Raphaël | 15/15 | `out/prompts/saint-raphael.txt` |
-| Saran | 16/16 | `out/prompts/saran.txt` |
+| Chambéry | 18/18 | `out/prompts/chambery.txt` |
+| Montpellier | 17/17 | `out/prompts/montpellier.txt` |
+| Sélestat | 17/17 | `out/prompts/selestat.txt` |
+| Nîmes | 16/16 | `out/prompts/nimes.txt` |
+| Toulouse | 15/16 | `out/prompts/toulouse.txt` |
+| Cesson-Rennes | 14/14 | `out/prompts/cesson-rennes.txt` |
 | Tremblay | 15/15 | `out/prompts/tremblay.txt` |
-| Cesson-Rennes | 1/14 | `out/prompts/cesson-rennes.txt` |
-| Chambéry | 1/18 | `out/prompts/chambery.txt` |
-| **Total** | **115** | **115 prompts** |
+| **Total** | **112** | **112 prompts** |
 
-Caen, Chartres, Dunkerque, Montpellier, Nîmes, Sélestat et Toulouse : 0 photo publiée.
-Relancer `fetch_lnh_s2.py` toutes les semaines.
+Tremblay figure ici alors que ses refs datent d'août : ses prompts ont été refaits pour
+passer de `--ow 100` à `--ow 300` comme les autres.
+
+Aix, Limoges, Nantes, Paris, Saint-Raphaël et Saran n'apparaissent plus : leurs rendus
+sont choisis, `--skip-done` les écarte et `out/prompts/` est vidé à chaque run.
+
+**Il reste 49 joueurs sans photo**, sur trois clubs seulement : Caen (18), Chartres (15),
+Dunkerque (15), plus Pontus Brolin à Toulouse. Relancer `fetch_lnh_s2.py` toutes les
+semaines jusqu'à ce qu'ils sortent.
+
+**Rendus retenus au 28 août 2026 : 98 sur 259**, soit six clubs complets — Aix,
+Limoges et Nantes (générés avec le prompt « Semi-realistic anime »), puis Saran, Paris
+et Saint-Raphaël (prompt « Stylized comic book » actuel). Les 49 rendus de ces trois
+derniers clubs ont été appariés à partir des planches de `build_match_sheets.py` plutôt
+qu'avec le picker, et les cutouts sont en place.
 
 **Source des données.** Le scraper interroge `clubs-effectif?team=<clef>` et non les
 pages `/equipes/<slug>` : seule la première expose le **centre de formation**, où se
@@ -56,7 +71,38 @@ GitHub, mais si tu veux alléger, passer les refs en JPEG q85 diviserait par cin
 et regarde le résultat. Ça valide trois choses d'un coup, et ça coûte 15 minutes contre
 plusieurs heures de rendus à jeter.
 
-Les 111 prompts embarquent la référence de style `https://s.mj.run/Dq9JJbmxWzE`, celle
+**La couleur du maillot est injectée dans chaque prompt.** Elle n'est pas codée en dur
+par club : `tools/jersey_colors.py` la lit sur la photo de référence elle-même — fond
+détouré par remplissage connexe depuis les bords (pour qu'un maillot blanc ne parte pas
+avec le fond), peau filtrée, pixels du torse nommés puis comptés. Le résultat est
+ensuite lissé par club **en séparant les gardiens**, dont le maillot diffère réellement.
+La valeur est stockée dans le champ `jersey` du manifest : si une couleur est fausse,
+corrige-la à la main, un rerun la respectera. `--recompute-jersey` force le recalcul.
+
+**La coiffure et la pilosité sont décrites joueur par joueur.** Contrairement à la
+couleur du maillot, elles ne sont pas mesurables en pixels : rasé, bouclé, chignon,
+dreadlocks, calvitie, ça se regarde. `tools/build_head_sheets.py` assemble des planches
+contact de 12 têtes cadrées, numérotées et légendées ; les descriptions sont stockées
+dans `data/hair.json` et corrigeables à la main. Pour les futurs clubs :
+
+```bash
+py tools/build_head_sheets.py --seulement-sans-description
+```
+
+Au 30 août, `data/hair.json` couvre les **210 joueurs qui ont une ref** : les 95 arrivés
+avec la vague du 30 août ont été décrits depuis huit planches. Rien à faire donc avant
+le prochain lot de photos, où la commande ci-dessus ne sortira que les nouveaux.
+
+Deux conséquences sur le prompt d'origine :
+
+- `Athletic man` devient `Athletic man with long black dreadlocks` — la coiffure est
+  placée tôt, là où Midjourney lui donne le plus de poids.
+- **`textured stubble` a disparu.** Il était figé dans le prompt et imposait de la barbe
+  aux joueurs glabres, ce qui est une source de divergence en soi. Il est remplacé par
+  la pilosité réelle : `clean-shaven`, `a thick black beard`, `a thin moustache`… Pour
+  revenir en arrière, remets la chaîne en dur à la place de `{barbe}`.
+
+Les prompts embarquent la référence de style `https://s.mj.run/Dq9JJbmxWzE`, celle
 du rendu validé — c'est elle qui donne son sens au `--sw 100`. Elle est codée en dur
 dans `DEFAULT_SREF` en tête de `tools/build_prompts_s2.py` : une regénération sans le
 flag la conserve, et il faut un `--no-sref` explicite pour s'en passer. Si tu changes
@@ -65,7 +111,8 @@ collection se retrouvera à cheval sur deux esthétiques.
 
 Vérifie sur ces 14 :
 - **cadrage** — buste avec les deux épaules, pas de tête flottante ni de coupe au cou
-- **ressemblance** — `--ow 550` est agressif, les visages doivent être reconnaissables
+- **ressemblance** — `--ow 300` est un compromis, les visages doivent rester
+  reconnaissables sans virer à la photo
 - **fond** — gris clair uni et vide, c'est ce qui rendra le détourage rembg propre
 
 **Et note comment Midjourney nomme les fichiers téléchargés.** Les 111 prompts sont
@@ -118,12 +165,29 @@ C'est ce découpage qui permet au picker de savoir quel joueur correspond à que
 
 ## Étape 4 — le picker
 
+Le tri se faisant directement dans Midjourney, il n'y a qu'**une image par joueur** à
+la sortie. Le picker ne sert donc plus à départager 4 rendus mais à garantir que chaque
+image tombe sur le bon joueur — ce qui est justement plus risqué dans ce sens, puisque
+l'ordre de téléchargement ne suit plus l'ordre de collage.
+
 ```bash
-py tools/pick_renders.py --downloads "C:/Users/quent/Downloads/mj"
+py tools/pick_renders.py --downloads "C:/Users/quent/Downloads/mj" --per-player 1
 ```
 
+`--per-player 1` bascule en **mode banque** : chaque joueur se voit proposer les 16
+images du club, pas seulement celle que l'ordre lui attribuerait. Une image déjà prise
+est grisée et porte le nom de son joueur, donc l'affectation reste lisible.
+
+La marche à suivre : `P` pré-affecte tout le club dans l'ordre, puis tu descends les
+lignes et tu corriges celles où le visage de gauche ne correspond pas. Si l'ordre était
+bon, il n'y a rien à faire ; s'il était mélangé, tu ne reprends que les fautives.
+
+Un compteur en haut signale en rouge toute image affectée à deux joueurs : avec 16
+images pour 16 joueurs, c'est forcément une erreur, et elle laisse quelqu'un sans rendu.
+Le message s'affiche aussi à l'arrêt du serveur.
+
 Ça ouvre `http://localhost:8765` : une ligne par joueur, le portrait officiel LNH à
-gauche, les 4 rendus à droite. Le manifest est écrit à chaque choix, il n'y a rien à
+gauche, les rendus à droite. Le manifest est écrit à chaque choix, il n'y a rien à
 enregistrer.
 
 | Touche | Effet |
@@ -131,17 +195,15 @@ enregistrer.
 | `1`–`9` | choisir ce rendu et passer au joueur suivant |
 | `←` `→` | naviguer |
 | `0` | effacer le choix |
-| `[` `]` | recaler tout le club d'un cran (si les visages ne correspondent pas) |
+| `[` `]` | recaler tout le club d'un cran (mode 4 rendus uniquement) |
+| `P` | pré-affecter les images restantes du club dans l'ordre |
 | `Entrée` | sauter au prochain joueur non traité |
 
-**Le recalage est le filet de sécurité.** Si la photo de gauche et les rendus de droite
-ne montrent pas le même joueur, c'est que le club a glissé : appuie sur `[` ou `]`
-jusqu'à ce que ça colle, le décalage est mémorisé pour ce club.
+**La photo de référence à gauche est le filet de sécurité.** Tant qu'elle montre le même
+joueur que l'image retenue à droite, l'affectation est bonne. C'est la seule vérification
+qui compte, et elle est visuelle.
 
-Si tu télécharges les grilles 2×2 au lieu des upscales séparés, ajoute
-`--per-player 1`.
-
-Compte 3 secondes par joueur, soit une quinzaine de minutes pour les 111.
+Compte 3 secondes par joueur, soit une quinzaine de minutes pour les 115.
 
 ---
 
@@ -159,6 +221,26 @@ ce qu'il te reste à coller.
 
 ---
 
+## Le réglage `--ow`, seul paramètre qui a bougé
+
+C'est le poids de la photo de référence face au style demandé. Son histoire tient en
+trois valeurs, et elle explique les écarts d'esthétique entre clubs déjà rendus :
+
+| Valeur | Quand | Effet | Clubs générés ainsi |
+|---|---|---|---|
+| 550 | à l'origine | au-dessus du plafond conseillé par MJ (400) : la photo prime sur le style, rendus photoréalistes | Aix, Limoges, Nantes |
+| 100 | 17 août | défaut MJ : le style comic s'impose, mais la ressemblance devient trop lâche | Saran, Paris |
+| **300** | **25 août** | **compromis retenu (option C de la grille de test)** | **Saint-Raphaël, puis tout le reste** |
+
+Le 25 août, `300` avait été passé en ligne de commande sans toucher la constante `OW`
+de `tools/build_prompts_s2.py`, restée à `100` : n'importe quel rerun serait
+silencieusement reparti sur l'ancien réglage. **La constante vaut désormais `300`**, un
+`build_prompts_s2.py` sans argument produit donc la bonne valeur. Pour explorer autre
+chose, `--ow`, `--sw` et `--stylize` restent surchargeables, et `--test <ids>` balaie la
+grille complète sur un joueur donné.
+
+---
+
 ## Points de vigilance
 
 **Les trois joueurs introuvables sont réglés.** Alexiou STAVROS, Alexandre BARADAT et
@@ -169,8 +251,10 @@ silhouette côté LNH, donc leur ref vient de `data/refs_manuelles.json` :
 - **Baradat** — portrait studio du site de Cesson, équivalent à un portrait LNH.
 - **Claude** — recadré dans une photo de signature du site de Chambéry, où il n'est pas
   seul. Le visage est net et de face, mais **il porte un t-shirt d'entraînement gris et
-  non le maillot du club** : avec `--ow 550` le rendu risque de reprendre cette tenue.
-  Regarde-le en premier dans le picker.
+  non le maillot du club** : le rendu risque de reprendre cette tenue. Son champ
+  `jersey` a donc été forcé à la main sur la couleur de Chambéry (idem Baradat sur
+  celle de Cesson), le prompt réclame bien le maillot du club — mais regarde-le
+  quand même en premier dans le picker.
 
 Ce mécanisme est un vrai repli : dès que la LNH publie le portrait officiel d'un de ces
 joueurs, il reprend automatiquement la main sur la ref manuelle.
