@@ -12,6 +12,7 @@ import json
 import html as html_lib
 from urllib.parse import quote
 from bs4 import BeautifulSoup
+from utils import livescore
 
 # --- CORRECTION : Variable remise pour éviter l'erreur dans test_cog ---
 LIVESCORE_URL = "https://www.livescore.in/fr/handball/france/starligue/"
@@ -96,6 +97,17 @@ RESULTS_CHECK_INTERVAL = 7200 # 2 heures
 BROWSERLESS_API_TOKEN = os.getenv('BROWSERLESS_API_TOKEN')
 BROWSERLESS_CONTENT_API_URL = f"https://production-sfo.browserless.io/content?token={BROWSERLESS_API_TOKEN}"
 
+# livescore.in affiche les horaires dans le fuseau du navigateur de scraping,
+# que l'API REST de Browserless ne permet pas de fixer. Une sonde injectée dans
+# la page le remonte ; ce réglage n'est que le repli si elle n'a pas tourné.
+LIVESCORE_SOURCE_TZ_NAME = os.getenv('LIVESCORE_SOURCE_TZ', 'UTC')
+try:
+    LIVESCORE_SOURCE_TZ = pytz.timezone(LIVESCORE_SOURCE_TZ_NAME)
+except Exception:
+    print(f"⚠️ LIVESCORE_SOURCE_TZ invalide ('{LIVESCORE_SOURCE_TZ_NAME}'), repli sur UTC")
+    LIVESCORE_SOURCE_TZ_NAME = 'UTC'
+    LIVESCORE_SOURCE_TZ = pytz.utc
+
 class EventsCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -109,7 +121,7 @@ class EventsCog(commands.Cog):
             {"name": "LFH", "url": "https://www.livescore.in/fr/handball/france/division-1-femmes/fixtures/"},
             {"name": "Euro Féminin", "url": "https://www.livescore.in/fr/handball/europe/ehf-euro-women/fixtures/", "teams_filter": ["france"]},
             {"name": "Mondial Masculin", "url": "https://www.livescore.in/fr/handball/monde/championnat-du-monde/fixtures/", "teams_filter": ["france"]},
-            {"name": "Mondial Féminin", "url": "https://www.livescore.in/fr/handball/europe/ehf-euro/fixtures/", "teams_filter": ["france"]},
+            {"name": "Mondial Féminin", "url": "https://www.livescore.in/fr/handball/monde/championnat-du-monde-femmes/fixtures/", "teams_filter": ["france"]},
             {"name": "Ligue des Champions Masculine", "url": "https://www.livescore.in/fr/handball/europe/ligue-des-champions/fixtures/", "teams_filter": ["paris", "psg","nantes"]},
             {"name": "Ligue des Champions Féminine", "url": "https://www.livescore.in/fr/handball/europe/ligue-des-champions-femmes/fixtures/", "teams_filter": ["metz", "brest-bretagne"]},
             {"name": "Ligue Européene Masculine", "url": "https://www.livescore.in/fr/handball/europe/ligue-europeenne/fixtures/", "teams_filter": ["montpellier"]},
@@ -225,128 +237,98 @@ class EventsCog(commands.Cog):
 
     # --- SCRAPING ---
 
-    async def scrape_livescore_matches(self, url, competition_name, teams_filter=None):
-        if not BROWSERLESS_API_TOKEN:
-            print(f"❌ (SCRAPING) [{competition_name}] Token Browserless manquant")
-            return []
-        matches = []
-        paris_tz = pytz.timezone('Europe/Paris')
+    async def _fetch_rendered_html(self, url, competition_name, with_tz_probe=True):
+        """HTML rendu par Browserless, ou None si l'appel échoue.
+
+        La sonde de fuseau est injectée via `addScriptTag` : si l'API la refuse,
+        l'appelant retente sans plutôt que de perdre tout le scraping.
+        """
         payload = {
             "url": url,
             "gotoOptions": {"waitUntil": "networkidle2", "timeout": 30000},
             "waitForSelector": {"selector": ".event__match", "timeout": 15000},
             "bestAttempt": True,
         }
+        if with_tz_probe:
+            payload["addScriptTag"] = [{"content": livescore.TZ_PROBE_SCRIPT}]
+
+        suffix = "" if with_tz_probe else " (sans sonde fuseau)"
+        async with aiohttp.ClientSession() as session:
+            async with session.post(BROWSERLESS_CONTENT_API_URL, json=payload, timeout=45) as response:
+                print(f"📡 (SCRAPING) [{competition_name}] Réponse Browserless{suffix}: {response.status}")
+                if response.status != 200:
+                    body = (await response.text())[:200]
+                    print(f"❌ (SCRAPING) [{competition_name}] Erreur HTTP {response.status} : {body}")
+                    return None
+                return await response.text()
+
+    async def scrape_livescore_matches(self, url, competition_name, teams_filter=None):
+        if not BROWSERLESS_API_TOKEN:
+            print(f"❌ (SCRAPING) [{competition_name}] Token Browserless manquant")
+            return []
 
         print(f"🔍 (SCRAPING) [{competition_name}] Démarrage du scraping : {url}")
+        matches = []
+        paris_tz = pytz.timezone('Europe/Paris')
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(BROWSERLESS_CONTENT_API_URL, json=payload, timeout=45) as response:
-                    print(f"📡 (SCRAPING) [{competition_name}] Réponse Browserless: {response.status}")
-                    if response.status != 200:
-                        print(f"❌ (SCRAPING) [{competition_name}] Erreur HTTP {response.status}")
-                        return matches
-                    html = await response.text()
-                    print(f"📄 (SCRAPING) [{competition_name}] HTML reçu: {len(html)} caractères")
-            
+            html = await self._fetch_rendered_html(url, competition_name)
+            if html is None:
+                html = await self._fetch_rendered_html(url, competition_name, with_tz_probe=False)
+            if html is None:
+                return matches
+            print(f"📄 (SCRAPING) [{competition_name}] HTML reçu: {len(html)} caractères")
+
             soup = BeautifulSoup(html, 'html.parser')
-            now = datetime.now(paris_tz)
-            match_containers = soup.select("div.event__match--scheduled")
-            print(f"📦 (SCRAPING) [{competition_name}] Conteneurs trouvés: {len(match_containers)}")
+            now_paris = datetime.now(paris_tz)
+            now_utc = datetime.now(timezone.utc)
+            limit_date_utc = now_utc + timedelta(days=7)
 
-            if not match_containers:
-                # Vérifier s'il y a d'autres types de matchs
-                all_containers = soup.select("div.event__match")
-                print(f"📦 (SCRAPING) [{competition_name}] Total conteneurs (tous types): {len(all_containers)}")
-                # Debug: afficher un extrait du HTML pour voir la structure
-                body_text = soup.get_text()[:500]
-                print(f"📝 (SCRAPING) [{competition_name}] Extrait page: {body_text}...")
+            source_tz, tz_label = livescore.detect_source_timezone(soup)
+            if source_tz is None:
+                source_tz, tz_label = LIVESCORE_SOURCE_TZ, f"{LIVESCORE_SOURCE_TZ_NAME} (repli, sonde absente)"
+            print(f"🕒 (SCRAPING) [{competition_name}] Horaires de la page lus en {tz_label}")
 
-            for idx, container in enumerate(match_containers):
-                try:
-                    time_elem = container.find(class_="event__time")
-                    if not time_elem:
-                        print(f"   ⚠️ Container {idx}: Pas d'élément event__time")
-                        continue
-                    
-                    time_text = time_elem.get_text(strip=True)
-                    match_time_parts = time_text.split(' ')
-                    if len(match_time_parts) != 2:
-                        print(f"   ⚠️ Container {idx}: Format de temps invalide: '{time_text}'")
-                        continue
-                    
-                    date_part, time_part = match_time_parts
-                    day, month = map(int, date_part.split('.')[:2])
-                    hour, minute = map(int, time_part.split(':'))
-                    
-                    year = now.year
-                    match_date = date(year, month, day)
-                    if match_date < now.date(): match_date = match_date.replace(year=year + 1)
-                        
-                    match_datetime_naive = datetime.combine(match_date, datetime.min.time()).replace(hour=hour, minute=minute)
-                    match_datetime_utc = match_datetime_naive.replace(tzinfo=timezone.utc)
-                    
-                    # Essayer plusieurs sélecteurs pour trouver les équipes
-                    # Nouvelles classes livescore.in (2025)
-                    team1_elem = container.find(class_="event__homeParticipant")
-                    team2_elem = container.find(class_="event__awayParticipant")
-                    
-                    # Anciennes classes (pour compatibilité)
-                    if not team1_elem or not team2_elem:
-                        team1_elem = container.find(class_="event__participant--home")
-                        team2_elem = container.find(class_="event__participant--away")
-                    
-                    # Si les classes spécifiques ne marchent pas, essayer des sélecteurs plus généraux
-                    if not team1_elem or not team2_elem:
-                        # Essayer avec les classes participant génériques (pattern wcl-participant_*)
-                        participants = container.find_all(class_=re.compile(r"event__.*Participant"))
-                        if len(participants) >= 2:
-                            team1_elem = participants[0]
-                            team2_elem = participants[1]
-                    
-                    if not team1_elem or not team2_elem:
-                        # Debug: afficher les classes disponibles dans ce container
-                        all_divs = container.find_all("div", class_=True)
-                        class_names = [" ".join(div.get('class', [])) for div in all_divs[:5]]
-                        print(f"   ⚠️ Container {idx}: Équipes non trouvées. Classes disponibles: {class_names}")
-                        continue
-                    
-                    team1 = team1_elem.get_text(strip=True)
-                    team2 = team2_elem.get_text(strip=True)
-                    
-                    if teams_filter:
-                        match_found = False
-                        for filter_name in teams_filter:
-                            if filter_name.lower() in team1.lower() or filter_name.lower() in team2.lower():
-                                match_found = True
-                                break
-                        if not match_found: continue         
-                            
-                    match_id_raw = container.get('id', '')
-                    match_id = match_id_raw.replace('g_7_', '')
+            containers, selector = livescore.find_match_rows(soup)
+            print(f"📦 (SCRAPING) [{competition_name}] Conteneurs trouvés: {len(containers)} ({selector})")
+            if not containers:
+                print(f"📝 (SCRAPING) [{competition_name}] Extrait page: {soup.get_text(' ', strip=True)[:300]}...")
+                return matches
 
-                    if not all([team1, team2, match_id]):
-                        print(f"⚠️ (SCRAPING) [{competition_name}] Données incomplètes: team1={team1}, team2={team2}, match_id={match_id}")
-                        continue
-
-                    limit_date_utc = datetime.now(timezone.utc) + timedelta(days=7)
-                    now_utc = now.astimezone(timezone.utc)
-                    print(f"🕐 (SCRAPING) [{competition_name}] Match trouvé: {team1} vs {team2} à {match_datetime_utc} (now: {now_utc}, limit: {limit_date_utc})")
-
-                    if now_utc < match_datetime_utc < limit_date_utc:
-                        matches.append({
-                            "team1": team1, "team2": team2,
-                            "start_time_utc": match_datetime_utc,
-                            "event_id": match_id,
-                            "competition": competition_name
-                        })
-                        print(f"✅ (SCRAPING) [{competition_name}] Match ajouté: {team1} vs {team2}")
-                    else:
-                        print(f"⏭️ (SCRAPING) [{competition_name}] Match hors fenêtre temporelle: {team1} vs {team2}")
-                except Exception as e:
-                    print(f"⚠️ (SCRAPING) [{competition_name}] Erreur parsing match: {e}")
+            skipped = []
+            for idx, container in enumerate(containers):
+                row = livescore.parse_match_row(container, now_paris.date())
+                if "error" in row:
+                    skipped.append(f"#{idx} {row['error']}")
                     continue
+
+                team1, team2 = row["team1"], row["team2"]
+                if teams_filter and not any(
+                    f.lower() in team1.lower() or f.lower() in team2.lower() for f in teams_filter
+                ):
+                    continue
+
+                start_time_utc = livescore.localize(row["naive_dt"], source_tz).astimezone(timezone.utc)
+                shown = start_time_utc.astimezone(paris_tz).strftime('%d/%m %H:%M')
+
+                if now_utc < start_time_utc < limit_date_utc:
+                    matches.append({
+                        "team1": team1, "team2": team2,
+                        "start_time_utc": start_time_utc,
+                        "event_id": row["event_id"],
+                        "competition": competition_name
+                    })
+                    print(f"✅ (SCRAPING) [{competition_name}] {team1} vs {team2} — {shown} Paris (page: '{row['raw_time']}')")
+                else:
+                    print(f"⏭️ (SCRAPING) [{competition_name}] Hors fenêtre 7j : {team1} vs {team2} — {shown} Paris")
+
+            if skipped:
+                print(f"⚠️ (SCRAPING) [{competition_name}] {len(skipped)} ligne(s) ignorée(s) : {' | '.join(skipped[:5])}")
+                if len(skipped) == len(containers):
+                    # Plus rien ne matche : le DOM a encore bougé, on loggue une
+                    # empreinte de ligne pour pouvoir corriger les sélecteurs.
+                    print(f"🔬 (SCRAPING) [{competition_name}] {livescore.describe_row(containers[0])}")
+
             print(f"🎯 (SCRAPING) [{competition_name}] Total matchs extraits: {len(matches)}")
             return matches
         except Exception as e:

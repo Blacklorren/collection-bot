@@ -28,6 +28,24 @@ class TestCog(commands.Cog):
         self.test_results = []
         self.test_messages = []
         
+    async def _scrape_starligue(self):
+        """Matchs Starligue via le scraper d'EventsCog -> (matchs, erreur).
+
+        Passer par le vrai scraper évite qu'une copie des sélecteurs vieillisse
+        ici sans qu'on s'en aperçoive.
+        """
+        if not BROWSERLESS_API_TOKEN:
+            return [], "Token Browserless manquant."
+        events_cog = self.bot.get_cog('EventsCog')
+        if not events_cog:
+            return [], "Cog Events non chargé."
+        comp = next((c for c in events_cog.COMPETITIONS if c["name"] == "Starligue"), events_cog.COMPETITIONS[0])
+        try:
+            matches = await events_cog.scrape_livescore_matches(comp["url"], comp["name"])
+        except Exception as e:
+            return [], f"{type(e).__name__}: {e}"
+        return matches, None
+
     def log_test(self, test_name, success, message=""):
         emoji = "✅" if success else "❌"
         if len(message) > 150: message = message[:147] + "..."
@@ -81,38 +99,15 @@ class TestCog(commands.Cog):
         start_msg = await ctx.send(f"🎯 **Lancement du test d'intégration...** Le test va se dérouler dans le salon {prono_channel.mention}.")
         
         # --- ÉTAPE 1: SCRAPING ---
-        parsed_matches = []
-        try:
-            if not BROWSERLESS_API_TOKEN:
-                await start_msg.edit(content="❌ **Erreur de configuration :** Token Browserless manquant."); return
-            
-            payload = {"url": LIVESCORE_URL}; 
-            async with aiohttp.ClientSession() as session:
-                async with session.post(BROWSERLESS_CONTENT_API_URL, json=payload, timeout=45) as response:
-                    if response.status != 200:
-                        await start_msg.edit(content=f"❌ **Erreur Scraping :** L'API a retourné le status {response.status}."); return
-                    html = await response.text()
-            
-            soup = BeautifulSoup(html, 'html.parser'); paris_tz = pytz.timezone('Europe/Paris'); now_paris = datetime.now(paris_tz)
-            for container in soup.select("div.event__match--scheduled"):
-                try:
-                    time_elem = container.find(class_="event__time"); time_text = time_elem.get_text(strip=True); date_part, time_part = time_text.split(' ')
-                    day, month = map(int, date_part.split('.')[:2]); hour, minute = map(int, time_part.split(':'))
-                    year = now_paris.year; match_date = date(year, month, day)
-                    if match_date < now_paris.date(): match_date = match_date.replace(year=year + 1)
-                    dt = datetime.combine(match_date, datetime.min.time()).replace(hour=hour, minute=minute)
-                    team1 = container.find(class_="event__participant--home").get_text(strip=True); team2 = container.find(class_="event__participant--away").get_text(strip=True)
-                    parsed_matches.append({"team1": team1, "team2": team2, "datetime_paris": paris_tz.localize(dt)})
-                except: continue
-        except Exception as e:
-            await start_msg.edit(content=f"❌ **Erreur durant le scraping :** `{e}`"); return
-
-        if not parsed_matches:
+        matches, error = await self._scrape_starligue()
+        if error:
+            await start_msg.edit(content=f"❌ **Erreur durant le scraping :** `{error}`"); return
+        if not matches:
             await start_msg.edit(content="⚠️ **Test annulé :** Aucun match programmé n'a été trouvé sur Livescore pour servir de test."); return
-        
-        target_match = parsed_matches[0]
-        team1, team2, match_date_utc = target_match['team1'], target_match['team2'], target_match['datetime_paris'].astimezone(timezone.utc)
-        
+
+        target_match = min(matches, key=lambda m: m['start_time_utc'])
+        team1, team2, match_date_utc = target_match['team1'], target_match['team2'], target_match['start_time_utc']
+
         # --- ÉTAPE 2: CRÉATION DU TEST DANS LE BON SALON ---
         test_message = None; match_id = None; fake_event_id = f"test_{int(datetime.now().timestamp())}"
         try:
@@ -199,26 +194,25 @@ class TestCog(commands.Cog):
     @test_group.command(name='scraping')
     async def test_scraping(self, ctx, silent=False):
         if not silent:
-            msg = await ctx.send(f"🌐 **Test du scraping via Browserless sur `{LIVESCORE_URL}`...**"); self.test_messages.append(msg)
-        if not BROWSERLESS_API_TOKEN:
-            self.log_test("Configuration", False, "Token Browserless manquant."); await ctx.send("❌ **Échec config :** Token API introuvable."); return
-        payload = {"url": LIVESCORE_URL}
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(BROWSERLESS_CONTENT_API_URL, json=payload, timeout=45) as response:
-                    status = response.status; self.log_test("API Connexion", status == 200, f"Status: {status}")
-                    if status != 200:
-                        if not silent: await ctx.send(f"❌ **Échec connexion API (Status: {status})**"); return
-                    html = await response.text()
-            soup = BeautifulSoup(html, 'html.parser'); parsed_matches = []
-            if soup.select("div.event__match--scheduled"):
-                self.log_test("Analyse HTML", True, f"{len(soup.select('div.event__match--scheduled'))} matchs trouvés.")
-                if not silent: await ctx.send(f"✅ **Scraping et analyse OK.** {len(soup.select('div.event__match--scheduled'))} matchs trouvés.")
-            else:
-                self.log_test("Analyse HTML", False, "Aucun match parsé.")
-                if not silent: await ctx.send("⚠️ **Scraping réussi mais aucun match parsé.** La structure a sûrement changé.")
-        except Exception as e:
-            self.log_test("Scraping", False, f"{type(e).__name__}: {e}"); await ctx.send(f"❌ **Erreur scraping :** `{type(e).__name__}: {e}`")
+            msg = await ctx.send("🌐 **Test du scraping Starligue via Browserless...**"); self.test_messages.append(msg)
+
+        matches, error = await self._scrape_starligue()
+        if error:
+            self.log_test("Scraping", False, error)
+            await ctx.send(f"❌ **Erreur scraping :** `{error}`")
+            return
+
+        # Compter les conteneurs ne prouve rien : seul un match complètement
+        # parsé (équipes + horaire) valide que les sélecteurs tiennent encore.
+        if matches:
+            apercu = ", ".join(f"{m['team1']}-{m['team2']}" for m in matches[:3])
+            self.log_test("Analyse HTML", True, f"{len(matches)} match(s) extrait(s) : {apercu}")
+            if not silent:
+                await ctx.send(f"✅ **Scraping OK.** {len(matches)} match(s) extrait(s) sous 7 jours : {apercu}")
+        else:
+            self.log_test("Analyse HTML", False, "0 match extrait.")
+            if not silent:
+                await ctx.send("⚠️ **Scraping joignable mais 0 match extrait.** Structure du site changée, ou aucun match sous 7 jours (voir les logs).")
 
     @test_group.command(name='db')
     async def test_db(self, ctx, silent=False):
@@ -239,7 +233,7 @@ class TestCog(commands.Cog):
             with open('cards.json', 'r', encoding='utf-8') as f: data = json.load(f)
             if not isinstance(data, list) or not data: raise ValueError("JSON vide")
             self.log_test("cards.json", True, f"{len(data)} cartes.")
-            card = data[0]; embed = discord.Embed(title=f"**{card['nom']}**", color=discord.Color.blue); embed.set_image(url=card['image_url'])
+            card = data[0]; embed = discord.Embed(title=f"**{card['nom']}**", color=discord.Color.blue); embed.set_image(url=card.get('image_url'))
             if not silent: msg = await ctx.send(embed=embed); self.test_messages.append(msg)
             self.log_test("Affichage carte", True)
         except Exception as e: self.log_test("Collection", False, str(e)); await ctx.send(f"❌ **Erreur collection :** `{str(e)}`")
