@@ -8,8 +8,11 @@ Ce que fait la migration :
     remise a plat complete de l'economie, personne ne demarre la S2 avec une
     reserve constituee avant la bascule.
 
-Ce qu'elle ne touche pas : les pronostics et l'Elo des duels. Seule la collection S1
-survit, a un exemplaire par carte, en lecture seule.
+L'Elo des duels repart de sa valeur de depart (1000) : classement neuf pour la
+saison 2. L'historique de la table `duels` est conserve comme journal.
+
+Ce qu'elle ne touche pas : les pronostics, ni les collections elles-memes. Seule la
+collection S1 survit, a un exemplaire par carte, en lecture seule.
 
 A ne pas confondre avec database.wipe_all_user_data(), qui efface TOUT, collections
 comprises. Ici les collections survivent, seuls les doublons disparaissent.
@@ -33,6 +36,7 @@ from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import database  # noqa: E402
+import duel_engine  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CARDS_S1 = os.path.join(ROOT, "cards.json")
@@ -40,11 +44,24 @@ CARDS_S1 = os.path.join(ROOT, "cards.json")
 # Compteurs de la table users remis a zero au lancement de la S2
 COLONNES_RAZ = ("fragments", "packs", "points")
 
+# L'Elo, lui, ne repart pas de zero mais de sa VALEUR DE DEPART : un classement
+# de duels neuf pour la saison 2 (arbitrage de la reprise). L'historique de la
+# table `duels` est conserve tel quel — c'est un journal, et chaque ligne porte
+# deja l'Elo d'avant et d'apres, donc il reste lisible.
+ELO_DEPART = duel_engine.ELO_START
+
 
 def ids_s1():
-    """Ids des cartes S1, en texte : la colonne card_id melange entiers et chaines
-    (ex. 'noel_1'), on compare donc tout en TEXT."""
-    return [str(c["id"]) for c in json.load(open(CARDS_S1, encoding="utf-8"))]
+    """Ids des cartes de la SAISON 1, en texte : la colonne card_id melange entiers
+    et chaines (ex. 'noel_1'), on compare donc tout en TEXT.
+
+    Le filtre sur `saison` rend cette migration INDEPENDANTE DE L'ORDRE. Sans lui,
+    publier la saison 2 avant de migrer ferait purger les doublons de la saison
+    NEUVE (ids_s1() rendrait aussi les slugs S2) : un joueur qui aurait ouvert des
+    packs entre la publication et la bascule perdrait ce qu'il vient de gagner.
+    Une carte sans champ `saison` date d'avant tools/publier_s2.py : c'est une S1."""
+    cartes = json.load(open(CARDS_S1, encoding="utf-8"))
+    return [str(c["id"]) for c in cartes if c.get("saison", 1) == 1]
 
 
 def colonne_existe(cur, table, colonne):
@@ -93,6 +110,7 @@ def main():
     """, s1).fetchone()[0]
 
     presentes = [c for c in COLONNES_RAZ if colonne_existe(cur, "users", c)]
+    elo_present = colonne_existe(cur, "users", "elo")
 
     print(f"Base            : {args.db}")
     print(f"Cartes en base  : {total} lignes")
@@ -105,6 +123,14 @@ def main():
             f"SELECT COALESCE(SUM({col}),0), COUNT(*) FILTER (WHERE {col} > 0) FROM users"
         ).fetchone()
         print(f"{col.capitalize():15s} : {somme} au total, chez {combien} joueurs")
+    if elo_present:
+        combien, mini, maxi = cur.execute(
+            f"SELECT COUNT(*) FILTER (WHERE elo != {ELO_DEPART}), MIN(elo), MAX(elo) FROM users"
+        ).fetchone()
+        print(f"{'Elo':15s} : {combien} joueur(s) hors de {ELO_DEPART} "
+              f"(de {mini} a {maxi}) -> tous ramenes a {ELO_DEPART}")
+    else:
+        print(f"{'Elo':15s} : colonne absente, rien a faire")
 
     if not args.go:
         print("\nSIMULATION — rien n'a ete ecrit. Relance avec --go pour appliquer.")
@@ -129,6 +155,9 @@ def main():
         for col in presentes:
             cur.execute(f"UPDATE users SET {col} = 0 WHERE {col} != 0")
             remises[col] = cur.rowcount
+        if elo_present:
+            cur.execute("UPDATE users SET elo = ? WHERE elo != ?", (ELO_DEPART, ELO_DEPART))
+            remises["elo"] = cur.rowcount
         con.commit()
     except Exception:
         con.rollback()
@@ -143,8 +172,11 @@ def main():
     """, s1).fetchone()[0]
     con.close()
 
-    detail = ", ".join(f"{n} {col}" for col, n in remises.items())
-    print(f"\n{supprimees} doublons supprimes. Compteurs remis a zero : {detail}.")
+    detail = ", ".join(f"{n} {col}" for col, n in remises.items() if col != "elo")
+    print("")
+    print(f"{supprimees} doublons supprimes. Compteurs remis a zero : {detail}.")
+    if remises.get("elo"):
+        print(f"{remises['elo']} joueur(s) ramene(s) a {ELO_DEPART} d'Elo (classement neuf).")
     print(f"Controle : {restants} doublon(s) S1 restant(s) (doit valoir 0).")
     print(f"En cas de probleme, restaurer la sauvegarde : {os.path.basename(bak)}")
 
