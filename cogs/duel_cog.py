@@ -34,7 +34,7 @@ from discord.ext import commands
 import database
 import duel_engine as E
 from beta import beta_guard, BetaLocked, is_tester
-from cogs.collection_cog import load_cards_data, RARITY_EMOJI
+from cogs.collection_cog import load_cards_data, RARITY_EMOJI, saison_de, saison_en_cours
 
 PARIS = pytz.timezone("Europe/Paris")
 
@@ -198,7 +198,7 @@ class LineupPicker(discord.ui.View):
                 continue
             seen.add(cid)
             card = self.cog.get_card(cid)
-            if card and card.get("rarete") != "Noël":   # Noël = promo, non jouable
+            if self.cog.jouable(card):
                 clubs.setdefault(card["club"], []).append(card)
         return clubs
 
@@ -452,10 +452,22 @@ class DuelCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.all_cards = load_cards_data()
+        # Saison EFFECTIVE, pas la constante : si les cartes de la saison n'ont pas
+        # encore ete publiees, on suit celle qui l'est (cf saison_en_cours).
+        self.saison = saison_en_cours(self.all_cards)
         self.card_map = {}
         for c in self.all_cards:
             self.card_map[c["id"]] = c
             self.card_map[str(c["id"])] = c
+
+    def jouable(self, card):
+        """Une carte est alignable en duel si elle est de la saison EN COURS.
+
+        Les cartes des saisons passees restent dans la collection — c'est l'archive —
+        mais ne descendent plus sur le terrain : sinon un ancien alignerait d'entree
+        une equipe complete heritee de la saison 1, contre laquelle un nouveau ne
+        peut rien. Les cartes Noel restent exclues, c'est une promo."""
+        return bool(card) and card.get("rarete") != "Noël" and saison_de(card) == self.saison
 
     def get_card(self, cid):
         return self.card_map.get(cid) or self.card_map.get(str(cid))
@@ -481,7 +493,7 @@ class DuelCog(commands.Cog):
                 continue
             seen.add(cid)
             card = self.get_card(cid)
-            if card and card.get("rarete") != "Noël":   # Noël = promo, non jouable
+            if self.jouable(card):
                 cards.append(card)
 
         lineup = {s: None for s in E.SLOTS}
@@ -504,7 +516,7 @@ class DuelCog(commands.Cog):
         """Équipe synthétique du bot pour un entraînement : une carte de `rarete`
         par poste, à son poste naturel quand le pool le permet (donc bonus ×1.4).
         Les cartes sortent de cards.json, pas d'une collection : rien en base."""
-        pool = [c for c in self.all_cards if c.get("rarete") == rarete]
+        pool = [c for c in self.all_cards if c.get("rarete") == rarete and self.jouable(c)]
         lineup = {s: None for s in E.SLOTS}
         used = set()
         for slot in E.SLOTS:
@@ -527,7 +539,7 @@ class DuelCog(commands.Cog):
         for slot in E.SLOTS:
             cid = last.get(slot)
             card = self.get_card(cid) if cid is not None else None
-            if card and str(card["id"]) in owned and card.get("rarete") != "Noël":
+            if self.jouable(card) and str(card["id"]) in owned:
                 lineup[slot] = card
         if not any(lineup.values()):
             lineup = self.auto_lineup(user_id)
@@ -566,7 +578,7 @@ class DuelCog(commands.Cog):
             return await interaction.response.send_message("Un des deux joueurs a déjà un duel en cours.", ephemeral=True)
 
         # Faut-il au moins quelques cartes jouables ?
-        if not any(self.get_card(c) and self.get_card(c).get("rarete") != "Noël"
+        if not any(self.jouable(self.get_card(c))
                    for c in database.get_user_collection(challenger.id)):
             return await interaction.response.send_message("Tu n'as pas encore de cartes jouables.", ephemeral=True)
 

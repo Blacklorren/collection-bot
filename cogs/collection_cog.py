@@ -89,6 +89,37 @@ def load_cards_data():
     with open('cards.json', 'r', encoding='utf-8') as f:
         return json.load(f)
 
+
+# --- SAISON (reprise du 4 septembre) ---------------------------------------
+# Les cartes des saisons passées restent VISIBLES dans la collection — c'est
+# l'archive, et elle est complète à un exemplaire par carte — mais elles ne sont
+# plus tirables en pack, plus créables au craft, et plus alignables en duel.
+# Une carte sans champ « saison » date d'avant tools/publier_s2.py : c'est une S1.
+SAISON_COURANTE = 2
+
+
+def saison_de(card):
+    return card.get('saison', 1)
+
+
+def cartes_de_la_saison(cards, saison=SAISON_COURANTE):
+    return [c for c in cards if saison_de(c) == saison]
+
+
+def saison_en_cours(cards):
+    """La saison qui SE JOUE réellement.
+
+    SAISON_COURANTE dès qu'elle est publiée dans cards.json, sinon la plus récente
+    qui s'y trouve. Ce repli existe pour une raison précise : si le code part en
+    production avant tools/publier_s2.py, le pool de tirage serait VIDE — /pack
+    planterait sur un tirage sans candidat et plus personne ne pourrait aligner
+    une équipe. Avec le repli, le bot continue simplement la saison précédente
+    jusqu'à ce que les cartes arrivent."""
+    if any(saison_de(c) == SAISON_COURANTE for c in cards):
+        return SAISON_COURANTE
+    dispo = {saison_de(c) for c in cards}
+    return max(dispo) if dispo else SAISON_COURANTE
+
 class RecycleView(discord.ui.View):
     """Recyclage sélectif (Saison 2) : choisir les doublons à recycler, ou tout recycler."""
 
@@ -205,14 +236,24 @@ class CollectionCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.all_cards = load_cards_data()
+        # Ce qui se JOUE cette saison. Tout le reste (tirage, craft, progression,
+        # classement) s'y rapporte ; seul card_map garde les cartes archivées, sans
+        # quoi une collection de la saison passée ne se résoudrait plus (nom, rareté,
+        # image) et l'album afficherait des trous à la place.
+        self.saison = saison_en_cours(self.all_cards)
+        if self.saison != SAISON_COURANTE:
+            print(f"⚠️  (CARTES) Aucune carte de la saison {SAISON_COURANTE} dans "
+                  f"cards.json — le bot continue la saison {self.saison}. "
+                  f"Lance tools/publier_s2.py puis redémarre.")
+        self.cards_saison = cartes_de_la_saison(self.all_cards, self.saison)
 
-        # Organisation des cartes pour les tirages
+        # Organisation des cartes pour les tirages (saison en cours uniquement)
         self.cards_by_rarity = {
-            "Commun": [c for c in self.all_cards if c['rarete'] == 'Commun'],
-            "Peu Commun": [c for c in self.all_cards if c['rarete'] == 'Peu Commun'],
-            "Rare": [c for c in self.all_cards if c['rarete'] == 'Rare'],
-            "Épique": [c for c in self.all_cards if c['rarete'] == 'Épique'],
-            "Légendaire": [c for c in self.all_cards if c['rarete'] == 'Légendaire']
+            "Commun": [c for c in self.cards_saison if c['rarete'] == 'Commun'],
+            "Peu Commun": [c for c in self.cards_saison if c['rarete'] == 'Peu Commun'],
+            "Rare": [c for c in self.cards_saison if c['rarete'] == 'Rare'],
+            "Épique": [c for c in self.cards_saison if c['rarete'] == 'Épique'],
+            "Légendaire": [c for c in self.cards_saison if c['rarete'] == 'Légendaire']
         }
         
         # Calcul du total par club pour l'affichage
@@ -236,12 +277,16 @@ class CollectionCog(commands.Cog):
 
         unique_cards = {c['id']: c for c in cards_pool}.values()
 
-        # Complétion calculée sur le sous-ensemble Commun + Peu Commun uniquement
+        # Complétion calculée sur le sous-ensemble Commun + Peu Commun uniquement,
+        # et SUR LA SAISON EN COURS seulement : compter l'archive activerait le boost
+        # dès le premier pack (une collection S1 complète, c'est 166 basses raretés
+        # pour 173 en S2), alors que le joueur repart de zéro cette saison.
         low_tier_total = sum(len(self.cards_by_rarity.get(r, [])) for r in LOW_TIER_RARITIES)
         low_tier_owned = 0
         for cid in user_collection_set:
             card = self.card_map.get(cid)
-            if card and card.get('rarete') in LOW_TIER_RARITIES:
+            if (card and card.get('rarete') in LOW_TIER_RARITIES
+                    and saison_de(card) == self.saison):
                 low_tier_owned += 1
         boost_active = low_tier_total > 0 and (low_tier_owned / low_tier_total) >= LOW_TIER_THRESHOLD
 
@@ -508,8 +553,9 @@ class CollectionCog(commands.Cog):
         return f"{emoji} **{card['nom']}** · {card['rarete']} — {tag}"
 
     def _album_progress_text(self, uid):
-        unique = len(set(database.get_user_collection(uid)))
-        total = len(self.all_cards)
+        ids_saison = {str(c['id']) for c in self.cards_saison}
+        unique = len({str(c) for c in database.get_user_collection(uid)} & ids_saison)
+        total = len(self.cards_saison)
         pct = (unique / total * 100) if total else 0
         return f"📈 Album : {unique}/{total} ({pct:.0f}%)"
 
@@ -544,7 +590,7 @@ class CollectionCog(commands.Cog):
             data = None
         if data:
             return discord.File(io.BytesIO(data), filename="card.png"), "attachment://card.png"
-        return None, card['image_url']
+        return None, card.get('image_url')
 
     async def _reveal_each(self, edit, uid, packs):
         """Ouverture détaillée : révèle chaque pack l'un après l'autre (1 à 5 packs)."""
@@ -649,7 +695,7 @@ class CollectionCog(commands.Cog):
                     description=f"**{member.mention}** vient de tirer **{card['nom']}** ({card['rarete']}) !",
                     color=RARITY_COLORS.get(card['rarete'], discord.Color.gold()),
                 )
-                em.set_image(url=card['image_url'])
+                em.set_image(url=card.get('image_url'))
                 await chan.send(embed=em)
             except Exception:
                 pass
@@ -689,7 +735,7 @@ class CollectionCog(commands.Cog):
                 f"ℹ️ *Les utilisateurs qui l'avaient déjà n'ont pas reçu de doublon.*"
             )
             embed.color = discord.Color.green()
-            embed.set_image(url=target_card['image_url'])
+            embed.set_image(url=target_card.get('image_url'))
             await msg.edit(embed=embed)
             
         except Exception as e:
@@ -700,22 +746,39 @@ class CollectionCog(commands.Cog):
         # Ordre d'affichage des raretés dans le tableau de bord
         RARITY_ORDER_LIST = ["Commun", "Peu Commun", "Rare", "Épique", "Légendaire", "Noël"]
 
-        def __init__(self, author_id, all_cards, owned_ids):
+        def __init__(self, author_id, all_cards, owned_ids, saison=SAISON_COURANTE):
             super().__init__(timeout=180)
             self.author_id = author_id
-            self.all_cards = all_cards
+            self.toutes_cartes = all_cards
             self.owned_ids = {str(x) for x in owned_ids}
+            # Tant qu'une saison n'est pas publiée, son catalogue est vide : on ouvre
+            # alors sur la plus récente qui existe. Sans ça le menu de clubs partirait
+            # sans une seule option, et Discord refuse le message entier.
+            if not cartes_de_la_saison(all_cards, saison):
+                dispo = {saison_de(c) for c in all_cards}
+                saison = max(dispo) if dispo else saison
+            self._indexer(saison)
+
+        def _indexer(self, saison):
+            """(Re)construit les index sur UNE saison.
+
+            Une collection ne se lit que saison par saison : mélanger les deux
+            donnerait des comptes de club faux (165 joueurs ont une carte dans
+            chacune) et un pourcentage de complétion qui ne veut rien dire. Rejoué
+            tel quel au basculement vers l'archive."""
+            self.saison = saison
+            self.all_cards = cartes_de_la_saison(self.toutes_cartes, saison)
             self.current_club = None
             self._album_cache = {}  # bytes de l'image d'album, par club (évite de régénérer)
 
             # Cartes possédées (uniques)
-            self.collection = [c for c in all_cards if str(c['id']) in self.owned_ids]
+            self.collection = [c for c in self.all_cards if str(c['id']) in self.owned_ids]
 
             # Index : toutes les cartes par club, cartes possédées par club, totaux par rareté
             self.full_by_club = {}
             self.cards_per_club_total = {}
             self.rarity_total = {}
-            for card in all_cards:
+            for card in self.all_cards:
                 self.full_by_club.setdefault(card['club'], []).append(card)
                 self.cards_per_club_total[card['club']] = self.cards_per_club_total.get(card['club'], 0) + 1
                 self.rarity_total[card['rarete']] = self.rarity_total.get(card['rarete'], 0) + 1
@@ -726,10 +789,24 @@ class CollectionCog(commands.Cog):
                 self.cards_by_club.setdefault(card['club'], []).append(card)
                 self.rarity_owned[card['rarete']] = self.rarity_owned.get(card['rarete'], 0) + 1
 
-            self.club_select.options = self.create_select_options()
-            if not self.collection:
-                self.club_select.placeholder = "Ta collection est vide !"
-                self.club_select.disabled = True
+            # Un menu sans option fait rejeter le message par Discord : on en garde
+            # toujours une, inerte, plutôt que de casser /collection.
+            options = self.create_select_options()
+            self.club_select.options = options or [discord.SelectOption(label="—", value="_vide")]
+            self.club_select.disabled = not (options and self.collection)
+            if not options:
+                self.club_select.placeholder = "Saison pas encore publiée."
+            elif not self.collection:
+                self.club_select.placeholder = ("Ta collection est vide !" if saison == SAISON_COURANTE
+                                                else "Aucune carte archivée.")
+            else:
+                self.club_select.placeholder = "Choisis un club..."
+            self.home_button.disabled = True
+            # Rien à basculer tant que l'autre saison n'a pas été publiée.
+            autre = 1 if saison == SAISON_COURANTE else SAISON_COURANTE
+            self.saison_button.disabled = not cartes_de_la_saison(self.toutes_cartes, autre)
+            self.saison_button.label = ("🗄️ Archive S1" if saison == SAISON_COURANTE
+                                        else f"🔙 Saison {SAISON_COURANTE}")
 
         # --- Helpers d'affichage ---
         def _bar(self, pct, length=20):
@@ -757,9 +834,14 @@ class CollectionCog(commands.Cog):
             total = len(self.all_cards)
             pct = (unique / total * 100) if total else 0
 
+            archive = self.saison != SAISON_COURANTE
             embed = discord.Embed(
-                title="🗂️ Album de Collection",
-                description="Choisis un club ci-dessous pour afficher son album complet en image.",
+                title=(f"🗄️ Archive — Saison {self.saison}" if archive
+                       else f"🗂️ Album de Collection — Saison {self.saison}"),
+                description=("Ces cartes ne sont plus tirables ni jouables en duel : "
+                             "elles restent là comme souvenir de la saison passée."
+                             if archive else
+                             "Choisis un club ci-dessous pour afficher son album complet en image."),
                 color=discord.Color.dark_theme(),
             )
             embed.add_field(
@@ -837,6 +919,14 @@ class CollectionCog(commands.Cog):
             embed, file = await self.build_club_view()
             await interaction.edit_original_response(embed=embed, attachments=[file], view=self)
 
+        @discord.ui.button(label="🗄️ Archive S1", style=discord.ButtonStyle.secondary, row=1)
+        async def saison_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+            if interaction.user.id != self.author_id:
+                return await self._deny(interaction)
+            self._indexer(1 if self.saison == SAISON_COURANTE else SAISON_COURANTE)
+            await interaction.response.edit_message(embed=self.build_home_embed(),
+                                                    attachments=[], view=self)
+
         @discord.ui.button(label="↩️ Vue d'ensemble", style=discord.ButtonStyle.grey, row=1, disabled=True)
         async def home_button(self, interaction: discord.Interaction, button: discord.ui.Button):
             if interaction.user.id != self.author_id:
@@ -848,7 +938,7 @@ class CollectionCog(commands.Cog):
     @app_commands.command(name='collection', description="Affiche ta collection.")
     async def collection_command(self, interaction: discord.Interaction):
         raw_ids = database.get_user_collection(interaction.user.id)
-        view = self.CollectionView(interaction.user.id, self.all_cards, raw_ids)
+        view = self.CollectionView(interaction.user.id, self.all_cards, raw_ids, self.saison)
         await interaction.response.send_message(embed=view.build_home_embed(), view=view, ephemeral=True)
 
     # --- Helpers de recyclage (partagés legacy / sélectif) ---
@@ -916,7 +1006,10 @@ class CollectionCog(commands.Cog):
 
     @app_commands.command(name='creer', description="Fabriquer une carte.")
     async def create_card_command(self, interaction: discord.Interaction, nom_de_la_carte: str):
-        matches = [c for c in self.all_cards if nom_de_la_carte.lower() in c['nom'].lower()]
+        # Sur la saison en cours seulement : 165 joueurs existent dans les deux
+        # saisons, donc chercher sur tout le catalogue rendrait « Trop de résultats »
+        # pour la majorité des noms, en plus de permettre de fabriquer une archive.
+        matches = [c for c in self.cards_saison if nom_de_la_carte.lower() in c['nom'].lower()]
         
         if not matches: return await interaction.response.send_message("Carte introuvable.", ephemeral=True)
         if len(matches) > 1: return await interaction.response.send_message("Trop de résultats.", ephemeral=True)
@@ -950,7 +1043,7 @@ class CollectionCog(commands.Cog):
         database.add_card_to_collection(interaction.user.id, target['id'])
         
         e = discord.Embed(title="🃏 Carte Créée !", description=f"Bienvenue à **{target['nom']}** !", color=RARITY_COLORS.get(target['rarete']))
-        e.set_image(url=target['image_url'])
+        e.set_image(url=target.get('image_url'))
         await interaction.response.send_message(embed=e, ephemeral=True)
 
     @app_commands.command(name='fragments', description="Infos sur le recyclage et la création.")
@@ -968,11 +1061,11 @@ class CollectionCog(commands.Cog):
     @app_commands.command(name='top', description="Classement collection.")
     async def top_command(self, interaction: discord.Interaction):
         # On passe la liste des ID valides pour ne compter que les cartes qui existent encore
-        valid_ids = [c['id'] for c in self.all_cards]
+        valid_ids = [c['id'] for c in self.cards_saison]
         data = database.get_leaderboard_data(valid_ids, limit=20)
         clean_data = [d for d in data if d[0] not in LEADERBOARD_EXCLUDED_IDS][:20]
 
-        total_cards = len(self.all_cards)
+        total_cards = len(self.cards_saison)
         
         desc = ""
         for i, (uid, count) in enumerate(clean_data, 1):
@@ -1032,7 +1125,7 @@ class CollectionCog(commands.Cog):
             description=f"**{target['nom']}** a été ajoutée à la collection de {membre.mention}.",
             color=RARITY_COLORS.get(target['rarete'], discord.Color.default()),
         )
-        e.set_image(url=target['image_url'])
+        e.set_image(url=target.get('image_url'))
         await interaction.response.send_message(embed=e, ephemeral=True)
         try:
             await membre.send(f"🎁 Un admin t'a offert la carte **{target['nom']}** ({target['rarete']}) !")
