@@ -7,3 +7,7 @@ aiohttp==3.9.3
 beautifulsoup4==4.12.3
 lxml==5.1.0
 Pillow==10.2.0
+# Filet : audioop a ete retire de la stdlib en Python 3.13 (PEP 594) et
+# discord.py 2.3.2 l'importe au demarrage. Si le builder passe a 3.13,
+# ce backport evite que le bot refuse de demarrer.
+audioop-lts; python_version >= "3.13"
