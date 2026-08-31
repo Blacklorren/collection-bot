@@ -44,6 +44,45 @@ BORDER = 42     # epaisseur de la bordure noire (v2)
 PLAYER_ZOOM = 0.78        # echelle du joueur detoure (dezoom : on retrouve les epaules)
 PLAYER_TOP_MARGIN = 54    # air entre le liseré superieur et le sommet du crane
 BAND_TOP = 1028           # y du haut du bandeau noir / du separateur de couleur
+
+# --- Profil de cadrage "buste" : portraits S2 generes par Midjourney ---------------
+# Les rendus MJ sont deja cadres serre sur le buste et remplissent leur image. Leur
+# appliquer le dezoom S1 (PLAYER_ZOOM, une fraction fixe de la carte) les reduit a
+# 773 px de large sur une carte qui en fait 992 : d'ou le vide de part et d'autre des
+# epaules. Ici on met la BBOX DU SUJET a l'echelle de la carte, ce qui s'adapte au
+# cadrage reel de chaque image au lieu de le supposer.
+# Ce profil est opt-in (compose_v2(..., cadrage="buste")) : les cartes S1, dont les
+# portraits sources sont cadres tout autrement, gardent exactement le rendu actuel.
+BUSTE_RECOUVREMENT = 30   # de combien le bas du buste doit passer sous le separateur.
+# Le bandeau est opaque : ce qui compte est qu'il n'y ait pas de jour, pas que le
+# buste descende loin. A 60 px, deux rendus au buste court (Mohamed, Garciandia)
+# etaient agrandis pour rien, ce qui rognait leur chevelure de plus de 100 px.
+# Taille de tete visee, en fraction de la hauteur de carte. C'est LE reglage
+# d'homogeneite de la collection.
+#
+# Ce qu'on veut egaliser, c'est le VISAGE, et il n'est pas directement mesurable :
+# la silhouette ne dit pas ou s'arrete la chevelure. Deux reperes s'en approchent,
+# et ils se trompent dans des sens opposes :
+#   - crane -> menton : exact, mais gonfle par les cheveux (un afro, une coiffure
+#     bouffante, et le visage se retrouve reduit d'autant) ;
+#   - largeur du cou : insensible a la coiffure, mais suit la carrure.
+# On prend leur moyenne geometrique, ce qui divise par deux l'erreur de chacun.
+# BUSTE_COU_RATIO ramene la largeur de cou a l'echelle des hauteurs de tete : c'est
+# le rapport des medianes mesure sur les 98 rendus S2, pas une constante anatomique.
+BUSTE_TETE_H = 0.605
+BUSTE_COU_RATIO = 1.81
+BUSTE_MENTON_DEFAUT = 0.62  # repli quand le cou n'est pas detectable (cheveux longs)
+# Le menton est cale a une hauteur FIXE et c'est le sommet du crane qui flotte : une
+# chevelure haute monte dans le cadre au lieu de rapetisser le visage. Quand elle
+# depasse, on la ROGNE contre le liseré plutot que de reduire le visage — un crane
+# coupe par le bord est un cadrage de portrait ordinaire, un visage plus petit que
+# celui d'a cote se voit tout de suite. Au-dela de BUSTE_ROGNAGE_MAX on reduit quand
+# meme : deux joueurs sur 98 (Tritta, de 0,5 %, et Mohamed et son afro, de 4 %).
+BUSTE_MENTON_Y = 830
+BUSTE_ROGNAGE_MAX = 55
+_BUSTE_PROFIL_H = 256     # hauteur de travail de l'analyse de silhouette
+_BUSTE_LISSAGE = 5        # moyenne glissante sur le profil reduit, en lignes
+_BUSTE_CREUX = 0.88       # le cou doit etre 12 % plus etroit que la tete pour etre cru
 LOGO_SIZE = 180           # taille de l'ecusson dans le bandeau
 DISC_R = 108              # rayon du disque blanc sous l'ecusson (suit la taille du logo)
 
@@ -283,7 +322,116 @@ def _bottom_shade(size, start=0.5, max_a=210):
     return layer
 
 
-def compose_v2(cutout, nom, club, rarete, poste="", zoom=PLAYER_ZOOM):
+def _profil_largeur(alpha):
+    """Largeur de la silhouette ligne par ligne, en px de l'image reduite.
+
+    Mesure faite sur une reduction a _BUSTE_PROFIL_H lignes : a cette echelle une
+    ligne vaut ~5 px source, ce qui suffit largement pour situer un cou, et la
+    boucle Python reste negligeable. Renvoie (profil lisse, echelle source/reduit).
+    """
+    ech = alpha.height / _BUSTE_PROFIL_H
+    # Seule la hauteur est reduite : garder la largeur d'origine preserve la mesure
+    # des extremites de chaque ligne, qui est justement ce qu'on veut lire.
+    petit = alpha.resize((alpha.width, _BUSTE_PROFIL_H),
+                         Image.Resampling.BILINEAR).point(lambda v: 255 if v > 32 else 0)
+    larg = []
+    for y in range(petit.height):
+        bb = petit.crop((0, y, petit.width, y + 1)).getbbox()
+        larg.append(bb[2] - bb[0] if bb else 0)
+    n = _BUSTE_LISSAGE // 2
+    lisse = [sum(larg[max(0, y - n):y + n + 1]) / len(larg[max(0, y - n):y + n + 1])
+             for y in range(len(larg))]
+    return lisse, ech
+
+
+def _menton(alpha, bb):
+    """-> (y du menton sous le sommet du crane en px source ; largeur du cou ; fiable).
+
+    Le profil largeur(ligne) d'un buste a une forme caracteristique : nul au sommet
+    du crane, un ventre a hauteur des oreilles, un ETRANGLEMENT au cou, puis les
+    epaules qui saturent la largeur du cadre. Le menton est cet etranglement.
+
+    Il n'existe pas toujours : une chevelure longue (locs, dreadlocks) comble le cou
+    et le profil devient monotone. On le detecte au lieu de renvoyer n'importe quoi.
+    """
+    tete = alpha.crop(bb)
+    lisse, ech = _profil_largeur(tete)
+    n = len(lisse)
+    repli = (int((bb[3] - bb[1]) * BUSTE_MENTON_DEFAUT), 0.0, False)
+    if n < 8:
+        return repli
+
+    # Haut des epaules : premiere ligne, dans la moitie basse, ou la silhouette sature.
+    seuil = 0.95 * max(lisse)
+    y_ep = next((y for y in range(n // 2, n) if lisse[y] >= seuil), n - 1)
+    # Cou : minimum du profil entre le quart superieur et les epaules.
+    a = max(1, n // 4)
+    if y_ep <= a + 1:
+        return repli
+    y_cou = min(range(a, y_ep), key=lambda y: lisse[y])
+    # Oreilles : ligne la plus large au-dessus du cou. Il faut un vrai creux dessous.
+    y_or = max(range(y_cou), key=lambda y: lisse[y])
+    if not (y_or < y_cou and lisse[y_cou] < _BUSTE_CREUX * lisse[y_or]):
+        return repli
+    return int(round(y_cou * ech)), lisse[y_cou], True
+
+
+def _cadre_buste(art_src):
+    """Cadrage S2 -> calque W x H contenant le joueur cale et mis a l'echelle.
+
+    Deux invariants, et c'est tout ce qui fait l'homogeneite de la planche :
+      - le menton est a BUSTE_MENTON_Y, quelle que soit la coiffure ;
+      - la tete est mise a l'echelle sur une estimation du VISAGE et non de la
+        silhouette (cf. BUSTE_TETE_H), pour qu'une coiffure haute monte dans le
+        cadre au lieu de rapetisser le visage.
+
+    Deux butees, qui n'interviennent qu'aux extremes : la chevelure n'est rognee que
+    jusqu'a BUSTE_ROGNAGE_MAX (au-dela on rapetisse), et le buste doit descendre sous
+    le separateur (sinon un trou apparait au-dessus du bandeau).
+
+    A la difference du profil S1, l'image finit PLUS GRANDE que la carte : les
+    coordonnees de collage sont donc negatives et il faut decouper la zone visible
+    soi-meme, alpha_composite() n'acceptant pas de destination hors cadre."""
+    alpha = art_src.getchannel("A")
+    bb = alpha.getbbox() or (0, 0, *art_src.size)
+    bh = max(1, bb[3] - bb[1])
+    y_menton, l_cou, fiable = _menton(alpha, bb)
+    # Moyenne geometrique hauteur de tete / largeur de cou (cf. BUSTE_TETE_H). Sans
+    # cou exploitable, on retombe sur la seule hauteur, chevelure comprise.
+    tete = ((y_menton * l_cou * BUSTE_COU_RATIO) ** 0.5
+            if fiable and l_cou > 0 else y_menton)
+    k = (H * BUSTE_TETE_H) / max(tete, 1)
+    k = min(k, (BUSTE_MENTON_Y - BORDER + BUSTE_ROGNAGE_MAX) / max(y_menton, 1))
+    # Le buste doit descendre sous le separateur, sinon un trou apparait au-dessus du
+    # bandeau. Le menton etant fixe, ce qu'il reste a couvrir est ce qui est SOUS lui.
+    sous_menton = bh - y_menton
+    if sous_menton > 0:
+        k = max(k, ((BAND_TOP + BUSTE_RECOUVREMENT) - BUSTE_MENTON_Y) / sous_menton)
+
+    scaled = art_src.resize((max(1, round(art_src.width * k)),
+                             max(1, round(art_src.height * k))), Image.Resampling.LANCZOS)
+    sa = scaled.getchannel("A")
+    sb = sa.getbbox() or (0, 0, *scaled.size)
+
+    # Centrage horizontal sur la TETE et non sur la silhouette entiere : un buste de
+    # trois quarts a les epaules decalees, et c'est le visage qu'on veut au milieu.
+    haut_tete = sa.crop((0, sb[1], scaled.width,
+                         min(scaled.height, sb[1] + max(1, int(y_menton * k))))).getbbox()
+    cx = ((haut_tete[0] + haut_tete[2]) / 2 if haut_tete else (sb[0] + sb[2]) / 2)
+    x = int(round(W / 2 - cx))
+    y = BUSTE_MENTON_Y - int(round(y_menton * k)) - sb[1]
+
+    art = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    sx, sy = max(0, -x), max(0, -y)
+    dx, dy = max(0, x), max(0, y)
+    cw = min(scaled.width - sx, W - dx)
+    ch = min(scaled.height - sy, H - dy)
+    if cw > 0 and ch > 0:
+        art.alpha_composite(scaled.crop((sx, sy, sx + cw, sy + ch)), (dx, dy))
+    return art
+
+
+def compose_v2(cutout, nom, club, rarete, poste="", zoom=PLAYER_ZOOM, cadrage=None):
     """Compose la carte (PIL RGBA) layout v2 : joueur detoure (dezoom `zoom`, cale
     sur sa bbox alpha — centre sur le joueur et non sur l'image, sommet du crane a
     PLAYER_TOP_MARGIN sous le liseré) sur fond radial de rarete, fondu en pied, puis
@@ -301,7 +449,9 @@ def compose_v2(cutout, nom, club, rarete, poste="", zoom=PLAYER_ZOOM):
     # Fond radial de rarete + joueur, clippe au polygone interieur
     bg = _radial((W, H), lighten(rgb, 0.10), darken(rgb, 0.62), W * 0.5, H * 0.34, H * 0.78)
     art_src = _crop_to_ratio(cutout.convert("RGBA"), W / H)
-    if zoom >= 1.0:
+    if cadrage == "buste":
+        art = _cadre_buste(art_src)
+    elif zoom >= 1.0:
         art = art_src.resize((W, H), Image.Resampling.LANCZOS)
     else:
         sw, sh = max(1, int(W * zoom)), max(1, int(H * zoom))
@@ -447,7 +597,7 @@ async def get_card_bytes(card, session=None):
             import aiohttp
             session = aiohttp.ClientSession()
         try:
-            art = await _fetch_portrait(session, card["image_url"])
+            art = await _fetch_portrait(session, card.get("image_url"))
         finally:
             if own_session:
                 await session.close()
@@ -456,12 +606,19 @@ async def get_card_bytes(card, session=None):
 
     # Detoure -> dezoom design ; portrait brut -> plein cadre (evite l'effet "flottant")
     zoom = PLAYER_ZOOM if is_cutout else 1.0
-    return await asyncio.to_thread(_render_and_cache, art, card, zoom, path)
+    # Les portraits S2 sont des rendus Midjourney deja cadres serre : ils passent par
+    # le profil "buste", sans quoi le bot enverrait un cadrage DIFFERENT de celui que
+    # tools/finalize_s2.py fait valider (tetes plus petites, vide aux epaules).
+    # Le profil mesure la silhouette dans le canal alpha : il lui faut un vrai
+    # detourage, jamais un portrait brut telecharge en repli.
+    cadrage = "buste" if (is_cutout and card.get("saison") == 2) else None
+    return await asyncio.to_thread(_render_and_cache, art, card, zoom, path, cadrage)
 
 
-def _render_and_cache(art, card, zoom, path):
+def _render_and_cache(art, card, zoom, path, cadrage=None):
     """Rendu + ecriture du cache. Synchrone : appele via asyncio.to_thread."""
-    img = compose_v2(art, card["nom"], card["club"], card["rarete"], card.get("poste", ""), zoom=zoom)
+    img = compose_v2(art, card["nom"], card["club"], card["rarete"], card.get("poste", ""),
+                     zoom=zoom, cadrage=cadrage)
     buf = io.BytesIO()
     img.convert("RGB").save(buf, format="PNG")
     data = buf.getvalue()
