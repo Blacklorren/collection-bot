@@ -21,6 +21,11 @@ et il se resout exactement :
   6. on ne garde que la plus grande composante opaque : ca elimine les eclats de
      pixels sur les bords, qui gonflaient la bbox et faussaient le cadrage.
 
+Reste un cas que le fond uni ne couvre pas : Midjourney eclaire parfois le fond en
+degrade (un cote a +40 de distance de l'autre). La zone claire n'entre alors pas dans
+le coeur du fond, reste collee au sujet et survit au detourage. TOL_CORE est donc
+surchargeable par appel : finalize_s2.py mesure le gris residuel et relance plus haut.
+
 Pre-requis : pip install numpy scipy pillow  (pas de rembg, pas d'onnxruntime)
 
 Usage direct pour controle :
@@ -56,8 +61,9 @@ def _couleur_fond(arr):
     return np.median(cadre, axis=0)
 
 
-def detourer(source):
-    """-> PIL.Image RGBA detouree."""
+def detourer(source, tol_core=TOL_CORE):
+    """-> PIL.Image RGBA detouree. tol_core : voir TOL_CORE, a monter si le fond
+    est en degrade et qu'une plaque grise survit."""
     im = Image.open(source).convert("RGB") if isinstance(source, (str, os.PathLike)) \
         else source.convert("RGB")
     arr = np.asarray(im, dtype=np.float32)
@@ -67,7 +73,7 @@ def detourer(source):
     dist = np.linalg.norm(arr - fond, axis=2)
 
     # 1) fond franc + connexite : seules les plaques reliees au bord sont du fond
-    coeur = dist < TOL_CORE
+    coeur = dist < tol_core
     lab, n = ndimage.label(coeur)
     if n:
         bords = np.unique(np.concatenate([lab[0], lab[-1], lab[:, 0], lab[:, -1]]))
@@ -92,7 +98,7 @@ def detourer(source):
     #    ailleurs le sujet reste plein, meme s'il est grisatre
     alpha = np.ones((h, w), np.float32)
     bande = ndimage.binary_dilation(fond_mask, iterations=BANDE) & ~fond_mask
-    rampe = np.clip((dist - TOL_CORE) / max(TOL_EDGE - TOL_CORE, 1), 0.0, 1.0)
+    rampe = np.clip((dist - tol_core) / max(TOL_EDGE - tol_core, 1), 0.0, 1.0)
     alpha[bande] = rampe[bande]
     alpha[fond_mask] = 0.0
 

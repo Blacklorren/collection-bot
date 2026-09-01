@@ -7,6 +7,10 @@ compose la carte avec compose_v2().
 Le recadrage 4:5 n'est pas fait ici : _crop_to_ratio() s'en charge dans le renderer,
 ce qui garantit que la carte de preview est exactement celle que le bot produira.
 
+Le detourage est verifie apres coup : si une plaque de fond a survecu (Midjourney
+eclaire parfois le fond en degrade, cf. cutout_mj), on relance avec une tolerance de
+coeur plus large. C'est mesure, pas devine, et ca ne touche pas les rendus propres.
+
 Pre-requis : pip install rembg onnxruntime pillow
 
 Entree : data/roster_s2.json (image_file renseigne)
@@ -24,6 +28,7 @@ import json
 import os
 import sys
 
+import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -41,6 +46,38 @@ MATTING = dict(alpha_matting=True,
                alpha_matting_foreground_threshold=240,
                alpha_matting_background_threshold=15,
                alpha_matting_erode_size=8)
+
+
+# Au-dela de ce taux de pixels opaques encore a la couleur du fond, le detourage a
+# laisse une plaque : on relance plus large. 3 % couvre le bruit (peau claire, cheveux
+# gris) sans declencher a tort — le seul cas rate du lot 4 clubs etait a 15 %.
+FOND_TOLERE = 3.0
+TOLERANCES = (40, 55, 70)
+
+
+def _fond_residuel(cut, src):
+    """% de pixels opaques encore a la couleur du fond de l'image source."""
+    a = np.asarray(Image.open(src).convert("RGB"), dtype=np.float32)
+    b = 5
+    cadre = np.concatenate([a[:b].reshape(-1, 3), a[:, :b].reshape(-1, 3),
+                            a[:, -b:].reshape(-1, 3)])
+    fond = np.median(cadre, axis=0)
+    arr = np.asarray(cut, dtype=np.float32)
+    d = np.linalg.norm(arr[..., :3] - fond, axis=2)
+    return float(((arr[..., 3] > 200) & (d < 45)).mean() * 100)
+
+
+def decouper_propre(src):
+    """Detoure, puis relance plus large tant qu'il reste du fond colle au sujet."""
+    cut = detourer(src)
+    reste = _fond_residuel(cut, src)
+    for tol in TOLERANCES:
+        if reste <= FOND_TOLERE:
+            break
+        cut = detourer(src, tol_core=tol)
+        reste = _fond_residuel(cut, src)
+        print(f"      fond residuel -> nouvel essai a tol_core={tol} ({reste:.1f} %)")
+    return cut
 
 
 def planche(cartes, chemin, cols=4, larg=300):
@@ -69,7 +106,7 @@ def main():
                     help="repli sur rembg (avale les maillots sombres, a eviter)")
     args = ap.parse_args()
 
-    decoupe = detourer
+    decoupe = decouper_propre
     if args.rembg:
         from rembg import new_session, remove
         session = new_session("u2net")
