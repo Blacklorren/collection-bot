@@ -264,11 +264,12 @@
     "poste": "Pivot",
     "numero": 99,
     "lnh_slug": "owen-abodogo",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_abodogo-owen__picture__2026-2027-7098-17628.png",
+    "ref_file": "refs/abodogo-owen.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "red and yellow"
   },
   {
     "id": "allais-jordan",
@@ -280,11 +281,12 @@
     "poste": "Pivot",
     "numero": 8,
     "lnh_slug": "jordan-allais",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_allais-jordan__picture__2026-2027-3543-17629.png",
+    "ref_file": "refs/allais-jordan.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "red and yellow"
   },
   {
     "id": "areia-antonio",
@@ -296,11 +298,12 @@
     "poste": "Ailier Droit",
     "numero": 25,
     "lnh_slug": "antonio-areia-8608",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_areia-antonio__picture__2026-2027-8608-18050.png",
+    "ref_file": "refs/areia-antonio.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "red and yellow"
   },
   {
     "id": "cornette-mathieu",
@@ -312,11 +315,12 @@
     "poste": "Demi Centre",
     "numero": 23,
     "lnh_slug": "mathieu-cornette",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_cornette-mathieu__picture__2026-2027-5962-17636.png",
+    "ref_file": "refs/cornette-mathieu.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "red and yellow"
   },
   {
     "id": "discamps-maxime",
@@ -328,11 +332,12 @@
     "poste": "Arrière Gauche",
     "numero": 10,
     "lnh_slug": "maxime-discamps",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_discamps-maxime__picture__2026-2027-5268-18049.png",
+    "ref_file": "refs/discamps-maxime.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "red and yellow"
   },
   {
     "id": "ghoul-fares",
@@ -344,11 +349,12 @@
     "poste": "Pivot",
     "numero": 17,
     "lnh_slug": "fares-ghoul",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_ghoul-fares__picture__2026-2027-7677-17640.png",
+    "ref_file": "refs/ghoul-fares.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "red and yellow"
   },
   {
     "id": "gnago-adam",
@@ -360,11 +366,12 @@
     "poste": "Arrière Gauche",
     "numero": 7,
     "lnh_slug": "adam-gnago",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_gnago-adam__picture__2026-2027-5988-17641.png",
+    "ref_file": "refs/gnago-adam.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "red and yellow"
   },
   {
     "id": "kawada-haruki",
@@ -376,11 +383,12 @@
     "poste": "Demi Centre",
     "numero": 41,
     "lnh_slug": "haruki-kawada",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_kawada-haruki__picture__2026-2027-10236-17645.png",
+    "ref_file": "refs/kawada-haruki.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "red and yellow"
   },
   {
     "id": "melo-nilton",
@@ -392,11 +400,12 @@
     "poste": "Arrière Gauche",
     "numero": 96,
     "lnh_slug": "nilton-melo",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_melo-nilton__picture__2026-2027-9454-17647.png",
+    "ref_file": "refs/melo-nilton.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "red and yellow"
   },
   {
     "id": "mocevic-milos",
@@ -408,11 +417,12 @@
     "poste": "Gardien",
     "numero": 12,
     "lnh_slug": "milos-mocevic",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_mocevic-milos__picture__2026-2027-5259-17649.png",
+    "ref_file": "refs/mocevic-milos.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "yellow and orange"
   },
   {
     "id": "molliex-robin",
@@ -424,11 +434,12 @@
     "poste": "Ailier Droit",
     "numero": 9,
     "lnh_slug": "robin-molliex",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_molliex-robin__picture__2026-2027-7692-17287.png",
+    "ref_file": "refs/molliex-robin.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "red and yellow"
   },
   {
     "id": "rodriguez-hanser-michel",
@@ -440,11 +451,12 @@
     "poste": "Ailier Gauche",
     "numero": 14,
     "lnh_slug": "hanser-michel-rodriguez",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_rodriguez-hanser-michel__picture__2026-2027-9455-17651.png",
+    "ref_file": "refs/rodriguez-hanser-michel.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "red and yellow"
   },
   {
     "id": "ben-salem-yassine",
@@ -456,11 +468,12 @@
     "poste": "Arrière Droit",
     "numero": 33,
     "lnh_slug": "yassine-ben-salem",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_ben-salem-yassine__picture__2026-2027-6948-17632.png",
+    "ref_file": "refs/ben-salem-yassine.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "red and yellow"
   },
   {
     "id": "tournellec-louis",
@@ -472,11 +485,12 @@
     "poste": "Arrière Droit",
     "numero": 26,
     "lnh_slug": "louis-tournellec",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_tournellec-louis__picture__2026-2027-4858-17652.png",
+    "ref_file": "refs/tournellec-louis.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "red and yellow"
   },
   {
     "id": "van-zeller-tomas",
@@ -487,12 +501,13 @@
     "rarete": "Commun",
     "poste": "Gardien",
     "numero": 19,
-    "lnh_slug": "tomas-simoes-valente-estevao-van-zeller",
-    "ref_url": null,
-    "ref_file": null,
+    "lnh_slug": "tomas-van-zeller",
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_van-zeller-tomas__picture__2026-2027-10257-18062.png",
+    "ref_file": "refs/van-zeller-tomas.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "yellow and orange"
   },
   {
     "id": "villeminot-allan",
@@ -504,11 +519,12 @@
     "poste": "Demi Centre",
     "numero": 6,
     "lnh_slug": "allan-villeminot",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_villeminot-allan__picture__2026-2027-1237-17654.png",
+    "ref_file": "refs/villeminot-allan.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "red and yellow"
   },
   {
     "id": "baradat-alexandre",
@@ -1047,11 +1063,12 @@
     "poste": "Arrière Gauche",
     "numero": 11,
     "lnh_slug": "edmilson-araujo",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_araujo-edmilson__picture__2026-2027-3949-17714.png",
+    "ref_file": "refs/araujo-edmilson.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "navy blue"
   },
   {
     "id": "ben-fraj-koussay",
@@ -1063,11 +1080,12 @@
     "poste": "Arrière Gauche",
     "numero": 39,
     "lnh_slug": "koussay-ben-fraj",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_ben-fraj-koussay__picture__2026-2027-8323-17716.png",
+    "ref_file": "refs/ben-fraj-koussay.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "navy blue"
   },
   {
     "id": "garcias-andre",
@@ -1079,11 +1097,12 @@
     "poste": "Demi Centre",
     "numero": 94,
     "lnh_slug": "andre-garcias-jose",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_garcias-jose-andre__picture__2026-2027-6431-17725.png",
+    "ref_file": "refs/garcias-andre.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "navy blue"
   },
   {
     "id": "gourdel-paul",
@@ -1095,11 +1114,12 @@
     "poste": "Ailier Droit",
     "numero": 35,
     "lnh_slug": "paul-gourdel",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_gourdel-paul__picture__2026-2027-6885-17726.png",
+    "ref_file": "refs/gourdel-paul.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "navy blue"
   },
   {
     "id": "harbaoui-mehdi",
@@ -1111,11 +1131,12 @@
     "poste": "Gardien",
     "numero": 16,
     "lnh_slug": "mehdi-harbaoui",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_harbaoui-mehdi__picture__2026-2027-2259-17727.png",
+    "ref_file": "refs/harbaoui-mehdi.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "red"
   },
   {
     "id": "hosni-oussama",
@@ -1143,11 +1164,12 @@
     "poste": "Ailier Droit",
     "numero": 19,
     "lnh_slug": "edouard-kempf",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_kempf-edouard__picture__2026-2027-2700-17730.png",
+    "ref_file": "refs/kempf-edouard.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "navy blue"
   },
   {
     "id": "luciani-julien",
@@ -1159,11 +1181,12 @@
     "poste": "Pivot",
     "numero": 71,
     "lnh_slug": "julien-luciani",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_luciani-julien__picture__2026-2027-4413-17734.png",
+    "ref_file": "refs/luciani-julien.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "navy blue"
   },
   {
     "id": "martinez-gabin",
@@ -1175,11 +1198,12 @@
     "poste": "Arrière Droit",
     "numero": 82,
     "lnh_slug": "gabin-martinez",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_martinez-gabin__picture__2026-2027-3832-17735.png",
+    "ref_file": "refs/martinez-gabin.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "navy blue"
   },
   {
     "id": "meyer-julien",
@@ -1191,11 +1215,12 @@
     "poste": "Gardien",
     "numero": 31,
     "lnh_slug": "julien-meyer",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_meyer-julien__picture__2026-2027-1566-17736.png",
+    "ref_file": "refs/meyer-julien.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "red"
   },
   {
     "id": "minel-quentin",
@@ -1207,11 +1232,12 @@
     "poste": "Arrière Gauche",
     "numero": 38,
     "lnh_slug": "quentin-minel",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_minel-quentin__picture__2026-2027-674-17737.png",
+    "ref_file": "refs/minel-quentin.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "navy blue"
   },
   {
     "id": "onufriienko-oleksandr",
@@ -1223,11 +1249,12 @@
     "poste": "Pivot",
     "numero": 13,
     "lnh_slug": "oleksandr-onufriienko",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_onufriienko-oleksandr__picture__2026-2027-10239-17739.png",
+    "ref_file": "refs/onufriienko-oleksandr.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "navy blue"
   },
   {
     "id": "tighiouart-nael",
@@ -1239,11 +1266,12 @@
     "poste": "Ailier Gauche",
     "numero": 80,
     "lnh_slug": "nael-tighiouart",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_tighiouart-nael__picture__2026-2027-6949-18069.png",
+    "ref_file": "refs/tighiouart-nael.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "navy blue"
   },
   {
     "id": "tribillon-gael",
@@ -1255,11 +1283,12 @@
     "poste": "Ailier Gauche",
     "numero": 96,
     "lnh_slug": "gael-tribillon",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_tribillon-gael__picture__2026-2027-2781-17744.png",
+    "ref_file": "refs/tribillon-gael.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "navy blue"
   },
   {
     "id": "verin-yvan",
@@ -1271,11 +1300,12 @@
     "poste": "Arrière Gauche",
     "numero": 97,
     "lnh_slug": "yvan-verin",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_verin-yvan__picture__2026-2027-4789-17745.png",
+    "ref_file": "refs/verin-yvan.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "navy blue"
   },
   {
     "id": "appolinaire-ludwig",
@@ -1287,11 +1317,12 @@
     "poste": "Demi Centre",
     "numero": 54,
     "lnh_slug": "ludwig-appolinaire",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_appolinaire-ludwig__picture__2026-2027-1169-17746.png",
+    "ref_file": "refs/appolinaire-ludwig.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "navy blue and black"
   },
   {
     "id": "arteaga-thibaud",
@@ -1303,11 +1334,12 @@
     "poste": "Ailier Droit",
     "numero": 64,
     "lnh_slug": "thibaud-arteaga",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_arteaga-thibaud__picture__2026-2027-2983-17747.png",
+    "ref_file": "refs/arteaga-thibaud.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "navy blue and black"
   },
   {
     "id": "billant-florian",
@@ -1319,11 +1351,12 @@
     "poste": "Ailier Droit",
     "numero": 5,
     "lnh_slug": "florian-billant",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_billant-florian__picture__2026-2027-2251-17748.png",
+    "ref_file": "refs/billant-florian.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "navy blue and black"
   },
   {
     "id": "busselier-yanis",
@@ -1335,11 +1368,12 @@
     "poste": "Arrière Droit",
     "numero": 2,
     "lnh_slug": "yanis-busselier",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_busselier-yanis__picture__2026-2027-4959-17749.png",
+    "ref_file": "refs/busselier-yanis.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "navy blue and black"
   },
   {
     "id": "carabasse-geoffroy",
@@ -1351,11 +1385,12 @@
     "poste": "Pivot",
     "numero": 3,
     "lnh_slug": "geoffroy-carabasse",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_carabasse-geoffroy__picture__2026-2027-2880-17750.png",
+    "ref_file": "refs/carabasse-geoffroy.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "navy blue and black"
   },
   {
     "id": "romero-carreras-alejandro",
@@ -1367,11 +1402,12 @@
     "poste": "Gardien",
     "numero": 1,
     "lnh_slug": "alejandro-romero-carreras",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_romero-carreras-alejandro__picture__2026-2027-8321-17767.png",
+    "ref_file": "refs/romero-carreras-alejandro.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "sand beige"
   },
   {
     "id": "crepel-gautier",
@@ -1383,11 +1419,12 @@
     "poste": "Arrière Gauche",
     "numero": 30,
     "lnh_slug": "gautier-crepel",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_crepel-gautier__picture__2026-2027-4946-17751.png",
+    "ref_file": "refs/crepel-gautier.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "navy blue and black"
   },
   {
     "id": "dupuy-quentin",
@@ -1399,11 +1436,12 @@
     "poste": "Arrière Gauche",
     "numero": 11,
     "lnh_slug": "quentin-dupuy",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_dupuy-quentin__picture__2026-2027-1104-17754.png",
+    "ref_file": "refs/dupuy-quentin.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "navy blue and black"
   },
   {
     "id": "marie-joseph-steve",
@@ -1415,11 +1453,12 @@
     "poste": "Ailier Gauche",
     "numero": 55,
     "lnh_slug": "steve-marie-joseph",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_marie-joseph-steve__picture__2026-2027-1171-17761.png",
+    "ref_file": "refs/marie-joseph-steve.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "navy blue and black"
   },
   {
     "id": "marmier-matthieu",
@@ -1431,11 +1470,12 @@
     "poste": "Arrière Droit",
     "numero": 8,
     "lnh_slug": "matthieu-marmier",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_marmier-matthieu__picture__2026-2027-4296-17762.png",
+    "ref_file": "refs/marmier-matthieu.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "navy blue and black"
   },
   {
     "id": "minotskyi-taras",
@@ -1447,11 +1487,12 @@
     "poste": "Arrière Gauche",
     "numero": 35,
     "lnh_slug": "taras-minotskyi",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_minotskyi-taras__picture__2026-2027-5571-17763.png",
+    "ref_file": "refs/minotskyi-taras.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "navy blue and black"
   },
   {
     "id": "oliveira-diogo",
@@ -1463,11 +1504,12 @@
     "poste": "Demi Centre",
     "numero": 7,
     "lnh_slug": "diogo-de-abreu-oliveira",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_de-abreu-oliveira-diogo__picture__2026-2027-6778-17764.png",
+    "ref_file": "refs/oliveira-diogo.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "navy blue and black"
   },
   {
     "id": "tossin-dylan",
@@ -1479,11 +1521,12 @@
     "poste": "Ailier Gauche",
     "numero": 10,
     "lnh_slug": "dylan-tossin",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_tossin-dylan__picture__2026-2027-4944-17769.png",
+    "ref_file": "refs/tossin-dylan.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "navy blue and black"
   },
   {
     "id": "vainionpaa-santeri",
@@ -1495,11 +1538,12 @@
     "poste": "Demi Centre",
     "numero": 25,
     "lnh_slug": "santeri-vainionpaa",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_vainionpaa-santeri__picture__2026-2027-6910-17770.png",
+    "ref_file": "refs/vainionpaa-santeri.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "navy blue and black"
   },
   {
     "id": "villain-leo",
@@ -1511,11 +1555,12 @@
     "poste": "Gardien",
     "numero": 59,
     "lnh_slug": "leo-villain",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_villain-leo__picture__2026-2027-4777-17771.png",
+    "ref_file": "refs/villain-leo.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "sand beige"
   },
   {
     "id": "aman-valentin",
@@ -4314,11 +4359,12 @@
     "poste": "Ailier Gauche",
     "numero": 3,
     "lnh_slug": "antoine-bzdynga",
-    "ref_url": null,
-    "ref_file": null,
+    "ref_url": "https://www.lnh.fr/medias/sports_players/small_bzdynga-antoine__picture__2026-2027-8664-17634.png",
+    "ref_file": "refs/bzdynga-antoine.png",
     "image_file": null,
     "sorti": false,
-    "equipe": "pro"
+    "equipe": "pro",
+    "jersey": "red and yellow"
   },
   {
     "id": "vedie-marconnes-samuel",

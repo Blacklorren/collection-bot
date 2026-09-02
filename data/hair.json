@@ -3,9 +3,17 @@
     "barbe": "a full dark beard",
     "cheveux": "very short black hair"
   },
+  "abodogo-owen": {
+    "barbe": "a moustache and a short chin beard",
+    "cheveux": "short curly black hair"
+  },
   "acquevillo-jean-jacques": {
     "barbe": "a full black beard",
     "cheveux": "short black dreadlocks pulled back"
+  },
+  "allais-jordan": {
+    "barbe": "a thin moustache and a goatee",
+    "cheveux": "very short black hair"
   },
   "aman-valentin": {
     "barbe": "a short reddish beard",
@@ -19,9 +27,25 @@
     "barbe": "a full ginger beard",
     "cheveux": "short ginger hair"
   },
+  "appolinaire-ludwig": {
+    "barbe": "a short black beard",
+    "cheveux": "very short black hair"
+  },
+  "araujo-edmilson": {
+    "barbe": "a full black beard",
+    "cheveux": "short black hair"
+  },
+  "areia-antonio": {
+    "barbe": "a thick brown moustache",
+    "cheveux": "medium-length brown hair swept back"
+  },
   "arsenashvili-erekle": {
     "barbe": "light stubble",
     "cheveux": "short dark brown hair"
+  },
+  "arteaga-thibaud": {
+    "barbe": "dark stubble",
+    "cheveux": "short black hair"
   },
   "augustine-ylan": {
     "barbe": "clean-shaven",
@@ -63,8 +87,20 @@
     "barbe": "light stubble",
     "cheveux": "very short brown hair"
   },
+  "ben-fraj-koussay": {
+    "barbe": "light stubble",
+    "cheveux": "short dark curly hair"
+  },
+  "ben-salem-yassine": {
+    "barbe": "a full black beard",
+    "cheveux": "short curly black hair"
+  },
   "bernard-david": {
     "barbe": "a short brown beard",
+    "cheveux": "short dark brown hair"
+  },
+  "billant-florian": {
+    "barbe": "a full ginger beard",
     "cheveux": "short dark brown hair"
   },
   "blyzniuk-illia": {
@@ -107,11 +143,23 @@
     "barbe": "clean-shaven",
     "cheveux": "short curly brown hair"
   },
+  "busselier-yanis": {
+    "barbe": "light stubble",
+    "cheveux": "thick dark curly hair"
+  },
+  "bzdynga-antoine": {
+    "barbe": "light stubble",
+    "cheveux": "short brown hair"
+  },
   "caille-mateo": {
     "barbe": "light stubble",
     "cheveux": "short black hair"
   },
   "calle-eduardo": {
+    "barbe": "clean-shaven",
+    "cheveux": "short dark brown hair"
+  },
+  "carabasse-geoffroy": {
     "barbe": "clean-shaven",
     "cheveux": "short dark brown hair"
   },
@@ -139,6 +187,10 @@
     "barbe": "clean-shaven",
     "cheveux": "short light brown hair"
   },
+  "cornette-mathieu": {
+    "barbe": "light stubble",
+    "cheveux": "short dark curly hair"
+  },
   "corrales-rodrigo": {
     "barbe": "a thick black beard",
     "cheveux": "short black hair"
@@ -146,6 +198,10 @@
   "costoya-alejandro": {
     "barbe": "a thin dark moustache",
     "cheveux": "a shaved head"
+  },
+  "crepel-gautier": {
+    "barbe": "a thin blond moustache and a small goatee",
+    "cheveux": "short light brown hair"
   },
   "damiani-clement": {
     "barbe": "a short beard",
@@ -183,9 +239,17 @@
     "barbe": "a light beard",
     "cheveux": "short black afro hair"
   },
+  "discamps-maxime": {
+    "barbe": "a full brown beard",
+    "cheveux": "short wavy brown hair"
+  },
   "dupoux-jean-pierre": {
     "barbe": "a full dark beard",
     "cheveux": "short black hair"
+  },
+  "dupuy-quentin": {
+    "barbe": "a full dark beard",
+    "cheveux": "short brown hair"
   },
   "egermann-teo": {
     "barbe": "a short dark beard",
@@ -231,9 +295,17 @@
     "barbe": "a full dark beard",
     "cheveux": "short dark brown hair"
   },
+  "garcias-andre": {
+    "barbe": "a full black beard",
+    "cheveux": "short black hair"
+  },
   "gaudin-noah": {
     "barbe": "clean-shaven",
     "cheveux": "shoulder-length wavy dark brown hair"
+  },
+  "ghoul-fares": {
+    "barbe": "a full black beard",
+    "cheveux": "short black hair"
   },
   "gibelin-yoann": {
     "barbe": "a short black beard",
@@ -242,6 +314,14 @@
   "gibernon-damien": {
     "barbe": "a short brown beard",
     "cheveux": "short brown hair"
+  },
+  "gnago-adam": {
+    "barbe": "light stubble",
+    "cheveux": "thick dark curly hair"
+  },
+  "gourdel-paul": {
+    "barbe": "light stubble",
+    "cheveux": "short wavy light brown hair"
   },
   "grebille-mathieu": {
     "barbe": "a short beard",
@@ -266,6 +346,10 @@
   "hanusz-egon": {
     "barbe": "clean-shaven",
     "cheveux": "short brown hair"
+  },
+  "harbaoui-mehdi": {
+    "barbe": "a full black beard",
+    "cheveux": "very short black hair"
   },
   "hodzic-harun": {
     "barbe": "light stubble",
@@ -328,6 +412,14 @@
     "cheveux": "short grey hair"
   },
   "karlsson-sebastian": {
+    "barbe": "a short brown beard",
+    "cheveux": "short brown hair"
+  },
+  "kawada-haruki": {
+    "barbe": "clean-shaven",
+    "cheveux": "straight black hair with a fringe"
+  },
+  "kempf-edouard": {
     "barbe": "a short brown beard",
     "cheveux": "short brown hair"
   },
@@ -423,6 +515,10 @@
     "barbe": "light stubble",
     "cheveux": "short curly light brown hair"
   },
+  "luciani-julien": {
+    "barbe": "light stubble",
+    "cheveux": "very short blond hair"
+  },
   "lyse-simen": {
     "barbe": "a moustache",
     "cheveux": "short dark brown hair"
@@ -443,6 +539,18 @@
     "barbe": "a full ginger beard",
     "cheveux": "short light brown hair"
   },
+  "marie-joseph-steve": {
+    "barbe": "a full black beard",
+    "cheveux": "long black dreadlocks tied back"
+  },
+  "marmier-matthieu": {
+    "barbe": "a full black beard",
+    "cheveux": "short dark brown hair"
+  },
+  "martinez-gabin": {
+    "barbe": "a short brown beard",
+    "cheveux": "short light brown hair"
+  },
   "martins-vieira-goncalo": {
     "barbe": "a full black beard",
     "cheveux": "short black hair"
@@ -459,13 +567,33 @@
     "barbe": "a moustache",
     "cheveux": "short light brown hair"
   },
+  "melo-nilton": {
+    "barbe": "clean-shaven",
+    "cheveux": "very short black hair"
+  },
   "mendy-tony": {
     "barbe": "clean-shaven",
     "cheveux": "very short bleached-blond hair"
   },
+  "meyer-julien": {
+    "barbe": "a thin blond goatee",
+    "cheveux": "a shaved head"
+  },
   "mielczarski-piotr": {
     "barbe": "clean-shaven",
     "cheveux": "curly ginger hair"
+  },
+  "minel-quentin": {
+    "barbe": "a short dark beard",
+    "cheveux": "short dark brown hair"
+  },
+  "minotskyi-taras": {
+    "barbe": "clean-shaven",
+    "cheveux": "short light brown hair"
+  },
+  "mocevic-milos": {
+    "barbe": "light stubble",
+    "cheveux": "short dark brown hair"
   },
   "mohamed-antonin": {
     "barbe": "a short beard",
@@ -478,6 +606,10 @@
   "molinie-robin": {
     "barbe": "clean-shaven",
     "cheveux": "short light brown hair"
+  },
+  "molliex-robin": {
+    "barbe": "clean-shaven",
+    "cheveux": "medium-length light brown hair swept back"
   },
   "monte-dos-santos-hugo": {
     "barbe": "a full black beard",
@@ -519,9 +651,17 @@
     "barbe": "a goatee",
     "cheveux": "dark hair tied in a small bun"
   },
+  "oliveira-diogo": {
+    "barbe": "a short black beard",
+    "cheveux": "short black hair"
+  },
   "onodi-janoskuti-mate": {
     "barbe": "clean-shaven",
     "cheveux": "short light brown hair"
+  },
+  "onufriienko-oleksandr": {
+    "barbe": "clean-shaven",
+    "cheveux": "short brown hair"
   },
   "ooms-simon": {
     "barbe": "a brown moustache",
@@ -647,9 +787,17 @@
     "barbe": "a moustache and a goatee",
     "cheveux": "a shaved head"
   },
+  "rodriguez-hanser-michel": {
+    "barbe": "a thin black moustache",
+    "cheveux": "very short black hair"
+  },
   "rodriguez-lario-roberto": {
     "barbe": "clean-shaven",
     "cheveux": "short light brown hair"
+  },
+  "romero-carreras-alejandro": {
+    "barbe": "a full black beard",
+    "cheveux": "short black dreadlocks tied back"
   },
   "saha-william": {
     "barbe": "a short dark beard",
@@ -747,6 +895,10 @@
     "barbe": "a short dark beard",
     "cheveux": "short dark brown hair"
   },
+  "tighiouart-nael": {
+    "barbe": "a thin moustache and a goatee",
+    "cheveux": "short black hair"
+  },
   "tissot-antoine": {
     "barbe": "a short brown beard",
     "cheveux": "short brown hair"
@@ -755,13 +907,25 @@
     "barbe": "light stubble",
     "cheveux": "short dark brown hair"
   },
+  "tossin-dylan": {
+    "barbe": "a short dark beard",
+    "cheveux": "short dark brown hair"
+  },
   "tournat-nicolas": {
     "barbe": "light stubble",
     "cheveux": "short dark brown hair"
   },
+  "tournellec-louis": {
+    "barbe": "a thick brown moustache",
+    "cheveux": "short brown hair"
+  },
   "traore-queido": {
     "barbe": "clean-shaven",
     "cheveux": "very short black hair"
+  },
+  "tribillon-gael": {
+    "barbe": "a thick brown moustache",
+    "cheveux": "short brown hair"
   },
   "tritta-alexandre": {
     "barbe": "light stubble",
@@ -775,6 +939,10 @@
     "barbe": "clean-shaven",
     "cheveux": "short brown hair"
   },
+  "vainionpaa-santeri": {
+    "barbe": "clean-shaven",
+    "cheveux": "short wavy light brown hair"
+  },
   "valero-rovira-pol": {
     "barbe": "a full dark beard",
     "cheveux": "short dark curly hair"
@@ -782,6 +950,10 @@
   "van-ee-hugo": {
     "barbe": "light stubble",
     "cheveux": "short brown hair"
+  },
+  "van-zeller-tomas": {
+    "barbe": "a brown moustache",
+    "cheveux": "short wavy brown hair"
   },
   "vanegue-lucas": {
     "barbe": "a short brown beard",
@@ -795,6 +967,10 @@
     "barbe": "a thick moustache",
     "cheveux": "dark brown hair tied back"
   },
+  "verin-yvan": {
+    "barbe": "a full black beard",
+    "cheveux": "long black cornrow braids tied back"
+  },
   "vescovo-oreste": {
     "barbe": "a moustache and a small goatee",
     "cheveux": "medium-length brown hair"
@@ -802,6 +978,14 @@
   "vigneron-arthur": {
     "barbe": "light stubble",
     "cheveux": "short blond hair"
+  },
+  "villain-leo": {
+    "barbe": "clean-shaven",
+    "cheveux": "medium-length light brown hair"
+  },
+  "villeminot-allan": {
+    "barbe": "light stubble",
+    "cheveux": "short brown hair"
   },
   "villeminot-kyllian": {
     "barbe": "a short dark beard",
