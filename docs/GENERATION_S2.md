@@ -4,24 +4,27 @@
 La LNH a publié les portraits des trois derniers clubs — Caen, Chartres et Dunkerque —
 soit 46 refs de plus. La collecte des refs est donc terminée, à trois joueurs près.
 
-**Rendus retenus : 161 sur 259**, dix clubs complets : Aix, Limoges et Nantes (générés
+**Rendus retenus : 193 sur 259**, douze clubs complets : Aix, Limoges et Nantes (générés
 avec le prompt « Semi-realistic anime »), puis Saran, Paris et Saint-Raphaël, enfin
-Cesson-Rennes, Chambéry, Nîmes et Tremblay (prompt « Stylized comic book » actuel).
+Cesson-Rennes, Chambéry, Nîmes, Tremblay, Sélestat et Toulouse (prompt « Stylized comic
+book » actuel). Cutouts et cartes de contrôle en place pour les 193.
 
-Restent donc **98 joueurs sans rendu choisi**, en trois états distincts :
+Restent **66 joueurs sans rendu**, sur quatre clubs :
 
 | Club | Refs | Où ça en est | Fichier |
 |---|---|---|---|
 | Caen | 17/18 | **à coller** | `out/prompts/caen.txt` |
 | Chartres | 14/15 | **à coller** | `out/prompts/chartres.txt` |
 | Dunkerque | 15/15 | **à coller** | `out/prompts/dunkerque.txt` |
-| Sélestat | 17/17 | collé, rendus téléchargés — **à trier** | `Downloads/mj/selestat/` |
-| Toulouse | 15/16 | collé, rendus téléchargés — **à trier** | `Downloads/mj/toulouse/` |
-| Montpellier | 17/17 | collé ? aucun rendu trouvé dans `Downloads/mj` | `out/prompts/montpellier.txt` |
+| Montpellier | 17/17 | **à coller** (oublié à la vague du 30 août) | `out/prompts/montpellier.txt` |
 
-`--skip-done` écarte les rendus déjà choisis, pas les prompts déjà collés : les fichiers
-de Sélestat, Toulouse et Montpellier sont donc régénérés à chaque run alors qu'ils n'ont
-plus à être collés. **Ne recolle que les trois premières lignes du tableau.**
+**L'appariement de Sélestat et Toulouse n'est pas passé par le picker** : les rendus ont
+été rapprochés des portraits LNH sur les planches de `build_match_sheets.py`, en
+s'appuyant surtout sur `data/hair.json` — la coiffure et la pilosité ayant produit le
+rendu, elles le désignent en retour, bien plus sûrement qu'une ressemblance de visage.
+Deux cas ont demandé un autre indice : Mandic/Van Ee départagés par l'âge (Mandic a 37
+ans, ça se voit sur le rendu), Robert/Martins Vieira par le tatouage de cou de Robert,
+visible sur le rendu comme sur la photo.
 
 **Trois joueurs restent sans portrait** et sont écartés de la génération :
 
