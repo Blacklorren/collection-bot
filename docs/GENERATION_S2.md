@@ -1,37 +1,39 @@
 # Génération des portraits Saison 2 — mode d'emploi
 
-État au 30 août 2026 : **210 refs disponibles sur 259 joueurs**, 12 clubs complets.
-La LNH a publié 95 portraits entre le 18 et le 30 août — six clubs d'un coup.
+État au 2 septembre 2026 : **256 refs disponibles sur 259 joueurs**, 16 clubs sur 16.
+La LNH a publié les portraits des trois derniers clubs — Caen, Chartres et Dunkerque —
+soit 46 refs de plus. La collecte des refs est donc terminée, à trois joueurs près.
 
-**112 prompts sont en attente de collage**, tous regénérés le 30 août avec `--ow 300`
-(voir plus bas) et la couleur de maillot corrigée :
+**Rendus retenus : 161 sur 259**, dix clubs complets : Aix, Limoges et Nantes (générés
+avec le prompt « Semi-realistic anime »), puis Saran, Paris et Saint-Raphaël, enfin
+Cesson-Rennes, Chambéry, Nîmes et Tremblay (prompt « Stylized comic book » actuel).
 
-| Club | Refs | Prompts en attente |
+Restent donc **98 joueurs sans rendu choisi**, en trois états distincts :
+
+| Club | Refs | Où ça en est | Fichier |
+|---|---|---|---|
+| Caen | 17/18 | **à coller** | `out/prompts/caen.txt` |
+| Chartres | 14/15 | **à coller** | `out/prompts/chartres.txt` |
+| Dunkerque | 15/15 | **à coller** | `out/prompts/dunkerque.txt` |
+| Sélestat | 17/17 | collé, rendus téléchargés — **à trier** | `Downloads/mj/selestat/` |
+| Toulouse | 15/16 | collé, rendus téléchargés — **à trier** | `Downloads/mj/toulouse/` |
+| Montpellier | 17/17 | collé ? aucun rendu trouvé dans `Downloads/mj` | `out/prompts/montpellier.txt` |
+
+`--skip-done` écarte les rendus déjà choisis, pas les prompts déjà collés : les fichiers
+de Sélestat, Toulouse et Montpellier sont donc régénérés à chaque run alors qu'ils n'ont
+plus à être collés. **Ne recolle que les trois premières lignes du tableau.**
+
+**Trois joueurs restent sans portrait** et sont écartés de la génération :
+
+| Joueur | Club | Pourquoi |
 |---|---|---|
-| Chambéry | 18/18 | `out/prompts/chambery.txt` |
-| Montpellier | 17/17 | `out/prompts/montpellier.txt` |
-| Sélestat | 17/17 | `out/prompts/selestat.txt` |
-| Nîmes | 16/16 | `out/prompts/nimes.txt` |
-| Toulouse | 15/16 | `out/prompts/toulouse.txt` |
-| Cesson-Rennes | 14/14 | `out/prompts/cesson-rennes.txt` |
-| Tremblay | 15/15 | `out/prompts/tremblay.txt` |
-| **Total** | **112** | **112 prompts** |
+| Samuel VEDIE-MARCONNES | Caen | absent de l'effectif LNH (ajouté via `roster_complements.json`) |
+| Oussama HOSNI | Chartres | fiche LNH encore en silhouette |
+| Pontus BROLIN | Toulouse | fiche LNH encore en silhouette |
 
-Tremblay figure ici alors que ses refs datent d'août : ses prompts ont été refaits pour
-passer de `--ow 100` à `--ow 300` comme les autres.
-
-Aix, Limoges, Nantes, Paris, Saint-Raphaël et Saran n'apparaissent plus : leurs rendus
-sont choisis, `--skip-done` les écarte et `out/prompts/` est vidé à chaque run.
-
-**Il reste 49 joueurs sans photo**, sur trois clubs seulement : Caen (18), Chartres (15),
-Dunkerque (15), plus Pontus Brolin à Toulouse. Relancer `fetch_lnh_s2.py` toutes les
-semaines jusqu'à ce qu'ils sortent.
-
-**Rendus retenus au 28 août 2026 : 98 sur 259**, soit six clubs complets — Aix,
-Limoges et Nantes (générés avec le prompt « Semi-realistic anime »), puis Saran, Paris
-et Saint-Raphaël (prompt « Stylized comic book » actuel). Les 49 rendus de ces trois
-derniers clubs ont été appariés à partir des planches de `build_match_sheets.py` plutôt
-qu'avec le picker, et les cutouts sont en place.
+Pour les débloquer sans attendre la LNH : une URL de portrait trouvée sur le site du
+club, ajoutée à `data/refs_manuelles.json`, suffit (voir « Points de vigilance »). Sinon
+`publier_s2.py` les ignorera et la saison partira à 256 cartes.
 
 **Source des données.** Le scraper interroge `clubs-effectif?team=<clef>` et non les
 pages `/equipes/<slug>` : seule la première expose le **centre de formation**, où se
@@ -89,9 +91,10 @@ dans `data/hair.json` et corrigeables à la main. Pour les futurs clubs :
 py tools/build_head_sheets.py --seulement-sans-description
 ```
 
-Au 30 août, `data/hair.json` couvre les **210 joueurs qui ont une ref** : les 95 arrivés
-avec la vague du 30 août ont été décrits depuis huit planches. Rien à faire donc avant
-le prochain lot de photos, où la commande ci-dessus ne sortira que les nouveaux.
+Au 2 septembre, `data/hair.json` couvre les **256 joueurs qui ont une ref** : les 46 de
+Caen, Chartres et Dunkerque ont été décrits depuis quatre planches, après les 95 de la
+vague du 30 août. La collecte des refs étant finie, la commande ci-dessus ne sortira
+plus rien tant que les trois derniers joueurs n'ont pas de portrait.
 
 Deux conséquences sur le prompt d'origine :
 
