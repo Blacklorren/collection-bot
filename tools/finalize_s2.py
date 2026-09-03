@@ -99,6 +99,52 @@ def _fond_residuel(cut, src):
     return float(np.isin(lab, gros).mean() * 100)
 
 
+# Rattrapage semantique. Le detourage par couleur est exact tant que le sujet et le
+# fond ont des couleurs differentes -- ce qui n'est pas toujours vrai : sur le rendu de
+# Tom Vinatier, Midjourney a peint les cheveux courts du cote de la tete dans EXACTEMENT
+# le gris du fond (171/172/176 contre 170/171/175). Ils se relient au fond par le haut
+# de la coiffure, et aucune regle de couleur ni de morphologie ne peut les distinguer :
+# la fermeture morphologique n'en recupere que 1 800 px sur 14 000, la barriere d'encre
+# rien du tout. rembg, lui, sait que c'est une tete.
+#
+# On ne l'utilise donc PAS pour detourer -- il avale les maillots sombres, c'est tout le
+# sujet de cutout_mj -- mais seulement pour rendre au sujet ce que le detourage lui a
+# pris. Union, jamais soustraction. Et seulement par plaques d'un seul tenant : le bruit
+# de bord de rembg (0,1 a 0,3 % de l'image, disperse) ne passe pas le filtre de taille,
+# la vraie balafre de Vinatier si. Mesure sur sept rendus : 0,54 % rattrape chez lui,
+# 0,00 % partout ailleurs.
+RATTRAPAGE_MIN = 0.002   # part de l'image sous laquelle une plaque rendue est du bruit
+EROSION_SEM = 4          # marge de securite sur le masque semantique, en pixels
+_SESSION = []
+
+
+def _rattraper_sujet(cut, src):
+    """Rend au sujet les plaques que le detourage a prises et que rembg reconnait."""
+    try:
+        from rembg import new_session, remove
+    except ImportError:
+        return cut
+    if not _SESSION:
+        _SESSION.append(new_session("u2net"))
+    sem = np.asarray(remove(Image.open(src).convert("RGBA"), session=_SESSION[0],
+                            **MATTING))[..., 3] > 200
+    sem = ndimage.binary_erosion(sem, iterations=EROSION_SEM)
+
+    arr = np.array(cut)
+    manque = sem & (arr[..., 3] < 128)
+    lab, n = ndimage.label(manque)
+    if not n:
+        return cut
+    tailles = ndimage.sum(manque, lab, np.arange(1, n + 1))
+    gros = np.nonzero(tailles >= RATTRAPAGE_MIN * manque.size)[0] + 1
+    if not gros.size:
+        return cut
+    plaques = np.isin(lab, gros)
+    arr[..., 3][plaques] = 255
+    print(f"      rattrapage semantique : {plaques.mean()*100:.2f} % du sujet rendus")
+    return Image.fromarray(arr, "RGBA")
+
+
 # Une relance ne se justifie que si elle fait vraiment reculer la plaque. En dessous,
 # c'est du bruit de mesure, et monter la tolerance ne fait plus que ronger le sujet.
 GAIN_MINIMAL = 1.0
@@ -129,7 +175,7 @@ def decouper_propre(src):
     if meilleur is not essais[-1]:
         print(f"      relance sans effet : on garde tol_core={meilleur[1] or 'defaut'} "
               f"({meilleur[0]:.1f} %)")
-    return meilleur[2]
+    return _rattraper_sujet(meilleur[2], src)
 
 
 def planche(cartes, chemin, cols=4, larg=300):
