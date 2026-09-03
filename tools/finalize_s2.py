@@ -50,9 +50,12 @@ MATTING = dict(alpha_matting=True,
 
 
 # Au-dela de ce taux, le detourage a laisse une plaque de fond : on relance plus large.
-# Mesure sur les 193 rendus : les trois vraies plaques sortent entre 8 et 40 %, les
-# detourages propres sous 1,5 %. 3 % laisse donc une marge des deux cotes.
-FOND_TOLERE = 3.0
+# Le seuil peut etre BAS sans danger depuis que la relance garde le meilleur essai : un
+# faux positif (visage gris plat, maillot blanc) declenche une relance qui ne fait rien
+# reculer, donc le detourage d'origine est conserve intact. Verifie sur les cinq
+# joueurs entre 2 et 3,5 % : Bolzinger perd sa plaque (-2,9 %), Steins, Slatinek
+# Jovicic, Syprzak et Kojadinovic ne perdent pas un pixel.
+FOND_TOLERE = 2.0
 TOLERANCES = (20, 30, 45, 70)
 
 # Ce qui fait une plaque de fond survivante, et ce qui n'en fait pas une :
@@ -62,10 +65,12 @@ TOLERANCES = (20, 30, 45, 70)
 #     un decolore en ont : c'est ce qui les sauve, alors qu'un simple seuil de couleur
 #     les comptait comme du fond.                                          (ECART_TYPE)
 #   - d'un seul tenant et large                                            (TAILLE_MIN)
-#   - autour de la tete : plus bas, les epaules et le maillot occupent le cadre. (HAUT)
+#   - pas tout en bas : les epaules et le maillot occupent la derniere bande. A 0,5
+#     la plaque de Bolzinger, qui longe ses epaules, passait sous le radar (1,3 %) ;
+#     a 0,75 elle sort a 11,5 % et aucun maillot blanc ne se declenche encore.
 ECART_TYPE = 3.0     # ecart-type local maximal, en niveaux de gris, sur 9x9
 TAILLE_MIN = 0.004   # part de la zone analysee sous laquelle une tache est du bruit
-HAUT = 0.5           # moitie haute de l'image
+HAUT = 0.75          # trois quarts hauts : les epaules restent hors mesure
 
 
 def _fond_residuel(cut, src):

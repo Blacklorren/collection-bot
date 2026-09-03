@@ -80,6 +80,20 @@ BUSTE_MENTON_DEFAUT = 0.62  # repli quand le cou n'est pas detectable (cheveux l
 # meme : deux joueurs sur 98 (Tritta, de 0,5 %, et Mohamed et son afro, de 4 %).
 BUSTE_MENTON_Y = 830
 BUSTE_ROGNAGE_MAX = 55
+# Encadrement de la hauteur crane -> menton, en fraction de la hauteur de carte.
+# BUSTE_TETE_H vise le VISAGE via une estimation (moyenne geometrique hauteur/cou) ;
+# sur un joueur au cou epais cette estimation surevalue le visage, la tete est donc
+# dessinee plus petite et, le menton etant fixe, elle "tombe" dans le cadre : Ben Salem
+# et Melo se retrouvaient avec 145 px de vide au-dessus du crane et le cou mange par le
+# bandeau. On borne donc ce que l'estimation peut produire. Mesure sur les 255 rendus :
+# mediane 740 px, d'ou une fourchette de +-6 % autour d'elle.
+BUSTE_TETE_MIN = 0.585
+BUSTE_TETE_MAX = 0.645
+# Seuil d'opacite au-dela duquel un pixel compte comme du sujet pour le CALAGE.
+# getbbox() prend tout pixel non nul : la frange semi-transparente laissee par la rampe
+# alpha du detourage suffisait alors a etirer la boite jusqu'au bord de l'image, et le
+# centrage horizontal partait avec (10 joueurs decales de plus de 40 px, jusqu'a 100).
+BUSTE_ALPHA_MIN = 128
 _BUSTE_PROFIL_H = 256     # hauteur de travail de l'analyse de silhouette
 _BUSTE_LISSAGE = 5        # moyenne glissante sur le profil reduit, en lignes
 _BUSTE_CREUX = 0.88       # le cou doit etre 12 % plus etroit que la tete pour etre cru
@@ -322,6 +336,15 @@ def _bottom_shade(size, start=0.5, max_a=210):
     return layer
 
 
+def _bbox_opaque(alpha, boite=None):
+    """bbox des pixels franchement opaques (cf. BUSTE_ALPHA_MIN), pas de la frange."""
+    a = alpha.crop(boite) if boite else alpha
+    bb = a.point(lambda v: 255 if v > BUSTE_ALPHA_MIN else 0).getbbox()
+    if bb and boite:
+        return (bb[0] + boite[0], bb[1] + boite[1], bb[2] + boite[0], bb[3] + boite[1])
+    return bb
+
+
 def _profil_largeur(alpha):
     """Largeur de la silhouette ligne par ligne, en px de l'image reduite.
 
@@ -393,7 +416,7 @@ def _cadre_buste(art_src):
     coordonnees de collage sont donc negatives et il faut decouper la zone visible
     soi-meme, alpha_composite() n'acceptant pas de destination hors cadre."""
     alpha = art_src.getchannel("A")
-    bb = alpha.getbbox() or (0, 0, *art_src.size)
+    bb = _bbox_opaque(alpha) or (0, 0, *art_src.size)
     bh = max(1, bb[3] - bb[1])
     y_menton, l_cou, fiable = _menton(alpha, bb)
     # Moyenne geometrique hauteur de tete / largeur de cou (cf. BUSTE_TETE_H). Sans
@@ -401,6 +424,10 @@ def _cadre_buste(art_src):
     tete = ((y_menton * l_cou * BUSTE_COU_RATIO) ** 0.5
             if fiable and l_cou > 0 else y_menton)
     k = (H * BUSTE_TETE_H) / max(tete, 1)
+    # L'estimation du visage peut deraper (cou epais, cou fin) : on borne la hauteur
+    # crane -> menton qu'elle produit, sinon la tete flotte haut ou ecrase le cou.
+    k = min(max(k, (H * BUSTE_TETE_MIN) / max(y_menton, 1)),
+            (H * BUSTE_TETE_MAX) / max(y_menton, 1))
     k = min(k, (BUSTE_MENTON_Y - BORDER + BUSTE_ROGNAGE_MAX) / max(y_menton, 1))
     # Le buste doit descendre sous le separateur, sinon un trou apparait au-dessus du
     # bandeau. Le menton etant fixe, ce qu'il reste a couvrir est ce qui est SOUS lui.
@@ -411,12 +438,12 @@ def _cadre_buste(art_src):
     scaled = art_src.resize((max(1, round(art_src.width * k)),
                              max(1, round(art_src.height * k))), Image.Resampling.LANCZOS)
     sa = scaled.getchannel("A")
-    sb = sa.getbbox() or (0, 0, *scaled.size)
+    sb = _bbox_opaque(sa) or (0, 0, *scaled.size)
 
     # Centrage horizontal sur la TETE et non sur la silhouette entiere : un buste de
     # trois quarts a les epaules decalees, et c'est le visage qu'on veut au milieu.
-    haut_tete = sa.crop((0, sb[1], scaled.width,
-                         min(scaled.height, sb[1] + max(1, int(y_menton * k))))).getbbox()
+    haut_tete = _bbox_opaque(sa, (0, sb[1], scaled.width,
+                                  min(scaled.height, sb[1] + max(1, int(y_menton * k)))))
     cx = ((haut_tete[0] + haut_tete[2]) / 2 if haut_tete else (sb[0] + sb[2]) / 2)
     x = int(round(W / 2 - cx))
     y = BUSTE_MENTON_Y - int(round(y_menton * k)) - sb[1]
