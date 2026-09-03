@@ -26,13 +26,17 @@ Deux cas ont demandé un autre indice : Mandic/Van Ee départagés par l'âge (M
 ans, ça se voit sur le rendu), Robert/Martins Vieira par le tatouage de cou de Robert,
 visible sur le rendu comme sur la photo.
 
-**Trois joueurs restent sans portrait** et sont écartés de la génération :
+**Trois joueurs restent sans portrait de référence**, et sont donc écartés de la
+génération — la LNH ne publie rien pour eux :
 
-| Joueur | Club | Pourquoi |
-|---|---|---|
-| Samuel VEDIE-MARCONNES | Caen | absent de l'effectif LNH (ajouté via `roster_complements.json`) |
-| Oussama HOSNI | Chartres | fiche LNH encore en silhouette |
-| Pontus BROLIN | Toulouse | fiche LNH encore en silhouette |
+| Joueur | Club | Rareté | Pourquoi |
+|---|---|---|---|
+| Samuel VEDIE-MARCONNES | Caen | Commun | absent de l'effectif LNH (ajouté via `roster_complements.json`) |
+| Oussama HOSNI | Chartres | Commun | fiche LNH encore en silhouette |
+| Pontus BROLIN | Toulouse | Peu Commun | fiche LNH encore en silhouette |
+
+Un quatrième, **Quentin MINEL** (Chartres, Peu Commun), a bien sa référence : c'est son
+prompt qui n'est pas passé. Ligne 10 de `out/prompts/chartres.txt`.
 
 Pour les débloquer sans attendre la LNH : une URL de portrait trouvée sur le site du
 club, ajoutée à `data/refs_manuelles.json`, suffit (voir « Points de vigilance »). Sinon
