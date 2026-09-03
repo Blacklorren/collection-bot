@@ -39,16 +39,31 @@ from PIL import Image
 from scipy import ndimage
 
 # Distances RGB a la couleur de fond (0 = pile la couleur du fond).
-TOL_CORE = 26      # en deca : fond franc, sert a la connexite
+# TOL_CORE valait 26 jusqu'au 3 septembre 2026. C'etait trop large des que Midjourney
+# ne rendait PAS le gris clair demande : sur un fond gris-bleu sombre (Bono, 102/104/117)
+# ou moyen (Vinatier, 170/171/175), les meches claires et les ombres froides des cheveux
+# tombaient sous le seuil, se reliaient au bord et partaient AVEC le fond -- la couleur
+# de la carte se voyait alors au travers de la chevelure. Le fond plat, lui, est capture
+# des 12 : il est uniforme a 2 ou 3 unites pres, et la bande de dilatation (BANDE)
+# ramasse ce qui reste. Mesure sur Vinatier : hair intacte a 12, entamee a 18, largement
+# rongee a 26.
+TOL_CORE = 12      # en deca : fond franc, sert a la connexite
 TOL_EDGE = 105     # au dela : sujet franc. Entre les deux : alpha progressif
 BANDE = 9          # largeur de la frange adoucie autour du fond, en pixels
-TROU_MAX = 0.004   # poche de gris enfermee supprimee sous 0,4 % de l'image
+# Abaisse de 0,4 a 0,2 % le 3 septembre 2026 : la plage d'ombre dans les cheveux
+# decolores de Mendy fait 0,37 % et se faisait effacer, alors que le plus gros coin
+# de fond entre deux tresses (Nyembo) ne fait que 0,12 %. 0,2 % separe les deux.
+TROU_MAX = 0.002   # poche de gris enfermee supprimee sous 0,2 % de l'image
 # ...et seulement si elle est A MOINS DE CE NOMBRE DE PIXELS du vrai fond. Sans cette
 # condition la regle percait les visages : le fond est un gris moyen, et les ombres
 # froides du prompt ("cool desaturated slate-blue shadows") tombent dans la meme
 # teinte. Une poche prise dans une chevelure touche le fond ; une ombre sur une joue
 # en est loin (mediane mesuree : 62 px).
-POCHE_PROCHE = 12
+# Passe de 12 a 25 le 3 septembre 2026 : les coins de fond pris entre deux tresses
+# (Nyembo) sont a 20-23 px et survivaient, ce qui laissait deux plaques blanches dans
+# les cheveux. 25 les emporte et reste loin des 62 px d'une ombre de joue ; verifie sur
+# les 193 rendus deja retenus, aucun visage n'est perce.
+POCHE_PROCHE = 25
 
 
 def _couleur_fond(arr):

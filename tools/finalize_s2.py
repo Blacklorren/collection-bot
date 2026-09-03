@@ -30,6 +30,7 @@ import sys
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
+from scipy import ndimage
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -48,36 +49,87 @@ MATTING = dict(alpha_matting=True,
                alpha_matting_erode_size=8)
 
 
-# Au-dela de ce taux de pixels opaques encore a la couleur du fond, le detourage a
-# laisse une plaque : on relance plus large. 3 % couvre le bruit (peau claire, cheveux
-# gris) sans declencher a tort — le seul cas rate du lot 4 clubs etait a 15 %.
+# Au-dela de ce taux, le detourage a laisse une plaque de fond : on relance plus large.
+# Mesure sur les 193 rendus : les trois vraies plaques sortent entre 8 et 40 %, les
+# detourages propres sous 1,5 %. 3 % laisse donc une marge des deux cotes.
 FOND_TOLERE = 3.0
-TOLERANCES = (40, 55, 70)
+TOLERANCES = (20, 30, 45, 70)
+
+# Ce qui fait une plaque de fond survivante, et ce qui n'en fait pas une :
+#   - a la couleur du fond               (COULEUR)
+#   - PLATE : le prompt impose "flat plain light grey background, completely empty",
+#     donc le vrai fond n'a aucune texture. Un maillot blanc, une chevelure platine ou
+#     un decolore en ont : c'est ce qui les sauve, alors qu'un simple seuil de couleur
+#     les comptait comme du fond.                                          (ECART_TYPE)
+#   - d'un seul tenant et large                                            (TAILLE_MIN)
+#   - autour de la tete : plus bas, les epaules et le maillot occupent le cadre. (HAUT)
+ECART_TYPE = 3.0     # ecart-type local maximal, en niveaux de gris, sur 9x9
+TAILLE_MIN = 0.004   # part de la zone analysee sous laquelle une tache est du bruit
+HAUT = 0.5           # moitie haute de l'image
 
 
 def _fond_residuel(cut, src):
-    """% de pixels opaques encore a la couleur du fond de l'image source."""
+    """% de la moitie haute occupee par une plaque de fond encore opaque.
+
+    La premiere version comptait TOUS les pixels opaques proches de la couleur du fond,
+    ou qu'ils soient. Elle prenait donc un maillot blanc (Toulouse), une chevelure
+    platine ou une ombre grise pour du fond survivant : Bono sortait a 6,7 % avec un
+    detourage propre, la relance montait tol_core a 70 et lui mangeait les cheveux --
+    le remede faisait le mal. On exige desormais une zone PLATE, large et haute.
+    """
     a = np.asarray(Image.open(src).convert("RGB"), dtype=np.float32)
     b = 5
     cadre = np.concatenate([a[:b].reshape(-1, 3), a[:, :b].reshape(-1, 3),
                             a[:, -b:].reshape(-1, 3)])
     fond = np.median(cadre, axis=0)
-    arr = np.asarray(cut, dtype=np.float32)
+
+    arr = np.asarray(cut, dtype=np.float32)[:int(cut.height * HAUT)]
     d = np.linalg.norm(arr[..., :3] - fond, axis=2)
-    return float(((arr[..., 3] > 200) & (d < 45)).mean() * 100)
+    gris = arr[..., :3].mean(axis=2)
+    moy = ndimage.uniform_filter(gris, 9)
+    var = ndimage.uniform_filter(gris * gris, 9) - moy * moy
+    plat = np.sqrt(np.clip(var, 0, None)) < ECART_TYPE
+
+    plaque = (arr[..., 3] > 200) & (d < 45) & plat
+    lab, n = ndimage.label(plaque)
+    if not n:
+        return 0.0
+    tailles = ndimage.sum(plaque, lab, np.arange(1, n + 1))
+    gros = np.nonzero(tailles >= TAILLE_MIN * plaque.size)[0] + 1
+    return float(np.isin(lab, gros).mean() * 100)
+
+
+# Une relance ne se justifie que si elle fait vraiment reculer la plaque. En dessous,
+# c'est du bruit de mesure, et monter la tolerance ne fait plus que ronger le sujet.
+GAIN_MINIMAL = 1.0
 
 
 def decouper_propre(src):
-    """Detoure, puis relance plus large tant qu'il reste du fond colle au sujet."""
-    cut = detourer(src)
-    reste = _fond_residuel(cut, src)
+    """Detoure, puis relance plus large tant que ca fait reculer le fond.
+
+    On garde le MEILLEUR essai, pas le dernier. Luc Steins l'impose : son visage est
+    rendu dans un gris-beige plat, tres proche du fond, donc la mesure le prend pour une
+    plaque et ne redescend jamais sous le seuil. Sans cette garde, la boucle finissait a
+    tol_core=70 et lui mangeait la barbe pour rien -- alors que le detourage d'origine
+    etait bon. Une vraie plaque, elle, recule nettement des la premiere relance.
+    """
+    essais = [(_fond_residuel(cut := detourer(src), src), 0, cut)]
     for tol in TOLERANCES:
-        if reste <= FOND_TOLERE:
+        if essais[-1][0] <= FOND_TOLERE:
             break
         cut = detourer(src, tol_core=tol)
         reste = _fond_residuel(cut, src)
+        essais.append((reste, tol, cut))
         print(f"      fond residuel -> nouvel essai a tol_core={tol} ({reste:.1f} %)")
-    return cut
+
+    meilleur = essais[0]
+    for essai in essais[1:]:
+        if essai[0] < meilleur[0] - GAIN_MINIMAL:
+            meilleur = essai
+    if meilleur is not essais[-1]:
+        print(f"      relance sans effet : on garde tol_core={meilleur[1] or 'defaut'} "
+              f"({meilleur[0]:.1f} %)")
+    return meilleur[2]
 
 
 def planche(cartes, chemin, cols=4, larg=300):
