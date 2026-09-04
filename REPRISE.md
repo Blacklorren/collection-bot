@@ -164,16 +164,21 @@ joueur qui aurait ouvert des packs entre-temps ne perd rien.
 | `/collection` | s'ouvre sur « Album de Collection — Saison 2 », progression sur 258 |
 | bouton **Archive S1** | la collection de la saison passée, complète, un exemplaire par carte |
 | `/points` | 0 point, 0 pack |
-| `/classement_duel` | tout le monde à 1000 |
-| `/defi @quelquun` | compo à 7 postes avec des cartes S2 **seulement** |
+| `/classement_duel` | vide tant que personne n'a attaqué (l'Elo ne bouge qu'à l'attaque) |
+| `/defi @quelquun` | compo à 7 postes avec des cartes S2 **seulement**, cible hors ligne acceptée |
+| `/ma_defense` | l'équipe automatique qui te défend, cartes S2 uniquement |
 | `/creer <nom>` | trouve la carte sans dire « Trop de résultats » |
 | `!test all` | tous les modules verts |
 
-**Le test qui compte le plus, et qui n'a jamais été fait** : un vrai duel à **deux
-comptes**. Le moteur, la base, l'Elo et les récompenses sont vérifiés hors ligne,
-mais l'interface Discord à deux joueurs (composition partagée, bouton « Prêt » des
-deux côtés, lancement automatique, annulation avec un sélecteur ouvert) n'a jamais
-tourné en vrai. À faire **avant** vendredi, pas pendant.
+**Le test qui compte le plus, et qui n'a jamais été fait** : une vraie attaque sur
+un **second compte déconnecté**. Le moteur, la base, l'Elo à sens unique et les
+récompenses sont vérifiés hors ligne, mais côté Discord il reste à voir en vrai le
+**MP de compte-rendu** au défenseur, ses points crédités quand sa défense tient, et
+son Elo qui ne bouge pas. À faire **avant** vendredi, pas pendant.
+
+Depuis le passage au duel **asynchrone**, plus besoin de deux joueurs présents en
+même temps : le défenseur est représenté par sa compo automatique (`/ma_defense`).
+Le seul prérequis pour être attaquable est de posséder une carte de la saison.
 
 ---
 

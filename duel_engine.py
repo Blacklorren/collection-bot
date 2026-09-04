@@ -1,6 +1,10 @@
 """
 Moteur de duel (Saison 2) — logique PURE, sans Discord ni base de données.
 
+Le duel est ASYMÉTRIQUE : un seul joueur est connecté, l'attaquant. Le défenseur
+est représenté par sa compo automatique et ne met rien en jeu — voir
+`elo_apply_attacker` et les constantes DEFENSE_*.
+
 Concept : chaque joueur aligne 7 cartes sur les 7 postes du handball.
 La puissance d'équipe dépend de la rareté des cartes, d'un bonus si chaque
 carte est à SON poste, et d'une synergie si plusieurs cartes partagent le
@@ -77,6 +81,17 @@ SOFT_REWARD_FACTOR = 0.5  # récompenses réduites hors bande
 # --- RÉCOMPENSES (classé uniquement) ---
 DUEL_WIN_POINTS = 100     # base ; scalé par l'écart d'Elo
 DUEL_LOSS_POINTS = 20     # lot de consolation
+
+# --- DUEL ASYMÉTRIQUE (le défenseur n'est pas connecté) ---
+# Le défenseur ne met RIEN en jeu : son Elo ne bouge pas, il ne perd pas de points.
+# En revanche sa défense lui rapporte quand elle tient — se faire attaquer est une
+# bonne nouvelle, jamais une punition subie pendant son sommeil.
+# Calibré sur PACK_COST = 150 : avec le plafond de 5 défenses récompensées par jour
+# (DUEL_DEFENSE_REWARD_CAP), une journée de défense parfaite vaut environ UN pack.
+# Assez pour que se faire attaquer soit une bonne surprise, trop peu pour que rester
+# hors ligne devienne une stratégie de revenu.
+DEFENSE_HOLD_POINTS = 35  # sa compo gagne le match
+DEFENSE_DRAW_POINTS = 10  # match nul (n'arrive qu'en amical : le classé va en mort subite)
 
 
 def _clamp(x, lo, hi):
@@ -179,6 +194,20 @@ def elo_apply(elo1, elo2, result1, k=ELO_K):
     new1 = round(elo1 + k * (result1 - e1))
     new2 = round(elo2 + k * ((1.0 - result1) - (1.0 - e1)))
     return new1, new2
+
+
+def elo_apply_attacker(elo_att, elo_def, result_att, k=ELO_K):
+    """Duel ASYMÉTRIQUE : seul l'attaquant met son Elo en jeu.
+
+    Le défenseur n'a pas choisi ce match et n'était pas là pour le jouer : son Elo
+    ne bouge pas. L'espérance reste calculée contre son Elo, donc écraser un faible
+    ne rapporte quasiment rien et se faire sortir par lui coûte cher — le garde-fou
+    anti-farm est dans le barème lui-même, pas seulement dans les plafonds.
+
+    result_att : 1.0 victoire, 0.5 nul, 0.0 défaite. Retourne le nouvel Elo attaquant.
+    """
+    e = elo_expected(elo_att, elo_def)
+    return round(elo_att + k * (result_att - e))
 
 
 def within_band(elo_a, elo_b, band=ELO_BAND):

@@ -1005,18 +1005,25 @@ def record_duel(joueur1, joueur2, score1, score2, gagnant, classe,
         con.commit()
         return cur.lastrowid
 
-def count_ranked_duels_between(user_a, user_b, since_iso):
-    """Nb de duels CLASSÉS entre deux joueurs depuis `since_iso` (anti-farm de paire)."""
+def count_ranked_attacks_between(attaquant, defenseur, since_iso):
+    """Nb d'ATTAQUES classées de `attaquant` CONTRE `defenseur` depuis `since_iso`.
+
+    Anti-farm de paire, mais DIRECTIONNEL : en duel asymétrique, se faire attaquer
+    trois fois le matin ne doit pas empêcher de riposter l'après-midi — la victime
+    n'a rien fait pour mériter d'être bloquée.
+    """
     with _connect() as con:
         cur = con.cursor()
         return cur.execute("""
             SELECT COUNT(*) FROM duels
             WHERE classe = 1 AND datetime(created_at) >= datetime(?)
-              AND ((joueur1 = ? AND joueur2 = ?) OR (joueur1 = ? AND joueur2 = ?))
-        """, (since_iso, user_a, user_b, user_b, user_a)).fetchone()[0]
+              AND joueur1 = ? AND joueur2 = ?
+        """, (since_iso, attaquant, defenseur)).fetchone()[0]
 
 def count_ranked_duels_for(user_id, since_iso):
-    """Nb de duels CLASSÉS joués par un utilisateur depuis `since_iso` (plafond quotidien)."""
+    """Nb de duels CLASSÉS joués par un utilisateur depuis `since_iso`, attaque ET
+    défense confondues. Vue globale (stats, modération) : pour un plafond, préférer
+    `count_ranked_attacks_for` ou `count_defenses_for`, qui séparent les deux rôles."""
     with _connect() as con:
         cur = con.cursor()
         return cur.execute("""
@@ -1025,21 +1032,68 @@ def count_ranked_duels_for(user_id, since_iso):
               AND (joueur1 = ? OR joueur2 = ?)
         """, (since_iso, user_id, user_id)).fetchone()[0]
 
+def count_ranked_attacks_for(user_id, since_iso):
+    """Nb d'ATTAQUES classées lancées par un joueur depuis `since_iso`.
+
+    Duels asymétriques : `joueur1` est l'attaquant. Le plafond quotidien de
+    récompenses porte sur ce qu'on lance, jamais sur ce qu'on subit — sinon se faire
+    attaquer dix fois pendant la nuit épuiserait son propre quota du lendemain.
+    """
+    with _connect() as con:
+        cur = con.cursor()
+        return cur.execute("""
+            SELECT COUNT(*) FROM duels
+            WHERE classe = 1 AND datetime(created_at) >= datetime(?)
+              AND joueur1 = ?
+        """, (since_iso, user_id)).fetchone()[0]
+
+def count_defenses_for(user_id, since_iso, ranked_only=True):
+    """Nb de duels SUBIS en défense (le joueur était la cible) depuis `since_iso`.
+
+    Sert à deux plafonds distincts : les récompenses de défense (qu'on ne veut pas
+    voir s'accumuler passivement) et les MP de compte-rendu (qu'on ne veut pas voir
+    spammer une cible populaire).
+    """
+    clause = "classe = 1 AND " if ranked_only else ""
+    with _connect() as con:
+        cur = con.cursor()
+        return cur.execute(f"""
+            SELECT COUNT(*) FROM duels
+            WHERE {clause}datetime(created_at) >= datetime(?)
+              AND joueur2 = ?
+        """, (since_iso, user_id)).fetchone()[0]
+
+def get_user_defenses(user_id, limit=10):
+    """Dernières attaques subies par un joueur (il était `joueur2`), plus récentes d'abord."""
+    with _connect() as con:
+        con.row_factory = sqlite3.Row
+        cur = con.cursor()
+        cur.execute("""
+            SELECT * FROM duels
+            WHERE joueur2 = ?
+            ORDER BY id DESC LIMIT ?
+        """, (user_id, limit))
+        return [dict(r) for r in cur.fetchall()]
+
 def get_last_duel_lineup(user_id):
-    """Dernière compo alignée par le joueur : dict {slot: card_id | None}, ou None."""
+    """Dernière compo que le joueur a lui-même COMPOSÉE : {slot: card_id | None}, ou None.
+
+    On ne regarde que les duels où il était `joueur1`, c'est-à-dire l'attaquant : en
+    duel asymétrique, la compo du défenseur (`lineup2`) est générée automatiquement,
+    la reproposer en préremplissage écraserait le dernier choix réel du joueur.
+    """
     import json as _json
     with _connect() as con:
         cur = con.cursor()
         row = cur.execute("""
-            SELECT joueur1, lineup1, lineup2 FROM duels
-            WHERE joueur1 = ? OR joueur2 = ?
+            SELECT lineup1 FROM duels
+            WHERE joueur1 = ?
             ORDER BY id DESC LIMIT 1
-        """, (user_id, user_id)).fetchone()
+        """, (user_id,)).fetchone()
     if not row:
         return None
-    raw = row[1] if row[0] == user_id else row[2]
     try:
-        return _json.loads(raw) if raw else None
+        return _json.loads(row[0]) if row[0] else None
     except ValueError:
         return None
 
@@ -1056,19 +1110,28 @@ def get_user_duels(user_id, limit=10):
         return [dict(r) for r in cur.fetchall()]
 
 def get_duel_leaderboard(limit=10):
-    """Classement Elo des joueurs ayant disputé au moins un duel classé."""
+    """Classement Elo des joueurs ayant lancé au moins une ATTAQUE classée.
+
+    L'Elo ne bouge qu'à l'attaque (duels asymétriques) : classer quelqu'un qui n'a
+    jamais attaqué le figerait à 1000 au milieu du tableau sans rien vouloir dire.
+    On remonte quand même son bilan défensif, qui est l'autre moitié de son jeu.
+    """
     with _connect() as con:
         con.row_factory = sqlite3.Row
         cur = con.cursor()
         cur.execute("""
             SELECT u.user_id, u.elo,
                 (SELECT COUNT(*) FROM duels d
-                   WHERE d.classe = 1 AND (d.joueur1 = u.user_id OR d.joueur2 = u.user_id)) AS matchs,
+                   WHERE d.classe = 1 AND d.joueur1 = u.user_id) AS matchs,
                 (SELECT COUNT(*) FROM duels d
-                   WHERE d.classe = 1 AND d.gagnant = u.user_id) AS victoires
+                   WHERE d.classe = 1 AND d.joueur1 = u.user_id AND d.gagnant = u.user_id) AS victoires,
+                (SELECT COUNT(*) FROM duels d
+                   WHERE d.classe = 1 AND d.joueur2 = u.user_id) AS defenses,
+                (SELECT COUNT(*) FROM duels d
+                   WHERE d.classe = 1 AND d.joueur2 = u.user_id AND d.gagnant = u.user_id) AS defenses_tenues
             FROM users u
             WHERE EXISTS (SELECT 1 FROM duels d
-                          WHERE d.classe = 1 AND (d.joueur1 = u.user_id OR d.joueur2 = u.user_id))
+                          WHERE d.classe = 1 AND d.joueur1 = u.user_id)
             ORDER BY u.elo DESC
             LIMIT ?
         """, (limit,))
