@@ -695,8 +695,15 @@ class CollectionCog(commands.Cog):
                     description=f"**{member.mention}** vient de tirer **{card['nom']}** ({card['rarete']}) !",
                     color=RARITY_COLORS.get(card['rarete'], discord.Color.gold()),
                 )
-                em.set_image(url=card.get('image_url'))
-                await chan.send(embed=em)
+                # La CARTE composée, pas le portrait brut : `image_url` pointe sur la
+                # photo de référence (le détouré du joueur sur fond nu pour la S2), ce
+                # qui affichait un portrait sans cadre ni bandeau dans le salon public.
+                file, url = await self._card_image(card)
+                em.set_image(url=url)
+                if file:
+                    await chan.send(embed=em, file=file)
+                else:
+                    await chan.send(embed=em)
             except Exception:
                 pass
 
@@ -735,8 +742,12 @@ class CollectionCog(commands.Cog):
                 f"ℹ️ *Les utilisateurs qui l'avaient déjà n'ont pas reçu de doublon.*"
             )
             embed.color = discord.Color.green()
-            embed.set_image(url=target_card.get('image_url'))
-            await msg.edit(embed=embed)
+            file, url = await self._card_image(target_card)
+            embed.set_image(url=url)
+            if file:
+                await msg.edit(embed=embed, attachments=[file])
+            else:
+                await msg.edit(embed=embed)
             
         except Exception as e:
             await msg.edit(content=f"❌ Une erreur est survenue : `{e}`", embed=None)
@@ -1043,8 +1054,13 @@ class CollectionCog(commands.Cog):
         database.add_card_to_collection(interaction.user.id, target['id'])
         
         e = discord.Embed(title="🃏 Carte Créée !", description=f"Bienvenue à **{target['nom']}** !", color=RARITY_COLORS.get(target['rarete']))
-        e.set_image(url=target.get('image_url'))
-        await interaction.response.send_message(embed=e, ephemeral=True)
+        # La carte composée, pas le portrait brut (cf. _card_image)
+        file, url = await self._card_image(target)
+        e.set_image(url=url)
+        if file:
+            await interaction.response.send_message(embed=e, file=file, ephemeral=True)
+        else:
+            await interaction.response.send_message(embed=e, ephemeral=True)
 
     @app_commands.command(name='fragments', description="Infos sur le recyclage et la création.")
     async def fragments_command(self, interaction: discord.Interaction):
@@ -1125,8 +1141,12 @@ class CollectionCog(commands.Cog):
             description=f"**{target['nom']}** a été ajoutée à la collection de {membre.mention}.",
             color=RARITY_COLORS.get(target['rarete'], discord.Color.default()),
         )
-        e.set_image(url=target.get('image_url'))
-        await interaction.response.send_message(embed=e, ephemeral=True)
+        file, url = await self._card_image(target)
+        e.set_image(url=url)
+        if file:
+            await interaction.response.send_message(embed=e, file=file, ephemeral=True)
+        else:
+            await interaction.response.send_message(embed=e, ephemeral=True)
         try:
             await membre.send(f"🎁 Un admin t'a offert la carte **{target['nom']}** ({target['rarete']}) !")
         except discord.errors.Forbidden:
