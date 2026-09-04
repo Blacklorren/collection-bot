@@ -1,5 +1,6 @@
 import os
 import sys
+import aiohttp
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
@@ -16,6 +17,10 @@ DATA_DIR = '/data'
 LOCK_FILE = os.path.join(DATA_DIR, 'reset_done.lock')
 # Témoin de la bascule Saison 1 -> Saison 2 (voir « 2 bis » plus bas)
 MIGRATION_S2_LOCK = os.path.join(DATA_DIR, 'migration_s2_done.lock')
+# Attentes entre deux tentatives de connexion, en secondes. La connexion initiale
+# échoue parfois sur un TimeoutError réseau ; sans reprise, le conteneur meurt et le
+# bot reste hors ligne jusqu'à ce qu'on s'en aperçoive.
+RECONNEXION_ATTENTES = (15, 30, 60, 120, 300)
 
 # 1. Chargement des variables d'environnements
 load_dotenv()
@@ -337,9 +342,28 @@ async def main():
     
     try:
         print("⏳ Attente de 5 secondes avant connexion API...")
-        await asyncio.sleep(5) 
-        await bot.start(TOKEN)
-        
+        await asyncio.sleep(5)
+        # La connexion initiale a deja echoue deux fois sur un TimeoutError : le GET
+        # /users/@me n'aboutit pas et discord.py abandonne au bout de cinq minutes.
+        # C'est du reseau, pas du code -- mais sans reprise le conteneur meurt, et le
+        # bot est reste 2 h 30 hors ligne sans que personne ne le voie. On reessaie,
+        # en espacant : cinq tentatives couvrent une vingtaine de minutes de panne.
+        for essai, attente in enumerate(RECONNEXION_ATTENTES, start=1):
+            try:
+                await bot.start(TOKEN)
+                break
+            except (asyncio.TimeoutError, aiohttp.ClientConnectorError, OSError) as e:
+                if not bot.is_closed():
+                    await bot.close()
+                print(f"⚠️  Connexion impossible ({type(e).__name__}) — tentative "
+                      f"{essai}/{len(RECONNEXION_ATTENTES)}, nouvelle tentative dans "
+                      f"{attente} s.", flush=True)
+                await asyncio.sleep(attente)
+                bot = HandnewsBot()
+                await setup_global_commands(bot)
+        else:
+            print("❌ Discord reste injoignable après toutes les tentatives.")
+
     except discord.errors.LoginFailure:
         print("❌ Erreur de connexion : Le token fourni est invalide.")
         
