@@ -98,27 +98,44 @@ bot ne démarrera pas du tout.
 l'inverse exact de ce qu'on veut. À vérifier avant de toucher au volume ou de
 redéployer proprement.
 
-### 3.2 Arrêter le bot
+### 3.2 Migrer la base : rien à lancer, c'est le redémarrage qui le fait
 
-Pour que personne n'ouvre un pack pendant la migration.
+La migration se déclenche **au démarrage de `bot.py`**, une seule fois, sur le même
+principe que la remise à zéro ci-dessus : un témoin sur le volume,
+`/data/migration_s2_done.lock`. Tant qu'il est absent la bascule s'exécute ; une fois
+posé, elle ne se rejoue plus, quel que soit le nombre de redéploiements.
 
-### 3.3 Migrer la base
+Il n'y a donc **ni SSH, ni CLI, ni arrêt manuel du bot** : on redéploie, et on lit le
+log. C'est aussi ce qui règle la question du pack ouvert pendant la migration — elle a
+lieu avant que le bot ne se connecte à Discord.
 
-Sur le volume Railway, **pas sur la copie locale** :
+Ce qu'on doit voir dans le log de déploiement :
 
-```bash
-python tools/migration_s2.py --db /data/collection.db
+```
+🏁  (S2) Lancement de la bascule Saison 1 -> Saison 2...
+Base            : /data/collection.db
+Doublons S1     : N lignes a supprimer, chez M joueurs
+Sauvegarde      : /data/collection.db.avant-s2-<horodatage>.bak
+N doublons supprimes. Compteurs remis a zero : ...
+Controle : 0 doublon(s) S1 restant(s) (doit valoir 0).
+✅  (S2) Bascule terminée. Le témoin est posé, elle ne se rejouera pas.
 ```
 
-Simulation. Elle annonce le nombre de doublons à supprimer, les compteurs à remettre
-à zéro et les Elo à ramener à 1000.
+Une **sauvegarde horodatée** est prise avant écriture (`collection.db.avant-s2-*.bak`),
+sur le volume. En cas de problème, c'est elle qu'on restaure.
+
+**Si la bascule échoue**, le témoin n'est pas posé et la base n'est pas modifiée (tout
+passe en une transaction) : le bot démarre quand même — pour ne pas laisser le service
+en boucle de crash — et la bascule sera retentée au redémarrage suivant. Le log affiche
+alors `❌ (S2) Bascule EN ÉCHEC` suivi de la classe de l'exception et de la trace.
+
+Pour la relancer volontairement, il suffit de supprimer
+`/data/migration_s2_done.lock`. Et pour la jouer à la main sur une base de test :
 
 ```bash
-python tools/migration_s2.py --db /data/collection.db --go
+python tools/migration_s2.py --db chemin/vers/copie.db        # simulation
+python tools/migration_s2.py --db chemin/vers/copie.db --go
 ```
-
-Une **sauvegarde horodatée** est prise avant écriture (`collection.db.avant-s2-*.bak`).
-En cas de problème, c'est elle qu'on restaure.
 
 Ce que ça fait :
 - un seul exemplaire de chaque carte S1 par joueur (l'archive reste complète) ;
@@ -131,7 +148,7 @@ l'historique des duels (c'est un journal, chaque ligne porte l'Elo d'avant/aprè
 Le script ne purge **que** la saison 1, même s'il tourne après la publication : un
 joueur qui aurait ouvert des packs entre-temps ne perd rien.
 
-### 3.4 Redémarrer et synchroniser
+### 3.3 Synchroniser les commandes
 
 ```
 !sync
@@ -169,4 +186,5 @@ tourné en vrai. À faire **avant** vendredi, pas pendant.
 | `/pack` donne des cartes S1 | `cards.json` sans champ `saison` | relancer `tools/publier_s2.py --go`, redémarrer |
 | `/pack` plante | pool de tirage vide | les logs disent la saison suivie ; publier puis redémarrer |
 | une carte sans portrait | cutout manquant | `tools/finalize_s2.py`, puis republier |
-| doublons S1 encore là | migration lancée sur la copie locale | relancer avec `--db /data/collection.db` |
+| doublons S1 encore là | bascule non jouée, ou en échec | chercher `(S2)` dans le log ; si le témoin manque elle se rejouera au prochain démarrage |
+| points/Elo remis à zéro après coup | `migration_s2_done.lock` effacé du volume | restaurer la sauvegarde `.bak` la plus récente |

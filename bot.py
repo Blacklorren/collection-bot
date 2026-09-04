@@ -1,4 +1,5 @@
 import os
+import sys
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
@@ -13,6 +14,8 @@ from datetime import datetime, timedelta
 DATA_DIR = '/data'
 # On définit le chemin complet pour le fichier de verrouillage
 LOCK_FILE = os.path.join(DATA_DIR, 'reset_done.lock')
+# Témoin de la bascule Saison 1 -> Saison 2 (voir « 2 bis » plus bas)
+MIGRATION_S2_LOCK = os.path.join(DATA_DIR, 'migration_s2_done.lock')
 
 # 1. Chargement des variables d'environnements
 load_dotenv()
@@ -59,6 +62,34 @@ try:
 except Exception as e:
     print(f"Erreur lors de l'initialisation de la base de données : {e}")
     exit()
+
+
+# 2 bis. Bascule Saison 1 -> Saison 2, UNE SEULE FOIS
+# Même mécanique que la remise à zéro plus haut : un témoin sur le volume, donc
+# l'opération ne se rejoue pas au redémarrage suivant. Elle ne garde qu'un exemplaire
+# de chaque carte S1 (l'archive reste complète), remet points, packs et fragments à
+# zéro, et ramène tous les Elo à leur valeur de départ.
+# La migration prend elle-même une sauvegarde horodatée de la base avant d'écrire, et
+# travaille en transaction : si elle échoue, la base est laissée intacte.
+if not os.path.exists(MIGRATION_S2_LOCK):
+    print(f"ℹ️  (S2) Le témoin '{MIGRATION_S2_LOCK}' est absent.")
+    print("🏁  (S2) Lancement de la bascule Saison 1 -> Saison 2...")
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tools'))
+        from migration_s2 import migrer
+        migrer(database.DB_NAME, go=True)
+        with open(MIGRATION_S2_LOCK, 'w') as f:
+            f.write(f"Migration S2 performed on {datetime.now().isoformat()}")
+        print("✅  (S2) Bascule terminée. Le témoin est posé, elle ne se rejouera pas.")
+    except Exception as e:
+        # On NE POSE PAS le témoin : la bascule sera retentée au prochain démarrage.
+        # Le bot démarre quand même, pour ne pas laisser le service en boucle de crash.
+        print(f"❌  (S2) Bascule EN ÉCHEC : {type(e).__name__}: {e or '(pas de message)'}")
+        traceback.print_exc()
+        print("⚠️  (S2) La base n'a pas été modifiée. Le bot démarre sur l'ancienne "
+              "économie : corriger, puis redémarrer.")
+else:
+    print("ℹ️  (S2) Bascule Saison 2 déjà effectuée. Démarrage normal.")
 
 
 # 3. Définition des "Intents" (les autorisations du bot)

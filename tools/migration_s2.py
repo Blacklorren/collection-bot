@@ -81,19 +81,17 @@ def sauvegarder(chemin):
     return dest
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--go", action="store_true", help="applique reellement (sinon simulation)")
-    ap.add_argument("--db", default=database.DB_NAME)
-    args = ap.parse_args()
-
-    if not os.path.exists(args.db):
-        raise SystemExit(f"Base introuvable : {args.db}\n"
+def migrer(db, go=False):
+    """Coeur de la migration, appelable sans passer par la ligne de commande :
+    c'est ainsi que bot.py la declenche au demarrage, une seule fois, sur le meme
+    principe de fichier temoin que la remise a zero de la saison 1."""
+    if not os.path.exists(db):
+        raise SystemExit(f"Base introuvable : {db}\n"
                          "Sur Railway elle est sur le volume monte (/data/collection.db).")
 
     s1 = ids_s1()
     marques = ",".join("?" * len(s1))
-    con = sqlite3.connect(args.db)
+    con = sqlite3.connect(db)
     cur = con.cursor()
 
     # --- etat avant ---
@@ -112,7 +110,7 @@ def main():
     presentes = [c for c in COLONNES_RAZ if colonne_existe(cur, "users", c)]
     elo_present = colonne_existe(cur, "users", "elo")
 
-    print(f"Base            : {args.db}")
+    print(f"Base            : {db}")
     print(f"Cartes en base  : {total} lignes")
     print(f"Doublons S1     : {a_supprimer} lignes a supprimer, chez {joueurs} joueurs")
     for col in COLONNES_RAZ:
@@ -132,16 +130,16 @@ def main():
     else:
         print(f"{'Elo':15s} : colonne absente, rien a faire")
 
-    if not args.go:
+    if not go:
         print("\nSIMULATION — rien n'a ete ecrit. Relance avec --go pour appliquer.")
         con.close()
         return
 
     con.close()
-    bak = sauvegarder(args.db)
+    bak = sauvegarder(db)
     print(f"\nSauvegarde      : {bak}")
 
-    con = sqlite3.connect(args.db)
+    con = sqlite3.connect(db)
     cur = con.cursor()
     try:
         cur.execute("BEGIN")
@@ -179,6 +177,15 @@ def main():
         print(f"{remises['elo']} joueur(s) ramene(s) a {ELO_DEPART} d'Elo (classement neuf).")
     print(f"Controle : {restants} doublon(s) S1 restant(s) (doit valoir 0).")
     print(f"En cas de probleme, restaurer la sauvegarde : {os.path.basename(bak)}")
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--go", action="store_true",
+                    help="applique reellement (sinon simulation)")
+    ap.add_argument("--db", default=database.DB_NAME)
+    args = ap.parse_args()
+    migrer(args.db, args.go)
 
 
 if __name__ == "__main__":
