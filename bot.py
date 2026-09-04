@@ -6,6 +6,7 @@ import database
 import pytz
 import asyncio
 import logging
+import traceback
 from datetime import datetime, timedelta
 
 # Le dossier où les données persistantes sont stockées
@@ -356,7 +357,13 @@ async def main():
             print(f"❌ Erreur HTTP Autre : {e}")
             
     except Exception as e:
-        print(f"❌ Une erreur inattendue est survenue : {e}")
+        # str(e) est VIDE sur toute une famille d'exceptions -- asyncio.TimeoutError,
+        # ConnectionResetError, CancelledError -- et le log ne disait alors rien du
+        # tout : "Une erreur inattendue est survenue :" suivi de rien. On affiche donc
+        # la classe, qui elle est toujours parlante, et la trace complete.
+        print(f"❌ Une erreur inattendue est survenue : "
+              f"{type(e).__name__}: {e or '(pas de message)'}")
+        traceback.print_exc()
     finally:
         if not bot.is_closed():
             await bot.close()
