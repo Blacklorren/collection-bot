@@ -75,18 +75,23 @@ PACK_COST = 150
 DAILY_BONUS = 100
 POINTS_PER_MESSAGE = 20
 MAX_DAILY_MESSAGE_POINTS = 300
-MESSAGE_COOLDOWN = 10
-
 # --- ANTI-TRICHE « écrire puis supprimer » ---
-# Les points d'un message ne sont pas crédités tout de suite : ils MÛRISSENT.
-# Pendant la maturation ils ne sont ni dépensables ni comptés dans le solde, donc il
-# n'existe aucun instant où l'on pourrait convertir en packs les points d'un message
-# qu'on s'apprête à effacer. Supprimer avant maturité = zéro point ; supprimer après
-# = le solde est débité (il peut devenir négatif).
+# Les points d'un message ne sont pas crédités tout de suite : ils MÛRISSENT pendant
+# 12 heures. Tant qu'ils n'ont pas mûri ils ne sont ni dépensables ni comptés dans le
+# solde, donc il n'existe aucun instant où l'on pourrait convertir en packs les points
+# d'un message qu'on s'apprête à effacer. Supprimer avant maturité = zéro point ;
+# supprimer après = le solde est débité (il peut devenir négatif).
 # Le quota quotidien, lui, est consommé dès l'écriture et n'est JAMAIS rendu : sinon
 # supprimer libérerait de la place pour regagner, et la triche deviendrait rentable.
-POINT_MATURATION_MINUTES = int(os.getenv("POINT_MATURATION_MINUTES", "10"))
+#
+# 12 h, c'est ce qui remplace l'ancien cooldown de 10 secondes : plafonner sa journée
+# reste rapide, mais il faut ensuite LAISSER ses messages en place une demi-journée.
+# Un spam de quinze lignes ne peut plus être effacé discrètement dans la foulée — il
+# reste sous les yeux des modérateurs le temps de mûrir, ou il ne rapporte rien.
+POINT_MATURATION_MINUTES = int(os.getenv("POINT_MATURATION_MINUTES", "720"))
 # Au-delà, on oublie la ligne : supprimer un très vieux message ne reprend plus rien.
+# Doit rester > POINT_MATURATION_MINUTES, sinon les points seraient purgés avant
+# d'avoir mûri et personne ne serait jamais payé.
 POINT_CLAWBACK_HOURS = int(os.getenv("POINT_CLAWBACK_HOURS", "48"))
 LEADERBOARD_EXCLUDED_IDS = [133711821214449665]
 # Boost de fin de collection basse rareté (Saison 2) :
@@ -245,6 +250,16 @@ class PackOpenView(discord.ui.View):
         await self.cog._run_button_open(interaction, self, MAX_BULK_OPEN)
 
 
+def _delai_maturation():
+    """Le délai de maturation, dit en français plutôt qu'en minutes brutes."""
+    h, m = divmod(POINT_MATURATION_MINUTES, 60)
+    if h and m:
+        return f"{h} h {m:02d}"
+    if h:
+        return f"{h} heure" + ("s" if h > 1 else "")
+    return f"{m} minutes"
+
+
 class CollectionCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -367,11 +382,10 @@ class CollectionCog(commands.Cog):
                 DAILY_BONUS + POINTS_PER_MESSAGE, now_paris.isoformat())
             return
         
-        # Cooldown anti-spam
-        if user_data['last_message_time']:
-            last_msg = datetime.datetime.fromisoformat(user_data['last_message_time'])
-            if last_msg.tzinfo is None: last_msg = paris_tz.localize(last_msg)
-            if (now_paris - last_msg).total_seconds() < MESSAGE_COOLDOWN: return
+        # Plus de cooldown entre deux messages : il ne servait plus à rien. Ce qui
+        # freine la triche maintenant, ce n'est pas le rythme d'écriture mais le fait
+        # de devoir laisser ses messages en ligne 12 h pour être payé. Le plafond
+        # quotidien reste le seul garde-fou sur le volume.
 
         # Limite quotidienne
         if user_data['daily_message_points'] >= MAX_DAILY_MESSAGE_POINTS: return
@@ -468,7 +482,7 @@ class CollectionCog(commands.Cog):
         # tant qu'ils n'ont pas mûri, autant que ce soit clair plutôt que de laisser
         # croire à un solde qui refuse d'acheter.
         attente = (f"\n⏳ **{pending} points** en cours d'acquisition "
-                   f"(disponibles ~{POINT_MATURATION_MINUTES} min après le message, "
+                   f"(disponibles {_delai_maturation()} après le message, "
                    f"perdus si tu le supprimes)." if pending else "")
         solde = (f"💰 **{data['points']} points** │ 🎒 **{data['packs']} packs** │ "
                  f"♻️ **{data['fragments']} fragments**")

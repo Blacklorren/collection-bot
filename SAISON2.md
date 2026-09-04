@@ -154,6 +154,52 @@ c'est aussi pourquoi la puissance de la défense est affichée avant l'attaque.
 
 ---
 
+## 3bis. Points de message : maturation différée — ✅ FAIT
+
+Des membres écrivaient un message, encaissaient les points, l'effaçaient, et
+recommençaient : le plafond de la journée tombait en quelques minutes, sans présence
+réelle et sans laisser de trace dans le salon.
+
+Le trou n'était pas la suppression mais le **crédit immédiat** : les points étaient
+dépensables avant que le message ait eu le temps d'exister, donc n'importe quelle
+déduction a posteriori arrivait après la conversion en packs. Corriger la suppression
+seule n'aurait rien réglé.
+
+**Mécanique** (`cogs/collection_cog.py`, table `pending_message_points`) :
+- à l'écriture, les points partent dans une table d'attente — invisibles dans le solde
+  et non dépensables ;
+- `mature_points_loop` (60 s) les crédite **12 h plus tard**
+  (`POINT_MATURATION_MINUTES = 720`), après avoir revérifié par `fetch_message` que le
+  message est toujours là ;
+- suppression avant maturité → la ligne disparaît, il n'y a rien à reprendre ;
+- suppression après maturité (jusqu'à `POINT_CLAWBACK_HOURS = 48`) → le solde est
+  débité, quitte à devenir négatif : `/pack` refuse alors tout achat
+  (`affordable = pts // PACK_COST <= 0`).
+
+**Le détail qui décide de tout** : le quota quotidien (`daily_message_points`) est
+consommé dès l'écriture et **jamais rendu**. Le restituer à la suppression libérerait
+de la place pour regagner et rendrait la triche plus rentable qu'avant.
+
+**Deux contournements fermés** :
+- on écoute `on_raw_message_delete` / `on_raw_bulk_message_delete` — les versions non
+  RAW ne se déclenchent que pour les messages encore en cache, donc ni ceux d'hier ni
+  après un redémarrage ;
+- la maturation revérifie l'existence du message, sinon couper le bot au bon moment
+  suffisait à perdre l'événement de suppression. En cas de doute (salon introuvable,
+  permission, réseau) on crédite : mieux vaut payer un message effacé que spolier
+  quelqu'un pour une panne.
+
+**Le cooldown de 10 s a disparu.** Ce qui freine désormais n'est plus le rythme
+d'écriture mais l'obligation de laisser ses messages en ligne une demi-journée : un
+spam de quinze lignes reste sous les yeux des modérateurs le temps de mûrir, ou il ne
+rapporte rien. Le plafond quotidien reste le seul garde-fou sur le volume.
+
+**Limite assumée** : plafonner sa journée reste possible en quelques secondes. Ce
+n'est plus discret, c'est tout. Pour l'empêcher vraiment il faudrait étaler les gains
+(un gain par fenêtre de N minutes), ce qui n'a pas été retenu.
+
+---
+
 ## 4. Tester (en bêta, salon `441230079100715008`)
 
 1. Déployer, lancer le bot, `!sync`.
