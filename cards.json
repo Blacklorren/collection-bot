@@ -5,7 +5,8 @@
     "club": "Aix",
     "rarete": "Commun",
     "poste": "Gardien",
-    "image_url": "https://i.imgur.com/oiYROP8.png"
+    "image_url": "https://i.imgur.com/oiYROP8.png",
+    "saison": 1
   },
   {
     "id": 2,
@@ -13,7 +14,8 @@
     "club": "Aix",
     "rarete": "Épique",
     "poste": "Gardien",
-    "image_url": "https://i.imgur.com/LaE1cRw.png"
+    "image_url": "https://i.imgur.com/LaE1cRw.png",
+    "saison": 1
   },
   {
     "id": 3,
@@ -21,7 +23,8 @@
     "club": "Aix",
     "rarete": "Peu Commun",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/sORcdlp.png"
+    "image_url": "https://i.imgur.com/sORcdlp.png",
+    "saison": 1
   },
   {
     "id": 4,
@@ -29,7 +32,8 @@
     "club": "Aix",
     "rarete": "Rare",
     "poste": "Demi Centre",
-    "image_url": "https://i.imgur.com/sy7CfCg.png"
+    "image_url": "https://i.imgur.com/sy7CfCg.png",
+    "saison": 1
   },
   {
     "id": 5,
@@ -37,7 +41,8 @@
     "club": "Aix",
     "rarete": "Commun",
     "poste": "Ailier Gauche",
-    "image_url": "https://i.imgur.com/L4zH8s8.png"
+    "image_url": "https://i.imgur.com/L4zH8s8.png",
+    "saison": 1
   },
   {
     "id": 6,
@@ -45,7 +50,8 @@
     "club": "Aix",
     "rarete": "Rare",
     "poste": "Demi Centre",
-    "image_url": "https://i.imgur.com/4tm6dQL.png"
+    "image_url": "https://i.imgur.com/4tm6dQL.png",
+    "saison": 1
   },
   {
     "id": 7,
@@ -53,7 +59,8 @@
     "club": "Aix",
     "rarete": "Peu Commun",
     "poste": "Arrière Droit",
-    "image_url": "https://i.imgur.com/FaYhlws.png"
+    "image_url": "https://i.imgur.com/FaYhlws.png",
+    "saison": 1
   },
   {
     "id": 8,
@@ -61,7 +68,8 @@
     "club": "Aix",
     "rarete": "Commun",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/FkgFNxN.png"
+    "image_url": "https://i.imgur.com/FkgFNxN.png",
+    "saison": 1
   },
   {
     "id": 9,
@@ -69,7 +77,8 @@
     "club": "Aix",
     "rarete": "Commun",
     "poste": "Arrière Gauche",
-    "image_url": "https://i.imgur.com/SZFBl2Z.png"
+    "image_url": "https://i.imgur.com/SZFBl2Z.png",
+    "saison": 1
   },
   {
     "id": 11,
@@ -77,7 +86,8 @@
     "club": "Aix",
     "rarete": "Épique",
     "poste": "Ailier Droit",
-    "image_url": "https://i.imgur.com/tp3xucU.png"
+    "image_url": "https://i.imgur.com/tp3xucU.png",
+    "saison": 1
   },
   {
     "id": 12,
@@ -85,7 +95,8 @@
     "club": "Aix",
     "rarete": "Rare",
     "poste": "Ailier Gauche",
-    "image_url": "https://i.imgur.com/lZULwtu.png"
+    "image_url": "https://i.imgur.com/lZULwtu.png",
+    "saison": 1
   },
   {
     "id": 13,
@@ -93,7 +104,8 @@
     "club": "Aix",
     "rarete": "Peu Commun",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/kGNJglO.png"
+    "image_url": "https://i.imgur.com/kGNJglO.png",
+    "saison": 1
   },
   {
     "id": 15,
@@ -101,7 +113,8 @@
     "club": "Aix",
     "rarete": "Peu Commun",
     "poste": "Ailier Droit",
-    "image_url": "https://i.imgur.com/iVG3c08.png"
+    "image_url": "https://i.imgur.com/iVG3c08.png",
+    "saison": 1
   },
   {
     "id": 16,
@@ -109,7 +122,8 @@
     "club": "Aix",
     "rarete": "Peu Commun",
     "poste": "Arrière Droit",
-    "image_url": "https://i.imgur.com/xoSRc9F.png"
+    "image_url": "https://i.imgur.com/xoSRc9F.png",
+    "saison": 1
   },
   {
     "id": 17,
@@ -117,7 +131,8 @@
     "club": "Aix",
     "rarete": "Épique",
     "poste": "Demi Centre",
-    "image_url": "https://i.imgur.com/sdE6HdB.png"
+    "image_url": "https://i.imgur.com/sdE6HdB.png",
+    "saison": 1
   },
   {
     "id": 18,
@@ -125,7 +140,8 @@
     "club": "Cesson-Rennes",
     "rarete": "Rare",
     "poste": "Demi Centre",
-    "image_url": "https://i.imgur.com/6P0uwVq.png"
+    "image_url": "https://i.imgur.com/6P0uwVq.png",
+    "saison": 1
   },
   {
     "id": 19,
@@ -133,7 +149,8 @@
     "club": "Cesson-Rennes",
     "rarete": "Peu Commun",
     "poste": "Arrière Gauche",
-    "image_url": "https://i.imgur.com/LeG6Xip.png"
+    "image_url": "https://i.imgur.com/LeG6Xip.png",
+    "saison": 1
   },
   {
     "id": 20,
@@ -141,7 +158,8 @@
     "club": "Cesson-Rennes",
     "rarete": "Peu Commun",
     "poste": "Ailier Droit",
-    "image_url": "https://i.imgur.com/uyWqjbb.png"
+    "image_url": "https://i.imgur.com/uyWqjbb.png",
+    "saison": 1
   },
   {
     "id": 21,
@@ -149,7 +167,8 @@
     "club": "Cesson-Rennes",
     "rarete": "Peu Commun",
     "poste": "Ailier Gauche",
-    "image_url": "https://i.imgur.com/fi0wTrU.png"
+    "image_url": "https://i.imgur.com/fi0wTrU.png",
+    "saison": 1
   },
   {
     "id": 22,
@@ -157,7 +176,8 @@
     "club": "Cesson-Rennes",
     "rarete": "Peu Commun",
     "poste": "Demi Centre",
-    "image_url": "https://i.imgur.com/vbko7Qa.png"
+    "image_url": "https://i.imgur.com/vbko7Qa.png",
+    "saison": 1
   },
   {
     "id": 23,
@@ -165,7 +185,8 @@
     "club": "Cesson-Rennes",
     "rarete": "Commun",
     "poste": "Gardien",
-    "image_url": "https://i.imgur.com/GDeinaF.png"
+    "image_url": "https://i.imgur.com/GDeinaF.png",
+    "saison": 1
   },
   {
     "id": 24,
@@ -173,7 +194,8 @@
     "club": "Cesson-Rennes",
     "rarete": "Commun",
     "poste": "Ailier Gauche",
-    "image_url": "https://i.imgur.com/JH2TTVq.png"
+    "image_url": "https://i.imgur.com/JH2TTVq.png",
+    "saison": 1
   },
   {
     "id": 25,
@@ -181,7 +203,8 @@
     "club": "Cesson-Rennes",
     "rarete": "Commun",
     "poste": "Ailier Gauche",
-    "image_url": "https://i.imgur.com/yDyon6i.png"
+    "image_url": "https://i.imgur.com/yDyon6i.png",
+    "saison": 1
   },
   {
     "id": 26,
@@ -189,7 +212,8 @@
     "club": "Cesson-Rennes",
     "rarete": "Commun",
     "poste": "Ailier Droit",
-    "image_url": "https://i.imgur.com/IHe0eDn.png"
+    "image_url": "https://i.imgur.com/IHe0eDn.png",
+    "saison": 1
   },
   {
     "id": 27,
@@ -197,7 +221,8 @@
     "club": "Cesson-Rennes",
     "rarete": "Peu Commun",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/MBLmcXM.png"
+    "image_url": "https://i.imgur.com/MBLmcXM.png",
+    "saison": 1
   },
   {
     "id": 28,
@@ -205,7 +230,8 @@
     "club": "Cesson-Rennes",
     "rarete": "Épique",
     "poste": "Arrière Droit",
-    "image_url": "https://i.imgur.com/pgkWnSo.png"
+    "image_url": "https://i.imgur.com/pgkWnSo.png",
+    "saison": 1
   },
   {
     "id": 29,
@@ -213,7 +239,8 @@
     "club": "Cesson-Rennes",
     "rarete": "Rare",
     "poste": "Arrière Droit",
-    "image_url": "https://i.imgur.com/ojYOArL.png"
+    "image_url": "https://i.imgur.com/ojYOArL.png",
+    "saison": 1
   },
   {
     "id": 30,
@@ -221,7 +248,8 @@
     "club": "Cesson-Rennes",
     "rarete": "Peu Commun",
     "poste": "Gardien",
-    "image_url": "https://i.imgur.com/HXm8Zaf.png"
+    "image_url": "https://i.imgur.com/HXm8Zaf.png",
+    "saison": 1
   },
   {
     "id": 31,
@@ -229,7 +257,8 @@
     "club": "Cesson-Rennes",
     "rarete": "Commun",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/t41j4yP.png"
+    "image_url": "https://i.imgur.com/t41j4yP.png",
+    "saison": 1
   },
   {
     "id": 32,
@@ -237,7 +266,8 @@
     "club": "Chambéry",
     "rarete": "Peu Commun",
     "poste": "Arrière Gauche",
-    "image_url": "https://i.imgur.com/mW0trT1.png"
+    "image_url": "https://i.imgur.com/mW0trT1.png",
+    "saison": 1
   },
   {
     "id": 33,
@@ -245,7 +275,8 @@
     "club": "Chambéry",
     "rarete": "Commun",
     "poste": "Ailier Droit",
-    "image_url": "https://i.imgur.com/wuwbJ9j.png"
+    "image_url": "https://i.imgur.com/wuwbJ9j.png",
+    "saison": 1
   },
   {
     "id": 34,
@@ -253,7 +284,8 @@
     "club": "Chambéry",
     "rarete": "Peu Commun",
     "poste": "Arrière Gauche",
-    "image_url": "https://i.imgur.com/lJ14Vvv.png"
+    "image_url": "https://i.imgur.com/lJ14Vvv.png",
+    "saison": 1
   },
   {
     "id": 35,
@@ -261,7 +293,8 @@
     "club": "Chambéry",
     "rarete": "Peu Commun",
     "poste": "Arrière Droit",
-    "image_url": "https://i.imgur.com/GrABhuE.png"
+    "image_url": "https://i.imgur.com/GrABhuE.png",
+    "saison": 1
   },
   {
     "id": 36,
@@ -269,7 +302,8 @@
     "club": "Chambéry",
     "rarete": "Commun",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/87rlJpq.png"
+    "image_url": "https://i.imgur.com/87rlJpq.png",
+    "saison": 1
   },
   {
     "id": 37,
@@ -277,7 +311,8 @@
     "club": "Chambéry",
     "rarete": "Rare",
     "poste": "Gardien",
-    "image_url": "https://i.imgur.com/PbWFvce.png"
+    "image_url": "https://i.imgur.com/PbWFvce.png",
+    "saison": 1
   },
   {
     "id": 38,
@@ -285,7 +320,8 @@
     "club": "Chambéry",
     "rarete": "Commun",
     "poste": "Gardien",
-    "image_url": "https://i.imgur.com/pEOnkn1.png"
+    "image_url": "https://i.imgur.com/pEOnkn1.png",
+    "saison": 1
   },
   {
     "id": 39,
@@ -293,7 +329,8 @@
     "club": "Chambéry",
     "rarete": "Rare",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/9nZtZZy.png"
+    "image_url": "https://i.imgur.com/9nZtZZy.png",
+    "saison": 1
   },
   {
     "id": 40,
@@ -301,7 +338,8 @@
     "club": "Chambéry",
     "rarete": "Rare",
     "poste": "Arrière Gauche",
-    "image_url": "https://i.imgur.com/rcmj1LH.png"
+    "image_url": "https://i.imgur.com/rcmj1LH.png",
+    "saison": 1
   },
   {
     "id": 41,
@@ -309,7 +347,8 @@
     "club": "Chambéry",
     "rarete": "Commun",
     "poste": "Arrière Droit",
-    "image_url": "https://i.imgur.com/sgZZCG7.png"
+    "image_url": "https://i.imgur.com/sgZZCG7.png",
+    "saison": 1
   },
   {
     "id": 42,
@@ -317,7 +356,8 @@
     "club": "Chambéry",
     "rarete": "Commun",
     "poste": "Demi Centre",
-    "image_url": "https://i.imgur.com/gvftrYs.png"
+    "image_url": "https://i.imgur.com/gvftrYs.png",
+    "saison": 1
   },
   {
     "id": 44,
@@ -325,7 +365,8 @@
     "club": "Chambéry",
     "rarete": "Rare",
     "poste": "Ailier Gauche",
-    "image_url": "https://i.imgur.com/Q75Uppu.png"
+    "image_url": "https://i.imgur.com/Q75Uppu.png",
+    "saison": 1
   },
   {
     "id": 45,
@@ -333,7 +374,8 @@
     "club": "Chambéry",
     "rarete": "Épique",
     "poste": "Demi Centre",
-    "image_url": "https://i.imgur.com/zZVT93c.png"
+    "image_url": "https://i.imgur.com/zZVT93c.png",
+    "saison": 1
   },
   {
     "id": 46,
@@ -341,7 +383,8 @@
     "club": "Chambéry",
     "rarete": "Peu Commun",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/j4zQkC5.png"
+    "image_url": "https://i.imgur.com/j4zQkC5.png",
+    "saison": 1
   },
   {
     "id": 47,
@@ -349,7 +392,8 @@
     "club": "Chambéry",
     "rarete": "Peu Commun",
     "poste": "Ailier Gauche",
-    "image_url": "https://i.imgur.com/TjvUVTy.png"
+    "image_url": "https://i.imgur.com/TjvUVTy.png",
+    "saison": 1
   },
   {
     "id": 48,
@@ -357,7 +401,8 @@
     "club": "Chartres",
     "rarete": "Épique",
     "poste": "Gardien",
-    "image_url": "https://i.imgur.com/pTOsvC0.png"
+    "image_url": "https://i.imgur.com/pTOsvC0.png",
+    "saison": 1
   },
   {
     "id": 49,
@@ -365,7 +410,8 @@
     "club": "Chartres",
     "rarete": "Rare",
     "poste": "Demi Centre",
-    "image_url": "https://i.imgur.com/kg3yjjQ.png"
+    "image_url": "https://i.imgur.com/kg3yjjQ.png",
+    "saison": 1
   },
   {
     "id": 50,
@@ -373,7 +419,8 @@
     "club": "Chartres",
     "rarete": "Peu Commun",
     "poste": "Ailier Droit",
-    "image_url": "https://i.imgur.com/aYQkUbI.png"
+    "image_url": "https://i.imgur.com/aYQkUbI.png",
+    "saison": 1
   },
   {
     "id": 51,
@@ -381,7 +428,8 @@
     "club": "Chartres",
     "rarete": "Commun",
     "poste": "Arrière Droit",
-    "image_url": "https://i.imgur.com/FCT2Djv.png"
+    "image_url": "https://i.imgur.com/FCT2Djv.png",
+    "saison": 1
   },
   {
     "id": 52,
@@ -389,7 +437,8 @@
     "club": "Chartres",
     "rarete": "Peu Commun",
     "poste": "Ailier Droit",
-    "image_url": "https://i.imgur.com/0mkCzXS.png"
+    "image_url": "https://i.imgur.com/0mkCzXS.png",
+    "saison": 1
   },
   {
     "id": 53,
@@ -397,7 +446,8 @@
     "club": "Chartres",
     "rarete": "Commun",
     "poste": "Arrière Gauche",
-    "image_url": "https://i.imgur.com/DTUcu35.png"
+    "image_url": "https://i.imgur.com/DTUcu35.png",
+    "saison": 1
   },
   {
     "id": 55,
@@ -405,7 +455,8 @@
     "club": "Chartres",
     "rarete": "Rare",
     "poste": "Ailier Gauche",
-    "image_url": "https://i.imgur.com/muDkFNE.png"
+    "image_url": "https://i.imgur.com/muDkFNE.png",
+    "saison": 1
   },
   {
     "id": 57,
@@ -413,7 +464,8 @@
     "club": "Chartres",
     "rarete": "Commun",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/nxTb5Rs.png"
+    "image_url": "https://i.imgur.com/nxTb5Rs.png",
+    "saison": 1
   },
   {
     "id": 58,
@@ -421,7 +473,8 @@
     "club": "Chartres",
     "rarete": "Rare",
     "poste": "Gardien",
-    "image_url": "https://i.imgur.com/APF72hW.png"
+    "image_url": "https://i.imgur.com/APF72hW.png",
+    "saison": 1
   },
   {
     "id": 59,
@@ -429,7 +482,8 @@
     "club": "Chartres",
     "rarete": "Rare",
     "poste": "Arrière Gauche",
-    "image_url": "https://i.imgur.com/kYgHxbM.png"
+    "image_url": "https://i.imgur.com/kYgHxbM.png",
+    "saison": 1
   },
   {
     "id": 60,
@@ -437,7 +491,8 @@
     "club": "Chartres",
     "rarete": "Peu Commun",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/tNaEkyY.png"
+    "image_url": "https://i.imgur.com/tNaEkyY.png",
+    "saison": 1
   },
   {
     "id": 61,
@@ -445,7 +500,8 @@
     "club": "Chartres",
     "rarete": "Commun",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/IdFszrk.png"
+    "image_url": "https://i.imgur.com/IdFszrk.png",
+    "saison": 1
   },
   {
     "id": 62,
@@ -453,7 +509,8 @@
     "club": "Chartres",
     "rarete": "Commun",
     "poste": "Arrière Gauche",
-    "image_url": "https://i.imgur.com/6p29oIl.png"
+    "image_url": "https://i.imgur.com/6p29oIl.png",
+    "saison": 1
   },
   {
     "id": 63,
@@ -461,7 +518,8 @@
     "club": "Chartres",
     "rarete": "Rare",
     "poste": "Demi Centre",
-    "image_url": "https://i.imgur.com/adfyabT.png"
+    "image_url": "https://i.imgur.com/adfyabT.png",
+    "saison": 1
   },
   {
     "id": 64,
@@ -469,7 +527,8 @@
     "club": "Chartres",
     "rarete": "Épique",
     "poste": "Ailier Gauche",
-    "image_url": "https://i.imgur.com/dHAXnEL.png"
+    "image_url": "https://i.imgur.com/dHAXnEL.png",
+    "saison": 1
   },
   {
     "id": 65,
@@ -477,7 +536,8 @@
     "club": "Chartres",
     "rarete": "Rare",
     "poste": "Arrière Gauche",
-    "image_url": "https://i.imgur.com/W9csfrj.jpeg"
+    "image_url": "https://i.imgur.com/W9csfrj.jpeg",
+    "saison": 1
   },
   {
     "id": 66,
@@ -485,7 +545,8 @@
     "club": "Dijon",
     "rarete": "Peu Commun",
     "poste": "Demi Centre",
-    "image_url": "https://i.imgur.com/DsEx7wC.png"
+    "image_url": "https://i.imgur.com/DsEx7wC.png",
+    "saison": 1
   },
   {
     "id": 67,
@@ -493,7 +554,8 @@
     "club": "Dijon",
     "rarete": "Peu Commun",
     "poste": "Ailier Droit",
-    "image_url": "https://i.imgur.com/NE32fa8.png"
+    "image_url": "https://i.imgur.com/NE32fa8.png",
+    "saison": 1
   },
   {
     "id": 68,
@@ -501,7 +563,8 @@
     "club": "Dijon",
     "rarete": "Commun",
     "poste": "Arrière Droit",
-    "image_url": "https://i.imgur.com/yFCl983.png"
+    "image_url": "https://i.imgur.com/yFCl983.png",
+    "saison": 1
   },
   {
     "id": 69,
@@ -509,7 +572,8 @@
     "club": "Dijon",
     "rarete": "Commun",
     "poste": "Gardien",
-    "image_url": "https://i.imgur.com/fx1WYZz.png"
+    "image_url": "https://i.imgur.com/fx1WYZz.png",
+    "saison": 1
   },
   {
     "id": 70,
@@ -517,7 +581,8 @@
     "club": "Dijon",
     "rarete": "Commun",
     "poste": "Ailier Droit",
-    "image_url": "https://i.imgur.com/69zfgGj.png"
+    "image_url": "https://i.imgur.com/69zfgGj.png",
+    "saison": 1
   },
   {
     "id": 71,
@@ -525,7 +590,8 @@
     "club": "Dijon",
     "rarete": "Peu Commun",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/Yv5sskd.png"
+    "image_url": "https://i.imgur.com/Yv5sskd.png",
+    "saison": 1
   },
   {
     "id": 72,
@@ -533,7 +599,8 @@
     "club": "Dijon",
     "rarete": "Commun",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/SnCTnUn.png"
+    "image_url": "https://i.imgur.com/SnCTnUn.png",
+    "saison": 1
   },
   {
     "id": 73,
@@ -541,7 +608,8 @@
     "club": "Dijon",
     "rarete": "Rare",
     "poste": "Arrière Gauche",
-    "image_url": "https://i.imgur.com/QMvjJOG.png"
+    "image_url": "https://i.imgur.com/QMvjJOG.png",
+    "saison": 1
   },
   {
     "id": 74,
@@ -549,7 +617,8 @@
     "club": "Dijon",
     "rarete": "Commun",
     "poste": "Ailier Gauche",
-    "image_url": "https://i.imgur.com/yHX4acH.png"
+    "image_url": "https://i.imgur.com/yHX4acH.png",
+    "saison": 1
   },
   {
     "id": 75,
@@ -557,7 +626,8 @@
     "club": "Dijon",
     "rarete": "Commun",
     "poste": "Ailier Droit",
-    "image_url": "https://i.imgur.com/2KBjrkI.png"
+    "image_url": "https://i.imgur.com/2KBjrkI.png",
+    "saison": 1
   },
   {
     "id": 76,
@@ -565,7 +635,8 @@
     "club": "Dijon",
     "rarete": "Commun",
     "poste": "Arrière Gauche",
-    "image_url": "https://i.imgur.com/l74aQ6d.png"
+    "image_url": "https://i.imgur.com/l74aQ6d.png",
+    "saison": 1
   },
   {
     "id": 77,
@@ -573,7 +644,8 @@
     "club": "Dijon",
     "rarete": "Peu Commun",
     "poste": "Arrière Gauche",
-    "image_url": "https://i.imgur.com/Ct1nbWv.png"
+    "image_url": "https://i.imgur.com/Ct1nbWv.png",
+    "saison": 1
   },
   {
     "id": 78,
@@ -581,7 +653,8 @@
     "club": "Dijon",
     "rarete": "Commun",
     "poste": "Gardien",
-    "image_url": "https://i.imgur.com/O1dchLK.png"
+    "image_url": "https://i.imgur.com/O1dchLK.png",
+    "saison": 1
   },
   {
     "id": 79,
@@ -589,7 +662,8 @@
     "club": "Dijon",
     "rarete": "Commun",
     "poste": "Arrière Gauche",
-    "image_url": "https://i.imgur.com/aJrb9CP.jpeg"
+    "image_url": "https://i.imgur.com/aJrb9CP.jpeg",
+    "saison": 1
   },
   {
     "id": 80,
@@ -597,7 +671,8 @@
     "club": "Dunkerque",
     "rarete": "Rare",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/208bvAU.png"
+    "image_url": "https://i.imgur.com/208bvAU.png",
+    "saison": 1
   },
   {
     "id": 81,
@@ -605,7 +680,8 @@
     "club": "Dunkerque",
     "rarete": "Commun",
     "poste": "Demi Centre",
-    "image_url": "https://i.imgur.com/rUtQ91D.png"
+    "image_url": "https://i.imgur.com/rUtQ91D.png",
+    "saison": 1
   },
   {
     "id": 82,
@@ -613,7 +689,8 @@
     "club": "Dunkerque",
     "rarete": "Commun",
     "poste": "Ailier Droit",
-    "image_url": "https://i.imgur.com/T7xa62M.png"
+    "image_url": "https://i.imgur.com/T7xa62M.png",
+    "saison": 1
   },
   {
     "id": 83,
@@ -621,7 +698,8 @@
     "club": "Dunkerque",
     "rarete": "Rare",
     "poste": "Ailier Droit",
-    "image_url": "https://i.imgur.com/lJkxhxp.png"
+    "image_url": "https://i.imgur.com/lJkxhxp.png",
+    "saison": 1
   },
   {
     "id": 84,
@@ -629,7 +707,8 @@
     "club": "Dunkerque",
     "rarete": "Peu Commun",
     "poste": "Gardien",
-    "image_url": "https://i.imgur.com/v8fkoml.png"
+    "image_url": "https://i.imgur.com/v8fkoml.png",
+    "saison": 1
   },
   {
     "id": 85,
@@ -637,7 +716,8 @@
     "club": "Dunkerque",
     "rarete": "Commun",
     "poste": "Arrière Gauche",
-    "image_url": "https://i.imgur.com/PKNa4Ul.png"
+    "image_url": "https://i.imgur.com/PKNa4Ul.png",
+    "saison": 1
   },
   {
     "id": 86,
@@ -645,7 +725,8 @@
     "club": "Dunkerque",
     "rarete": "Peu Commun",
     "poste": "Arrière Gauche",
-    "image_url": "https://i.imgur.com/8hSATHV.png"
+    "image_url": "https://i.imgur.com/8hSATHV.png",
+    "saison": 1
   },
   {
     "id": 87,
@@ -653,7 +734,8 @@
     "club": "Dunkerque",
     "rarete": "Rare",
     "poste": "Gardien",
-    "image_url": "https://i.imgur.com/RaNdUJC.png"
+    "image_url": "https://i.imgur.com/RaNdUJC.png",
+    "saison": 1
   },
   {
     "id": 88,
@@ -661,7 +743,8 @@
     "club": "Dunkerque",
     "rarete": "Commun",
     "poste": "Ailier Gauche",
-    "image_url": "https://i.imgur.com/UtiII65.png"
+    "image_url": "https://i.imgur.com/UtiII65.png",
+    "saison": 1
   },
   {
     "id": 89,
@@ -669,7 +752,8 @@
     "club": "Dunkerque",
     "rarete": "Commun",
     "poste": "Arrière Droit",
-    "image_url": "https://i.imgur.com/osuASYW.png"
+    "image_url": "https://i.imgur.com/osuASYW.png",
+    "saison": 1
   },
   {
     "id": 90,
@@ -677,7 +761,8 @@
     "club": "Dunkerque",
     "rarete": "Peu Commun",
     "poste": "Arrière Droit",
-    "image_url": "https://i.imgur.com/IASp6Hv.jpeg"
+    "image_url": "https://i.imgur.com/IASp6Hv.jpeg",
+    "saison": 1
   },
   {
     "id": 91,
@@ -685,7 +770,8 @@
     "club": "Dunkerque",
     "rarete": "Commun",
     "poste": "Arrière Gauche",
-    "image_url": "https://i.imgur.com/7jQuNCH.png"
+    "image_url": "https://i.imgur.com/7jQuNCH.png",
+    "saison": 1
   },
   {
     "id": 92,
@@ -693,7 +779,8 @@
     "club": "Dunkerque",
     "rarete": "Commun",
     "poste": "Demi Centre",
-    "image_url": "https://i.imgur.com/rOWP6rk.png"
+    "image_url": "https://i.imgur.com/rOWP6rk.png",
+    "saison": 1
   },
   {
     "id": 93,
@@ -701,7 +788,8 @@
     "club": "Dunkerque",
     "rarete": "Commun",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/dBqC67O.png"
+    "image_url": "https://i.imgur.com/dBqC67O.png",
+    "saison": 1
   },
   {
     "id": 94,
@@ -709,7 +797,8 @@
     "club": "Dunkerque",
     "rarete": "Peu Commun",
     "poste": "Ailier Gauche",
-    "image_url": "https://i.imgur.com/lDNO3AK.png"
+    "image_url": "https://i.imgur.com/lDNO3AK.png",
+    "saison": 1
   },
   {
     "id": 95,
@@ -717,7 +806,8 @@
     "club": "Istres",
     "rarete": "Peu Commun",
     "poste": "Arrière Gauche",
-    "image_url": "https://i.imgur.com/ZRweeCU.png"
+    "image_url": "https://i.imgur.com/ZRweeCU.png",
+    "saison": 1
   },
   {
     "id": 96,
@@ -725,7 +815,8 @@
     "club": "Istres",
     "rarete": "Commun",
     "poste": "Arrière Droit",
-    "image_url": "https://i.imgur.com/pYbukxn.png"
+    "image_url": "https://i.imgur.com/pYbukxn.png",
+    "saison": 1
   },
   {
     "id": 97,
@@ -733,7 +824,8 @@
     "club": "Istres",
     "rarete": "Commun",
     "poste": "Ailier Gauche",
-    "image_url": "https://i.imgur.com/GV6uR73.png"
+    "image_url": "https://i.imgur.com/GV6uR73.png",
+    "saison": 1
   },
   {
     "id": 98,
@@ -741,7 +833,8 @@
     "club": "Istres",
     "rarete": "Commun",
     "poste": "Gardien",
-    "image_url": "https://i.imgur.com/PGHNr2v.png"
+    "image_url": "https://i.imgur.com/PGHNr2v.png",
+    "saison": 1
   },
   {
     "id": 99,
@@ -749,7 +842,8 @@
     "club": "Istres",
     "rarete": "Peu Commun",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/fek6gBa.png"
+    "image_url": "https://i.imgur.com/fek6gBa.png",
+    "saison": 1
   },
   {
     "id": 100,
@@ -757,7 +851,8 @@
     "club": "Istres",
     "rarete": "Commun",
     "poste": "Demi Centre",
-    "image_url": "https://i.imgur.com/CAWQz8L.png"
+    "image_url": "https://i.imgur.com/CAWQz8L.png",
+    "saison": 1
   },
   {
     "id": 101,
@@ -765,7 +860,8 @@
     "club": "Istres",
     "rarete": "Commun",
     "poste": "Demi Centre",
-    "image_url": "https://i.imgur.com/gjeYjI2.png"
+    "image_url": "https://i.imgur.com/gjeYjI2.png",
+    "saison": 1
   },
   {
     "id": 102,
@@ -773,7 +869,8 @@
     "club": "Istres",
     "rarete": "Commun",
     "poste": "Arrière Gauche",
-    "image_url": "https://i.imgur.com/aAwj3Kt.png"
+    "image_url": "https://i.imgur.com/aAwj3Kt.png",
+    "saison": 1
   },
   {
     "id": 103,
@@ -781,7 +878,8 @@
     "club": "Istres",
     "rarete": "Commun",
     "poste": "Arrière Droit",
-    "image_url": "https://i.imgur.com/lPKVAxW.png"
+    "image_url": "https://i.imgur.com/lPKVAxW.png",
+    "saison": 1
   },
   {
     "id": 104,
@@ -789,7 +887,8 @@
     "club": "Istres",
     "rarete": "Commun",
     "poste": "Ailier Droit",
-    "image_url": "https://i.imgur.com/xC6i5Jb.png"
+    "image_url": "https://i.imgur.com/xC6i5Jb.png",
+    "saison": 1
   },
   {
     "id": 105,
@@ -797,7 +896,8 @@
     "club": "Istres",
     "rarete": "Rare",
     "poste": "Gardien",
-    "image_url": "https://i.imgur.com/gmUAev9.png"
+    "image_url": "https://i.imgur.com/gmUAev9.png",
+    "saison": 1
   },
   {
     "id": 106,
@@ -805,7 +905,8 @@
     "club": "Istres",
     "rarete": "Commun",
     "poste": "",
-    "image_url": "https://i.imgur.com/ksE60MH.png"
+    "image_url": "https://i.imgur.com/ksE60MH.png",
+    "saison": 1
   },
   {
     "id": 107,
@@ -813,7 +914,8 @@
     "club": "Istres",
     "rarete": "Commun",
     "poste": "Arrière Gauche",
-    "image_url": "https://i.imgur.com/hh5JFOt.png"
+    "image_url": "https://i.imgur.com/hh5JFOt.png",
+    "saison": 1
   },
   {
     "id": 108,
@@ -821,7 +923,8 @@
     "club": "Istres",
     "rarete": "Épique",
     "poste": "Ailier Droit",
-    "image_url": "https://i.imgur.com/098tk2v.png"
+    "image_url": "https://i.imgur.com/098tk2v.png",
+    "saison": 1
   },
   {
     "id": 109,
@@ -829,7 +932,8 @@
     "club": "Istres",
     "rarete": "Épique",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/89beqPY.png"
+    "image_url": "https://i.imgur.com/89beqPY.png",
+    "saison": 1
   },
   {
     "id": 110,
@@ -837,7 +941,8 @@
     "club": "Limoges",
     "rarete": "Peu Commun",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/CNtDsAS.png"
+    "image_url": "https://i.imgur.com/CNtDsAS.png",
+    "saison": 1
   },
   {
     "id": 111,
@@ -845,7 +950,8 @@
     "club": "Limoges",
     "rarete": "Peu Commun",
     "poste": "Demi Centre",
-    "image_url": "https://i.imgur.com/Hw0kxRZ.png"
+    "image_url": "https://i.imgur.com/Hw0kxRZ.png",
+    "saison": 1
   },
   {
     "id": 112,
@@ -853,7 +959,8 @@
     "club": "Limoges",
     "rarete": "Commun",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/uSvm3Qg.png"
+    "image_url": "https://i.imgur.com/uSvm3Qg.png",
+    "saison": 1
   },
   {
     "id": 113,
@@ -861,7 +968,8 @@
     "club": "Limoges",
     "rarete": "Commun",
     "poste": "Arrière Gauche",
-    "image_url": "https://i.imgur.com/G2zYisA.png"
+    "image_url": "https://i.imgur.com/G2zYisA.png",
+    "saison": 1
   },
   {
     "id": 114,
@@ -869,7 +977,8 @@
     "club": "Limoges",
     "rarete": "Commun",
     "poste": "Ailier Droit",
-    "image_url": "https://i.imgur.com/VSVhW24.png"
+    "image_url": "https://i.imgur.com/VSVhW24.png",
+    "saison": 1
   },
   {
     "id": 115,
@@ -877,7 +986,8 @@
     "club": "Limoges",
     "rarete": "Commun",
     "poste": "Arrière Gauche",
-    "image_url": "https://i.imgur.com/xZ9PZoQ.png"
+    "image_url": "https://i.imgur.com/xZ9PZoQ.png",
+    "saison": 1
   },
   {
     "id": 116,
@@ -885,7 +995,8 @@
     "club": "Limoges",
     "rarete": "Peu Commun",
     "poste": "Gardien",
-    "image_url": "https://i.imgur.com/RQB0e7T.jpeg"
+    "image_url": "https://i.imgur.com/RQB0e7T.jpeg",
+    "saison": 1
   },
   {
     "id": 117,
@@ -893,7 +1004,8 @@
     "club": "Limoges",
     "rarete": "Commun",
     "poste": "Arrière Droit",
-    "image_url": "https://i.imgur.com/WmxdsnC.png"
+    "image_url": "https://i.imgur.com/WmxdsnC.png",
+    "saison": 1
   },
   {
     "id": 118,
@@ -901,7 +1013,8 @@
     "club": "Limoges",
     "rarete": "Peu Commun",
     "poste": "Demi Centre",
-    "image_url": "https://i.imgur.com/i7VGeHG.png"
+    "image_url": "https://i.imgur.com/i7VGeHG.png",
+    "saison": 1
   },
   {
     "id": 119,
@@ -909,7 +1022,8 @@
     "club": "Limoges",
     "rarete": "Commun",
     "poste": "Ailier Droit",
-    "image_url": "https://i.imgur.com/PpDh3bc.png"
+    "image_url": "https://i.imgur.com/PpDh3bc.png",
+    "saison": 1
   },
   {
     "id": 120,
@@ -917,7 +1031,8 @@
     "club": "Limoges",
     "rarete": "Peu Commun",
     "poste": "Ailier Gauche",
-    "image_url": "https://i.imgur.com/ykjf3oo.png"
+    "image_url": "https://i.imgur.com/ykjf3oo.png",
+    "saison": 1
   },
   {
     "id": 121,
@@ -925,7 +1040,8 @@
     "club": "Limoges",
     "rarete": "Commun",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/B7ImmgR.png"
+    "image_url": "https://i.imgur.com/B7ImmgR.png",
+    "saison": 1
   },
   {
     "id": 122,
@@ -933,7 +1049,8 @@
     "club": "Limoges",
     "rarete": "Rare",
     "poste": "Gardien",
-    "image_url": "https://i.imgur.com/DSs4xej.png"
+    "image_url": "https://i.imgur.com/DSs4xej.png",
+    "saison": 1
   },
   {
     "id": 123,
@@ -941,7 +1058,8 @@
     "club": "Limoges",
     "rarete": "Épique",
     "poste": "Arrière Gauche",
-    "image_url": "https://i.imgur.com/SPUO0rD.png"
+    "image_url": "https://i.imgur.com/SPUO0rD.png",
+    "saison": 1
   },
   {
     "id": 124,
@@ -949,7 +1067,8 @@
     "club": "Limoges",
     "rarete": "Peu Commun",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/RTJ0XHe.png"
+    "image_url": "https://i.imgur.com/RTJ0XHe.png",
+    "saison": 1
   },
   {
     "id": 125,
@@ -957,7 +1076,8 @@
     "club": "Limoges",
     "rarete": "Épique",
     "poste": "Arrière Droit",
-    "image_url": "https://i.imgur.com/DvcSHAT.png"
+    "image_url": "https://i.imgur.com/DvcSHAT.png",
+    "saison": 1
   },
   {
     "id": 126,
@@ -965,7 +1085,8 @@
     "club": "Montpellier",
     "rarete": "Épique",
     "poste": "Ailier Droit",
-    "image_url": "https://i.imgur.com/RqDbFFt.png"
+    "image_url": "https://i.imgur.com/RqDbFFt.png",
+    "saison": 1
   },
   {
     "id": 127,
@@ -973,7 +1094,8 @@
     "club": "Montpellier",
     "rarete": "Rare",
     "poste": "Gardien",
-    "image_url": "https://i.imgur.com/CamLZxt.png"
+    "image_url": "https://i.imgur.com/CamLZxt.png",
+    "saison": 1
   },
   {
     "id": 128,
@@ -981,7 +1103,8 @@
     "club": "Montpellier",
     "rarete": "Légendaire",
     "poste": "Gardien",
-    "image_url": "https://i.imgur.com/xEmKZOq.gif"
+    "image_url": "https://i.imgur.com/xEmKZOq.gif",
+    "saison": 1
   },
   {
     "id": 129,
@@ -989,7 +1112,8 @@
     "club": "Montpellier",
     "rarete": "Peu Commun",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/AsCjPS4.png"
+    "image_url": "https://i.imgur.com/AsCjPS4.png",
+    "saison": 1
   },
   {
     "id": 130,
@@ -997,7 +1121,8 @@
     "club": "Montpellier",
     "rarete": "Rare",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/BEqymev.png"
+    "image_url": "https://i.imgur.com/BEqymev.png",
+    "saison": 1
   },
   {
     "id": 131,
@@ -1005,7 +1130,8 @@
     "club": "Montpellier",
     "rarete": "Rare",
     "poste": "Demi Centre",
-    "image_url": "https://i.imgur.com/nYAJsS1.png"
+    "image_url": "https://i.imgur.com/nYAJsS1.png",
+    "saison": 1
   },
   {
     "id": 132,
@@ -1013,7 +1139,8 @@
     "club": "Montpellier",
     "rarete": "Rare",
     "poste": "Arrière Gauche",
-    "image_url": "https://i.imgur.com/CIa3tNN.png"
+    "image_url": "https://i.imgur.com/CIa3tNN.png",
+    "saison": 1
   },
   {
     "id": 133,
@@ -1021,7 +1148,8 @@
     "club": "Montpellier",
     "rarete": "Rare",
     "poste": "Ailier Gauche",
-    "image_url": "https://i.imgur.com/Hn0JpBn.png"
+    "image_url": "https://i.imgur.com/Hn0JpBn.png",
+    "saison": 1
   },
   {
     "id": 134,
@@ -1029,7 +1157,8 @@
     "club": "Montpellier",
     "rarete": "Commun",
     "poste": "Ailier Gauche",
-    "image_url": "https://i.imgur.com/4mCd3j3.png"
+    "image_url": "https://i.imgur.com/4mCd3j3.png",
+    "saison": 1
   },
   {
     "id": 135,
@@ -1037,7 +1166,8 @@
     "club": "Montpellier",
     "rarete": "Légendaire",
     "poste": "Arrière Droit",
-    "image_url": "https://i.imgur.com/uulS3HS.gif"
+    "image_url": "https://i.imgur.com/uulS3HS.gif",
+    "saison": 1
   },
   {
     "id": 136,
@@ -1045,7 +1175,8 @@
     "club": "Montpellier",
     "rarete": "Épique",
     "poste": "Ailier Droit",
-    "image_url": "https://i.imgur.com/TzhPsdN.png"
+    "image_url": "https://i.imgur.com/TzhPsdN.png",
+    "saison": 1
   },
   {
     "id": 137,
@@ -1053,7 +1184,8 @@
     "club": "Montpellier",
     "rarete": "Légendaire",
     "poste": "Demi Centre",
-    "image_url": "https://i.imgur.com/R1Oc8Op.gif"
+    "image_url": "https://i.imgur.com/R1Oc8Op.gif",
+    "saison": 1
   },
   {
     "id": 138,
@@ -1061,7 +1193,8 @@
     "club": "Montpellier",
     "rarete": "Peu Commun",
     "poste": "Ailier Gauche",
-    "image_url": "https://i.imgur.com/SbjSPyO.png"
+    "image_url": "https://i.imgur.com/SbjSPyO.png",
+    "saison": 1
   },
   {
     "id": 139,
@@ -1069,7 +1202,8 @@
     "club": "Montpellier",
     "rarete": "Peu Commun",
     "poste": "Arrière Droit",
-    "image_url": "https://i.imgur.com/IKqn1Aw.png"
+    "image_url": "https://i.imgur.com/IKqn1Aw.png",
+    "saison": 1
   },
   {
     "id": 140,
@@ -1077,7 +1211,8 @@
     "club": "Montpellier",
     "rarete": "Rare",
     "poste": "Demi Centre",
-    "image_url": "https://i.imgur.com/auiFjLm.png"
+    "image_url": "https://i.imgur.com/auiFjLm.png",
+    "saison": 1
   },
   {
     "id": 141,
@@ -1085,7 +1220,8 @@
     "club": "Nantes",
     "rarete": "Épique",
     "poste": "Arrière Droit",
-    "image_url": "https://i.imgur.com/H95Jy6Z.png"
+    "image_url": "https://i.imgur.com/H95Jy6Z.png",
+    "saison": 1
   },
   {
     "id": 142,
@@ -1093,7 +1229,8 @@
     "club": "Nantes",
     "rarete": "Légendaire",
     "poste": "Arrière Gauche",
-    "image_url": "https://i.imgur.com/wjNc8Yj.gif"
+    "image_url": "https://i.imgur.com/wjNc8Yj.gif",
+    "saison": 1
   },
   {
     "id": 143,
@@ -1101,7 +1238,8 @@
     "club": "Nantes",
     "rarete": "Épique",
     "poste": "Arrière Droit",
-    "image_url": "https://i.imgur.com/RlKTLT9.png"
+    "image_url": "https://i.imgur.com/RlKTLT9.png",
+    "saison": 1
   },
   {
     "id": 144,
@@ -1109,7 +1247,8 @@
     "club": "Nantes",
     "rarete": "Peu Commun",
     "poste": "Ailier Droit",
-    "image_url": "https://i.imgur.com/HWNod22.png"
+    "image_url": "https://i.imgur.com/HWNod22.png",
+    "saison": 1
   },
   {
     "id": 145,
@@ -1117,7 +1256,8 @@
     "club": "Nantes",
     "rarete": "Peu Commun",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/FRMEv5j.png"
+    "image_url": "https://i.imgur.com/FRMEv5j.png",
+    "saison": 1
   },
   {
     "id": 146,
@@ -1125,7 +1265,8 @@
     "club": "Nantes",
     "rarete": "Peu Commun",
     "poste": "Gardien",
-    "image_url": "https://i.imgur.com/4JtRZO2.png"
+    "image_url": "https://i.imgur.com/4JtRZO2.png",
+    "saison": 1
   },
   {
     "id": 147,
@@ -1133,7 +1274,8 @@
     "club": "Nantes",
     "rarete": "Peu Commun",
     "poste": "Arrière Gauche",
-    "image_url": "https://i.imgur.com/AI9qEID.png"
+    "image_url": "https://i.imgur.com/AI9qEID.png",
+    "saison": 1
   },
   {
     "id": 148,
@@ -1141,7 +1283,8 @@
     "club": "Nantes",
     "rarete": "Peu Commun",
     "poste": "Ailier Gauche",
-    "image_url": "https://i.imgur.com/8Z48llh.png"
+    "image_url": "https://i.imgur.com/8Z48llh.png",
+    "saison": 1
   },
   {
     "id": 149,
@@ -1149,7 +1292,8 @@
     "club": "Nantes",
     "rarete": "Légendaire",
     "poste": "Demi Centre",
-    "image_url": "https://i.imgur.com/0g8npWt.gif"
+    "image_url": "https://i.imgur.com/0g8npWt.gif",
+    "saison": 1
   },
   {
     "id": 150,
@@ -1157,7 +1301,8 @@
     "club": "Nantes",
     "rarete": "Commun",
     "poste": "Demi Centre",
-    "image_url": "https://i.imgur.com/eR8eT6g.png"
+    "image_url": "https://i.imgur.com/eR8eT6g.png",
+    "saison": 1
   },
   {
     "id": 151,
@@ -1165,7 +1310,8 @@
     "club": "Nantes",
     "rarete": "Peu Commun",
     "poste": "Demi Centre",
-    "image_url": "https://i.imgur.com/fGg8R5o.png"
+    "image_url": "https://i.imgur.com/fGg8R5o.png",
+    "saison": 1
   },
   {
     "id": 152,
@@ -1173,7 +1319,8 @@
     "club": "Nantes",
     "rarete": "Rare",
     "poste": "Gardien",
-    "image_url": "https://i.imgur.com/J7utQ8y.png"
+    "image_url": "https://i.imgur.com/J7utQ8y.png",
+    "saison": 1
   },
   {
     "id": 153,
@@ -1181,7 +1328,8 @@
     "club": "Nantes",
     "rarete": "Épique",
     "poste": "Ailier Gauche",
-    "image_url": "https://i.imgur.com/EIyOf7L.png"
+    "image_url": "https://i.imgur.com/EIyOf7L.png",
+    "saison": 1
   },
   {
     "id": 154,
@@ -1189,7 +1337,8 @@
     "club": "Nantes",
     "rarete": "Épique",
     "poste": "Demi Centre",
-    "image_url": "https://i.imgur.com/Z6fvjCz.png"
+    "image_url": "https://i.imgur.com/Z6fvjCz.png",
+    "saison": 1
   },
   {
     "id": 155,
@@ -1197,7 +1346,8 @@
     "club": "Nantes",
     "rarete": "Légendaire",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/ImJ2TJP.gif"
+    "image_url": "https://i.imgur.com/ImJ2TJP.gif",
+    "saison": 1
   },
   {
     "id": 156,
@@ -1205,7 +1355,8 @@
     "club": "Nantes",
     "rarete": "Rare",
     "poste": "Ailier Droit",
-    "image_url": "https://i.imgur.com/GVKQLgS.png"
+    "image_url": "https://i.imgur.com/GVKQLgS.png",
+    "saison": 1
   },
   {
     "id": 157,
@@ -1213,7 +1364,8 @@
     "club": "Nantes",
     "rarete": "Commun",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/MLhuH5m.png"
+    "image_url": "https://i.imgur.com/MLhuH5m.png",
+    "saison": 1
   },
   {
     "id": 158,
@@ -1221,7 +1373,8 @@
     "club": "Nîmes",
     "rarete": "Peu Commun",
     "poste": "",
-    "image_url": "https://i.imgur.com/apXpSkG.png"
+    "image_url": "https://i.imgur.com/apXpSkG.png",
+    "saison": 1
   },
   {
     "id": 159,
@@ -1229,7 +1382,8 @@
     "club": "Nîmes",
     "rarete": "Rare",
     "poste": "Arrière Gauche",
-    "image_url": "https://i.imgur.com/DMAx0UU.png"
+    "image_url": "https://i.imgur.com/DMAx0UU.png",
+    "saison": 1
   },
   {
     "id": 160,
@@ -1237,7 +1391,8 @@
     "club": "Nîmes",
     "rarete": "Peu Commun",
     "poste": "Ailier Gauche",
-    "image_url": "https://i.imgur.com/nvve6Nk.png"
+    "image_url": "https://i.imgur.com/nvve6Nk.png",
+    "saison": 1
   },
   {
     "id": 161,
@@ -1245,7 +1400,8 @@
     "club": "Nîmes",
     "rarete": "Peu Commun",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/YAxhVYz.png"
+    "image_url": "https://i.imgur.com/YAxhVYz.png",
+    "saison": 1
   },
   {
     "id": 162,
@@ -1253,7 +1409,8 @@
     "club": "Dijon",
     "rarete": "Commun",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/D0wJFXV.png"
+    "image_url": "https://i.imgur.com/D0wJFXV.png",
+    "saison": 1
   },
   {
     "id": 163,
@@ -1261,7 +1418,8 @@
     "club": "Nîmes",
     "rarete": "Commun",
     "poste": "Demi Centre",
-    "image_url": "https://i.imgur.com/AslzCkJ.png"
+    "image_url": "https://i.imgur.com/AslzCkJ.png",
+    "saison": 1
   },
   {
     "id": 164,
@@ -1269,7 +1427,8 @@
     "club": "Nîmes",
     "rarete": "Peu Commun",
     "poste": "Demi Centre",
-    "image_url": "https://i.imgur.com/1Ll90Fd.png"
+    "image_url": "https://i.imgur.com/1Ll90Fd.png",
+    "saison": 1
   },
   {
     "id": 165,
@@ -1277,7 +1436,8 @@
     "club": "Nîmes",
     "rarete": "Peu Commun",
     "poste": "Arrière Gauche",
-    "image_url": "https://i.imgur.com/4mVlHYl.png"
+    "image_url": "https://i.imgur.com/4mVlHYl.png",
+    "saison": 1
   },
   {
     "id": 166,
@@ -1285,7 +1445,8 @@
     "club": "Nîmes",
     "rarete": "Commun",
     "poste": "Ailier Droit",
-    "image_url": "https://i.imgur.com/igwwCnK.png"
+    "image_url": "https://i.imgur.com/igwwCnK.png",
+    "saison": 1
   },
   {
     "id": 167,
@@ -1293,7 +1454,8 @@
     "club": "Nîmes",
     "rarete": "Rare",
     "poste": "Gardien",
-    "image_url": "https://i.imgur.com/DPDGUmV.png"
+    "image_url": "https://i.imgur.com/DPDGUmV.png",
+    "saison": 1
   },
   {
     "id": 168,
@@ -1301,7 +1463,8 @@
     "club": "Nîmes",
     "rarete": "Commun",
     "poste": "Arrière Droit",
-    "image_url": "https://i.imgur.com/k6q2wxL.png"
+    "image_url": "https://i.imgur.com/k6q2wxL.png",
+    "saison": 1
   },
   {
     "id": 169,
@@ -1309,7 +1472,8 @@
     "club": "Nîmes",
     "rarete": "Commun",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/kfGGgst.png"
+    "image_url": "https://i.imgur.com/kfGGgst.png",
+    "saison": 1
   },
   {
     "id": 170,
@@ -1317,7 +1481,8 @@
     "club": "Nîmes",
     "rarete": "Rare",
     "poste": "Gardien",
-    "image_url": "https://i.imgur.com/cL4INDS.png"
+    "image_url": "https://i.imgur.com/cL4INDS.png",
+    "saison": 1
   },
   {
     "id": 171,
@@ -1325,7 +1490,8 @@
     "club": "Nîmes",
     "rarete": "Épique",
     "poste": "Ailier Gauche",
-    "image_url": "https://i.imgur.com/zK28dg4.png"
+    "image_url": "https://i.imgur.com/zK28dg4.png",
+    "saison": 1
   },
   {
     "id": 172,
@@ -1333,7 +1499,8 @@
     "club": "Nîmes",
     "rarete": "Commun",
     "poste": "Ailier Droit",
-    "image_url": "https://i.imgur.com/GpP1yCP.png"
+    "image_url": "https://i.imgur.com/GpP1yCP.png",
+    "saison": 1
   },
   {
     "id": 173,
@@ -1341,7 +1508,8 @@
     "club": "Nîmes",
     "rarete": "Commun",
     "poste": "Demi Centre",
-    "image_url": "https://i.imgur.com/dqEAGxX.png"
+    "image_url": "https://i.imgur.com/dqEAGxX.png",
+    "saison": 1
   },
   {
     "id": 175,
@@ -1349,7 +1517,8 @@
     "club": "Paris",
     "rarete": "Peu Commun",
     "poste": "Demi Centre",
-    "image_url": "https://i.imgur.com/AjHwOnr.png"
+    "image_url": "https://i.imgur.com/AjHwOnr.png",
+    "saison": 1
   },
   {
     "id": 176,
@@ -1357,7 +1526,8 @@
     "club": "Paris",
     "rarete": "Peu Commun",
     "poste": "Ailier Gauche",
-    "image_url": "https://i.imgur.com/ZFUx1nW.png"
+    "image_url": "https://i.imgur.com/ZFUx1nW.png",
+    "saison": 1
   },
   {
     "id": 177,
@@ -1365,7 +1535,8 @@
     "club": "Paris",
     "rarete": "Rare",
     "poste": "Gardien",
-    "image_url": "https://i.imgur.com/s5QTxBp.png"
+    "image_url": "https://i.imgur.com/s5QTxBp.png",
+    "saison": 1
   },
   {
     "id": 178,
@@ -1373,7 +1544,8 @@
     "club": "Paris",
     "rarete": "Peu Commun",
     "poste": "Arrière Gauche",
-    "image_url": "https://i.imgur.com/Onx2Ddp.png"
+    "image_url": "https://i.imgur.com/Onx2Ddp.png",
+    "saison": 1
   },
   {
     "id": 179,
@@ -1381,7 +1553,8 @@
     "club": "Paris",
     "rarete": "Légendaire",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/MewC30j.gif"
+    "image_url": "https://i.imgur.com/MewC30j.gif",
+    "saison": 1
   },
   {
     "id": 180,
@@ -1389,7 +1562,8 @@
     "club": "Paris",
     "rarete": "Rare",
     "poste": "Ailier Droit",
-    "image_url": "https://i.imgur.com/zBkjdqF.png"
+    "image_url": "https://i.imgur.com/zBkjdqF.png",
+    "saison": 1
   },
   {
     "id": 181,
@@ -1397,7 +1571,8 @@
     "club": "Paris",
     "rarete": "Épique",
     "poste": "Arrière Gauche",
-    "image_url": "https://i.imgur.com/ByQ8rRi.png"
+    "image_url": "https://i.imgur.com/ByQ8rRi.png",
+    "saison": 1
   },
   {
     "id": 182,
@@ -1405,7 +1580,8 @@
     "club": "Paris",
     "rarete": "Commun",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/FA1aAin.png"
+    "image_url": "https://i.imgur.com/FA1aAin.png",
+    "saison": 1
   },
   {
     "id": 183,
@@ -1413,7 +1589,8 @@
     "club": "Paris",
     "rarete": "Commun",
     "poste": "Gardien",
-    "image_url": "https://i.imgur.com/HmFvnPt.png"
+    "image_url": "https://i.imgur.com/HmFvnPt.png",
+    "saison": 1
   },
   {
     "id": 184,
@@ -1421,7 +1598,8 @@
     "club": "Paris",
     "rarete": "Commun",
     "poste": "Ailier Gauche",
-    "image_url": "https://i.imgur.com/dZf1kQs.png"
+    "image_url": "https://i.imgur.com/dZf1kQs.png",
+    "saison": 1
   },
   {
     "id": 185,
@@ -1429,7 +1607,8 @@
     "club": "Paris",
     "rarete": "Épique",
     "poste": "Arrière Droit",
-    "image_url": "https://i.imgur.com/YxEy0tI.png"
+    "image_url": "https://i.imgur.com/YxEy0tI.png",
+    "saison": 1
   },
   {
     "id": 186,
@@ -1437,7 +1616,8 @@
     "club": "Paris",
     "rarete": "Peu Commun",
     "poste": "Arrière Gauche",
-    "image_url": "https://i.imgur.com/KulP6eO.png"
+    "image_url": "https://i.imgur.com/KulP6eO.png",
+    "saison": 1
   },
   {
     "id": 187,
@@ -1445,7 +1625,8 @@
     "club": "Paris",
     "rarete": "Légendaire",
     "poste": "Arrière Gauche",
-    "image_url": "https://i.imgur.com/PGxfcP0.gif"
+    "image_url": "https://i.imgur.com/PGxfcP0.gif",
+    "saison": 1
   },
   {
     "id": 188,
@@ -1453,7 +1634,8 @@
     "club": "Paris",
     "rarete": "Épique",
     "poste": "Ailier Droit",
-    "image_url": "https://i.imgur.com/PPABP3b.png"
+    "image_url": "https://i.imgur.com/PPABP3b.png",
+    "saison": 1
   },
   {
     "id": 189,
@@ -1461,7 +1643,8 @@
     "club": "Paris",
     "rarete": "Légendaire",
     "poste": "Demi Centre",
-    "image_url": "https://i.imgur.com/gRvmMmN.png"
+    "image_url": "https://i.imgur.com/gRvmMmN.png",
+    "saison": 1
   },
   {
     "id": 190,
@@ -1469,7 +1652,8 @@
     "club": "Paris",
     "rarete": "Légendaire",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/GqK7Peo.gif"
+    "image_url": "https://i.imgur.com/GqK7Peo.gif",
+    "saison": 1
   },
   {
     "id": 191,
@@ -1477,7 +1661,8 @@
     "club": "Saint-Raphaël",
     "rarete": "Rare",
     "poste": "Demi Centre",
-    "image_url": "https://i.imgur.com/DFhzYXC.png"
+    "image_url": "https://i.imgur.com/DFhzYXC.png",
+    "saison": 1
   },
   {
     "id": 192,
@@ -1485,7 +1670,8 @@
     "club": "Saint-Raphaël",
     "rarete": "Rare",
     "poste": "Arrière Droit",
-    "image_url": "https://i.imgur.com/c02fQbR.png"
+    "image_url": "https://i.imgur.com/c02fQbR.png",
+    "saison": 1
   },
   {
     "id": 193,
@@ -1493,7 +1679,8 @@
     "club": "Saint-Raphaël",
     "rarete": "Peu Commun",
     "poste": "Demi Centre",
-    "image_url": "https://i.imgur.com/g69DrAM.png"
+    "image_url": "https://i.imgur.com/g69DrAM.png",
+    "saison": 1
   },
   {
     "id": 194,
@@ -1501,7 +1688,8 @@
     "club": "Saint-Raphaël",
     "rarete": "Peu Commun",
     "poste": "Gardien",
-    "image_url": "https://i.imgur.com/1TqnrBF.png"
+    "image_url": "https://i.imgur.com/1TqnrBF.png",
+    "saison": 1
   },
   {
     "id": 195,
@@ -1509,7 +1697,8 @@
     "club": "Saint-Raphaël",
     "rarete": "Commun",
     "poste": "Arrière Droit",
-    "image_url": "https://i.imgur.com/1pdGstF.png"
+    "image_url": "https://i.imgur.com/1pdGstF.png",
+    "saison": 1
   },
   {
     "id": 196,
@@ -1517,7 +1706,8 @@
     "club": "Saint-Raphaël",
     "rarete": "Commun",
     "poste": "Ailier Droit",
-    "image_url": "https://i.imgur.com/BbBoGHr.png"
+    "image_url": "https://i.imgur.com/BbBoGHr.png",
+    "saison": 1
   },
   {
     "id": 197,
@@ -1525,7 +1715,8 @@
     "club": "Saint-Raphaël",
     "rarete": "Rare",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/Uf1r6RF.png"
+    "image_url": "https://i.imgur.com/Uf1r6RF.png",
+    "saison": 1
   },
   {
     "id": 198,
@@ -1533,7 +1724,8 @@
     "club": "Saint-Raphaël",
     "rarete": "Rare",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/jX1OItn.png"
+    "image_url": "https://i.imgur.com/jX1OItn.png",
+    "saison": 1
   },
   {
     "id": 199,
@@ -1541,7 +1733,8 @@
     "club": "Saint-Raphaël",
     "rarete": "Peu Commun",
     "poste": "Demi Centre",
-    "image_url": "https://i.imgur.com/JF30vQG.png"
+    "image_url": "https://i.imgur.com/JF30vQG.png",
+    "saison": 1
   },
   {
     "id": 200,
@@ -1549,7 +1742,8 @@
     "club": "Saint-Raphaël",
     "rarete": "Commun",
     "poste": "Ailier Gauche",
-    "image_url": "https://i.imgur.com/m5yJ183.png"
+    "image_url": "https://i.imgur.com/m5yJ183.png",
+    "saison": 1
   },
   {
     "id": 201,
@@ -1557,7 +1751,8 @@
     "club": "Saint-Raphaël",
     "rarete": "Commun",
     "poste": "Gardien",
-    "image_url": "https://i.imgur.com/NOjuTJm.png"
+    "image_url": "https://i.imgur.com/NOjuTJm.png",
+    "saison": 1
   },
   {
     "id": 202,
@@ -1565,7 +1760,8 @@
     "club": "Saint-Raphaël",
     "rarete": "Commun",
     "poste": "Arrière Gauche",
-    "image_url": "https://i.imgur.com/32c0w3e.png"
+    "image_url": "https://i.imgur.com/32c0w3e.png",
+    "saison": 1
   },
   {
     "id": 203,
@@ -1573,7 +1769,8 @@
     "club": "Saint-Raphaël",
     "rarete": "Rare",
     "poste": "Ailier Gauche",
-    "image_url": "https://i.imgur.com/iAS0IS6.png"
+    "image_url": "https://i.imgur.com/iAS0IS6.png",
+    "saison": 1
   },
   {
     "id": 204,
@@ -1581,7 +1778,8 @@
     "club": "Saint-Raphaël",
     "rarete": "Peu Commun",
     "poste": "Demi Centre",
-    "image_url": "https://i.imgur.com/iBOnI98.png"
+    "image_url": "https://i.imgur.com/iBOnI98.png",
+    "saison": 1
   },
   {
     "id": 205,
@@ -1589,7 +1787,8 @@
     "club": "Saint-Raphaël",
     "rarete": "Rare",
     "poste": "Ailier Droit",
-    "image_url": "https://i.imgur.com/roux35M.png"
+    "image_url": "https://i.imgur.com/roux35M.png",
+    "saison": 1
   },
   {
     "id": 206,
@@ -1597,7 +1796,8 @@
     "club": "Sélestat",
     "rarete": "Commun",
     "poste": "Arrière Gauche",
-    "image_url": "https://i.imgur.com/BkafN3E.png"
+    "image_url": "https://i.imgur.com/BkafN3E.png",
+    "saison": 1
   },
   {
     "id": 207,
@@ -1605,7 +1805,8 @@
     "club": "Sélestat",
     "rarete": "Commun",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/stq5fsx.png"
+    "image_url": "https://i.imgur.com/stq5fsx.png",
+    "saison": 1
   },
   {
     "id": 208,
@@ -1613,7 +1814,8 @@
     "club": "Sélestat",
     "rarete": "Peu Commun",
     "poste": "Arrière Droit",
-    "image_url": "https://i.imgur.com/ysmfk9z.png"
+    "image_url": "https://i.imgur.com/ysmfk9z.png",
+    "saison": 1
   },
   {
     "id": 209,
@@ -1621,7 +1823,8 @@
     "club": "Sélestat",
     "rarete": "Peu Commun",
     "poste": "Ailier Droit",
-    "image_url": "https://i.imgur.com/Z3aTRx7.png"
+    "image_url": "https://i.imgur.com/Z3aTRx7.png",
+    "saison": 1
   },
   {
     "id": 210,
@@ -1629,7 +1832,8 @@
     "club": "Sélestat",
     "rarete": "Commun",
     "poste": "Ailier Gauche",
-    "image_url": "https://i.imgur.com/PhrUT2q.png"
+    "image_url": "https://i.imgur.com/PhrUT2q.png",
+    "saison": 1
   },
   {
     "id": 211,
@@ -1637,7 +1841,8 @@
     "club": "Sélestat",
     "rarete": "Commun",
     "poste": "Demi Centre",
-    "image_url": "https://i.imgur.com/eXZtucw.png"
+    "image_url": "https://i.imgur.com/eXZtucw.png",
+    "saison": 1
   },
   {
     "id": 212,
@@ -1645,7 +1850,8 @@
     "club": "Sélestat",
     "rarete": "Commun",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/knpJBzc.png"
+    "image_url": "https://i.imgur.com/knpJBzc.png",
+    "saison": 1
   },
   {
     "id": 213,
@@ -1653,7 +1859,8 @@
     "club": "Sélestat",
     "rarete": "Commun",
     "poste": "Arrière Droit",
-    "image_url": "https://i.imgur.com/dsRhQcc.png"
+    "image_url": "https://i.imgur.com/dsRhQcc.png",
+    "saison": 1
   },
   {
     "id": 214,
@@ -1661,7 +1868,8 @@
     "club": "Sélestat",
     "rarete": "Commun",
     "poste": "Arrière Gauche",
-    "image_url": "https://i.imgur.com/LlcGDBC.png"
+    "image_url": "https://i.imgur.com/LlcGDBC.png",
+    "saison": 1
   },
   {
     "id": 215,
@@ -1669,7 +1877,8 @@
     "club": "Sélestat",
     "rarete": "Peu Commun",
     "poste": "Gardien",
-    "image_url": "https://i.imgur.com/sE0ztnJ.png"
+    "image_url": "https://i.imgur.com/sE0ztnJ.png",
+    "saison": 1
   },
   {
     "id": 216,
@@ -1677,7 +1886,8 @@
     "club": "Sélestat",
     "rarete": "Commun",
     "poste": "Demi Centre",
-    "image_url": "https://i.imgur.com/FdBHSgf.png"
+    "image_url": "https://i.imgur.com/FdBHSgf.png",
+    "saison": 1
   },
   {
     "id": 217,
@@ -1685,7 +1895,8 @@
     "club": "Sélestat",
     "rarete": "Commun",
     "poste": "Arrière Droit",
-    "image_url": "https://i.imgur.com/GnhPm47.png"
+    "image_url": "https://i.imgur.com/GnhPm47.png",
+    "saison": 1
   },
   {
     "id": 218,
@@ -1693,7 +1904,8 @@
     "club": "Sélestat",
     "rarete": "Commun",
     "poste": "Gardien",
-    "image_url": "https://i.imgur.com/Q7PkA9U.png"
+    "image_url": "https://i.imgur.com/Q7PkA9U.png",
+    "saison": 1
   },
   {
     "id": 219,
@@ -1701,7 +1913,8 @@
     "club": "Sélestat",
     "rarete": "Peu Commun",
     "poste": "Demi Centre",
-    "image_url": "https://i.imgur.com/VdGCKpy.png"
+    "image_url": "https://i.imgur.com/VdGCKpy.png",
+    "saison": 1
   },
   {
     "id": 220,
@@ -1709,7 +1922,8 @@
     "club": "Sélestat",
     "rarete": "Commun",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/aL5kJvm.png"
+    "image_url": "https://i.imgur.com/aL5kJvm.png",
+    "saison": 1
   },
   {
     "id": 221,
@@ -1717,7 +1931,8 @@
     "club": "Toulouse",
     "rarete": "Commun",
     "poste": "Demi Centre",
-    "image_url": "https://i.imgur.com/tDeIYkh.png"
+    "image_url": "https://i.imgur.com/tDeIYkh.png",
+    "saison": 1
   },
   {
     "id": 222,
@@ -1725,7 +1940,8 @@
     "club": "Toulouse",
     "rarete": "Commun",
     "poste": "Arrière Gauche",
-    "image_url": "https://i.imgur.com/xc6emGL.png"
+    "image_url": "https://i.imgur.com/xc6emGL.png",
+    "saison": 1
   },
   {
     "id": 223,
@@ -1733,7 +1949,8 @@
     "club": "Toulouse",
     "rarete": "Rare",
     "poste": "Arrière Gauche",
-    "image_url": "https://i.imgur.com/6JyP8jn.png"
+    "image_url": "https://i.imgur.com/6JyP8jn.png",
+    "saison": 1
   },
   {
     "id": 224,
@@ -1741,7 +1958,8 @@
     "club": "Toulouse",
     "rarete": "Commun",
     "poste": "Ailier Droit",
-    "image_url": "https://i.imgur.com/vfeKP1j.png"
+    "image_url": "https://i.imgur.com/vfeKP1j.png",
+    "saison": 1
   },
   {
     "id": 225,
@@ -1749,7 +1967,8 @@
     "club": "Toulouse",
     "rarete": "Épique",
     "poste": "Ailier Gauche",
-    "image_url": "https://i.imgur.com/qXdEM1w.png"
+    "image_url": "https://i.imgur.com/qXdEM1w.png",
+    "saison": 1
   },
   {
     "id": 226,
@@ -1757,7 +1976,8 @@
     "club": "Toulouse",
     "rarete": "Rare",
     "poste": "Ailier Gauche",
-    "image_url": "https://i.imgur.com/oE9brIk.png"
+    "image_url": "https://i.imgur.com/oE9brIk.png",
+    "saison": 1
   },
   {
     "id": 227,
@@ -1765,7 +1985,8 @@
     "club": "Toulouse",
     "rarete": "Commun",
     "poste": "Arrière Gauche",
-    "image_url": "https://i.imgur.com/E0BsdOx.png"
+    "image_url": "https://i.imgur.com/E0BsdOx.png",
+    "saison": 1
   },
   {
     "id": 228,
@@ -1773,7 +1994,8 @@
     "club": "Toulouse",
     "rarete": "Peu Commun",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/91Uk0mi.png"
+    "image_url": "https://i.imgur.com/91Uk0mi.png",
+    "saison": 1
   },
   {
     "id": 230,
@@ -1781,7 +2003,8 @@
     "club": "Toulouse",
     "rarete": "Peu Commun",
     "poste": "Ailier Droit",
-    "image_url": "https://i.imgur.com/yPjH4Z9.png"
+    "image_url": "https://i.imgur.com/yPjH4Z9.png",
+    "saison": 1
   },
   {
     "id": 231,
@@ -1789,7 +2012,8 @@
     "club": "Toulouse",
     "rarete": "Rare",
     "poste": "Arrière Droit",
-    "image_url": "https://i.imgur.com/cvoYTRg.png"
+    "image_url": "https://i.imgur.com/cvoYTRg.png",
+    "saison": 1
   },
   {
     "id": 232,
@@ -1797,7 +2021,8 @@
     "club": "Toulouse",
     "rarete": "Rare",
     "poste": "Gardien",
-    "image_url": "https://i.imgur.com/ZEaxXHF.png"
+    "image_url": "https://i.imgur.com/ZEaxXHF.png",
+    "saison": 1
   },
   {
     "id": 233,
@@ -1805,7 +2030,8 @@
     "club": "Toulouse",
     "rarete": "Rare",
     "poste": "Demi Centre",
-    "image_url": "https://i.imgur.com/eJZFaBk.png"
+    "image_url": "https://i.imgur.com/eJZFaBk.png",
+    "saison": 1
   },
   {
     "id": 234,
@@ -1813,7 +2039,8 @@
     "club": "Toulouse",
     "rarete": "Peu Commun",
     "poste": "Gardien",
-    "image_url": "https://i.imgur.com/tPs1J3T.png"
+    "image_url": "https://i.imgur.com/tPs1J3T.png",
+    "saison": 1
   },
   {
     "id": 235,
@@ -1821,7 +2048,8 @@
     "club": "Toulouse",
     "rarete": "Rare",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/STasG8h.png"
+    "image_url": "https://i.imgur.com/STasG8h.png",
+    "saison": 1
   },
   {
     "id": 236,
@@ -1829,7 +2057,8 @@
     "club": "Toulouse",
     "rarete": "Épique",
     "poste": "Arrière Gauche",
-    "image_url": "https://i.imgur.com/F1Ey4cb.png"
+    "image_url": "https://i.imgur.com/F1Ey4cb.png",
+    "saison": 1
   },
   {
     "id": 237,
@@ -1837,7 +2066,8 @@
     "club": "Tremblay",
     "rarete": "Commun",
     "poste": "Ailier Droit",
-    "image_url": "https://i.imgur.com/s3IJnB1.png"
+    "image_url": "https://i.imgur.com/s3IJnB1.png",
+    "saison": 1
   },
   {
     "id": 238,
@@ -1845,7 +2075,8 @@
     "club": "Tremblay",
     "rarete": "Commun",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/7kl0s3n.png"
+    "image_url": "https://i.imgur.com/7kl0s3n.png",
+    "saison": 1
   },
   {
     "id": 239,
@@ -1853,7 +2084,8 @@
     "club": "Tremblay",
     "rarete": "Commun",
     "poste": "Gardien",
-    "image_url": "https://i.imgur.com/BTZPpDC.png"
+    "image_url": "https://i.imgur.com/BTZPpDC.png",
+    "saison": 1
   },
   {
     "id": 240,
@@ -1861,7 +2093,8 @@
     "club": "Tremblay",
     "rarete": "Commun",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/nQEKmZD.png"
+    "image_url": "https://i.imgur.com/nQEKmZD.png",
+    "saison": 1
   },
   {
     "id": 241,
@@ -1869,7 +2102,8 @@
     "club": "Tremblay",
     "rarete": "Rare",
     "poste": "Demi Centre",
-    "image_url": "https://i.imgur.com/OM6JOjS.png"
+    "image_url": "https://i.imgur.com/OM6JOjS.png",
+    "saison": 1
   },
   {
     "id": 242,
@@ -1877,7 +2111,8 @@
     "club": "Tremblay",
     "rarete": "Épique",
     "poste": "Demi Centre",
-    "image_url": "https://i.imgur.com/4Vs5htD.png"
+    "image_url": "https://i.imgur.com/4Vs5htD.png",
+    "saison": 1
   },
   {
     "id": 243,
@@ -1885,7 +2120,8 @@
     "club": "Tremblay",
     "rarete": "Commun",
     "poste": "Demi Centre",
-    "image_url": "https://i.imgur.com/Edvm6sc.png"
+    "image_url": "https://i.imgur.com/Edvm6sc.png",
+    "saison": 1
   },
   {
     "id": 244,
@@ -1893,7 +2129,8 @@
     "club": "Tremblay",
     "rarete": "Rare",
     "poste": "Arrière Droit",
-    "image_url": "https://i.imgur.com/M1TjY9n.png"
+    "image_url": "https://i.imgur.com/M1TjY9n.png",
+    "saison": 1
   },
   {
     "id": 245,
@@ -1901,7 +2138,8 @@
     "club": "Tremblay",
     "rarete": "Peu Commun",
     "poste": "Arrière Droit",
-    "image_url": "https://i.imgur.com/D90yTsB.png"
+    "image_url": "https://i.imgur.com/D90yTsB.png",
+    "saison": 1
   },
   {
     "id": 246,
@@ -1909,7 +2147,8 @@
     "club": "Tremblay",
     "rarete": "Peu Commun",
     "poste": "Pivot",
-    "image_url": "https://i.imgur.com/YuqcY8y.png"
+    "image_url": "https://i.imgur.com/YuqcY8y.png",
+    "saison": 1
   },
   {
     "id": 247,
@@ -1917,7 +2156,8 @@
     "club": "Tremblay",
     "rarete": "Rare",
     "poste": "",
-    "image_url": "https://i.imgur.com/uy72vuE.png"
+    "image_url": "https://i.imgur.com/uy72vuE.png",
+    "saison": 1
   },
   {
     "id": 248,
@@ -1925,7 +2165,8 @@
     "club": "Tremblay",
     "rarete": "Épique",
     "poste": "Gardien",
-    "image_url": "https://i.imgur.com/kzgFqTx.png"
+    "image_url": "https://i.imgur.com/kzgFqTx.png",
+    "saison": 1
   },
   {
     "id": 249,
@@ -1933,7 +2174,8 @@
     "club": "Tremblay",
     "rarete": "Commun",
     "poste": "Ailier Gauche",
-    "image_url": "https://i.imgur.com/r376WIP.png"
+    "image_url": "https://i.imgur.com/r376WIP.png",
+    "saison": 1
   },
   {
     "id": 250,
@@ -1941,7 +2183,8 @@
     "club": "Tremblay",
     "rarete": "Peu Commun",
     "poste": "Arrière Gauche",
-    "image_url": "https://i.imgur.com/ffsP9NX.png"
+    "image_url": "https://i.imgur.com/ffsP9NX.png",
+    "saison": 1
   },
   {
     "id": 251,
@@ -1949,7 +2192,8 @@
     "club": "Tremblay",
     "rarete": "Peu Commun",
     "poste": "Ailier Gauche",
-    "image_url": "https://i.imgur.com/bfTZntW.png"
+    "image_url": "https://i.imgur.com/bfTZntW.png",
+    "saison": 1
   },
   {
     "id": 252,
@@ -1957,7 +2201,8 @@
     "club": "Aix",
     "rarete": "Peu Commun",
     "poste": "Arrière Gauche",
-    "image_url": "https://i.imgur.com/BK0w3TI.png"
+    "image_url": "https://i.imgur.com/BK0w3TI.png",
+    "saison": 1
   },
   {
     "id": 253,
@@ -1965,7 +2210,8 @@
     "club": "Dijon",
     "rarete": "Rare",
     "poste": "Arrière Gauche",
-    "image_url": "https://i.imgur.com/PsKm8hE.png"
+    "image_url": "https://i.imgur.com/PsKm8hE.png",
+    "saison": 1
   },
   {
     "id": 254,
@@ -1973,7 +2219,8 @@
     "club": "Toulouse",
     "rarete": "Commun",
     "poste": "Arrière Droit",
-    "image_url": "https://i.imgur.com/WH45wz0.png"
+    "image_url": "https://i.imgur.com/WH45wz0.png",
+    "saison": 1
   },
   {
     "id": 255,
@@ -1981,7 +2228,8 @@
     "club": "Chambéry",
     "rarete": "Commun",
     "poste": "Arrière Droit",
-    "image_url": "https://i.imgur.com/B1AUtkb.png"
+    "image_url": "https://i.imgur.com/B1AUtkb.png",
+    "saison": 1
   },
   {
     "id": 256,
@@ -1989,7 +2237,8 @@
     "club": "Paris",
     "rarete": "Commun",
     "poste": "Ailier Gauche",
-    "image_url": "https://i.imgur.com/yX6zCjx.png"
+    "image_url": "https://i.imgur.com/yX6zCjx.png",
+    "saison": 1
   },
   {
     "id": 257,
@@ -1997,7 +2246,8 @@
     "club": "Paris",
     "rarete": "Peu Commun",
     "poste": "Arrière Droit",
-    "image_url": "https://i.imgur.com/DXU7Z7M.png"
+    "image_url": "https://i.imgur.com/DXU7Z7M.png",
+    "saison": 1
   },
   {
     "id": 258,
@@ -2005,7 +2255,8 @@
     "club": "Chartres",
     "rarete": "Peu Commun",
     "poste": "Arrière Droit",
-    "image_url": "https://i.imgur.com/I5UkCwX.png"
+    "image_url": "https://i.imgur.com/I5UkCwX.png",
+    "saison": 1
   },
   {
     "id": "noel_1",
@@ -2013,7 +2264,8 @@
     "club": "Légendes Starligue",
     "rarete": "Noël",
     "poste": "",
-    "image_url": "https://i.imgur.com/eUEADJk.png?v=1"
+    "image_url": "https://i.imgur.com/eUEADJk.png?v=1",
+    "saison": 1
   },
   {
     "id": "noel_2",
@@ -2021,7 +2273,8 @@
     "club": "Légendes Starligue",
     "rarete": "Noël",
     "poste": "",
-    "image_url": "https://i.imgur.com/c4dHiLg.png"
+    "image_url": "https://i.imgur.com/c4dHiLg.png",
+    "saison": 1
   },
   {
     "id": "noel_3",
@@ -2029,7 +2282,8 @@
     "club": "Légendes Starligue",
     "rarete": "Noël",
     "poste": "",
-    "image_url": "https://i.imgur.com/N8iN805.png"
+    "image_url": "https://i.imgur.com/N8iN805.png",
+    "saison": 1
   },
   {
     "id": "noel_4",
@@ -2037,7 +2291,8 @@
     "club": "Légendes Starligue",
     "rarete": "Noël",
     "poste": "",
-    "image_url": "https://i.imgur.com/9ow64r1.png"
+    "image_url": "https://i.imgur.com/9ow64r1.png",
+    "saison": 1
   },
   {
     "id": "noel_5",
@@ -2045,7 +2300,8 @@
     "club": "Légendes Starligue",
     "rarete": "Noël",
     "poste": "",
-    "image_url": "https://i.imgur.com/1uJpYb9.png"
+    "image_url": "https://i.imgur.com/1uJpYb9.png",
+    "saison": 1
   },
   {
     "id": "noel_6",
@@ -2053,7 +2309,8 @@
     "club": "Légendes Starligue",
     "rarete": "Noël",
     "poste": "",
-    "image_url": "https://i.imgur.com/ySFtyQE.png"
+    "image_url": "https://i.imgur.com/ySFtyQE.png",
+    "saison": 1
   },
   {
     "id": "noel_7",
@@ -2061,7 +2318,8 @@
     "club": "Légendes Starligue",
     "rarete": "Noël",
     "poste": "",
-    "image_url": "https://i.imgur.com/z32rKUQ.png"
+    "image_url": "https://i.imgur.com/z32rKUQ.png",
+    "saison": 1
   },
   {
     "id": "noel_8",
@@ -2069,7 +2327,8 @@
     "club": "Légendes Starligue",
     "rarete": "Noël",
     "poste": "",
-    "image_url": "https://i.imgur.com/Apv59r5.png"
+    "image_url": "https://i.imgur.com/Apv59r5.png",
+    "saison": 1
   },
   {
     "id": "noel_9",
@@ -2077,7 +2336,8 @@
     "club": "Légendes Starligue",
     "rarete": "Noël",
     "poste": "",
-    "image_url": "https://i.imgur.com/cIrjYkA.png"
+    "image_url": "https://i.imgur.com/cIrjYkA.png",
+    "saison": 1
   },
   {
     "id": "noel_10",
@@ -2085,7 +2345,8 @@
     "club": "Légendes Starligue",
     "rarete": "Noël",
     "poste": "",
-    "image_url": "https://i.imgur.com/1pb8vE2.png"
+    "image_url": "https://i.imgur.com/1pb8vE2.png",
+    "saison": 1
   },
   {
     "id": "noel_11",
@@ -2093,7 +2354,8 @@
     "club": "Légendes Starligue",
     "rarete": "Noël",
     "poste": "",
-    "image_url": "https://i.imgur.com/x0hqLrX.png"
+    "image_url": "https://i.imgur.com/x0hqLrX.png",
+    "saison": 1
   },
   {
     "id": "noel_12",
@@ -2101,7 +2363,8 @@
     "club": "Légendes Starligue",
     "rarete": "Noël",
     "poste": "",
-    "image_url": "https://i.imgur.com/BQcPMA6.png"
+    "image_url": "https://i.imgur.com/BQcPMA6.png",
+    "saison": 1
   },
   {
     "id": "noel_13",
@@ -2109,7 +2372,8 @@
     "club": "Légendes Starligue",
     "rarete": "Noël",
     "poste": "",
-    "image_url": "https://i.imgur.com/pF0DXpo.png"
+    "image_url": "https://i.imgur.com/pF0DXpo.png",
+    "saison": 1
   },
   {
     "id": "noel_14",
@@ -2117,7 +2381,8 @@
     "club": "Légendes Starligue",
     "rarete": "Noël",
     "poste": "",
-    "image_url": "https://i.imgur.com/fOZZBFc.png"
+    "image_url": "https://i.imgur.com/fOZZBFc.png",
+    "saison": 1
   },
   {
     "id": "noel_15",
@@ -2125,7 +2390,8 @@
     "club": "Légendes Starligue",
     "rarete": "Noël",
     "poste": "",
-    "image_url": "https://i.imgur.com/zA7Sl6I.png"
+    "image_url": "https://i.imgur.com/zA7Sl6I.png",
+    "saison": 1
   },
   {
     "id": "noel_16",
@@ -2133,7 +2399,8 @@
     "club": "Légendes Starligue",
     "rarete": "Noël",
     "poste": "",
-    "image_url": "https://i.imgur.com/F9KvHDk.png"
+    "image_url": "https://i.imgur.com/F9KvHDk.png",
+    "saison": 1
   },
   {
     "id": "noel_17",
@@ -2141,7 +2408,8 @@
     "club": "Légendes Starligue",
     "rarete": "Noël",
     "poste": "",
-    "image_url": "https://i.imgur.com/CAdlLi1.png"
+    "image_url": "https://i.imgur.com/CAdlLi1.png",
+    "saison": 1
   },
   {
     "id": "noel_18",
@@ -2149,7 +2417,8 @@
     "club": "Légendes Starligue",
     "rarete": "Noël",
     "poste": "",
-    "image_url": "https://i.imgur.com/7STg1XW.png"
+    "image_url": "https://i.imgur.com/7STg1XW.png",
+    "saison": 1
   },
   {
     "id": "noel_19",
@@ -2157,7 +2426,8 @@
     "club": "Légendes Starligue",
     "rarete": "Noël",
     "poste": "",
-    "image_url": "https://i.imgur.com/jI64SZR.png"
+    "image_url": "https://i.imgur.com/jI64SZR.png",
+    "saison": 1
   },
   {
     "id": "noel_20",
@@ -2165,7 +2435,8 @@
     "club": "Légendes Starligue",
     "rarete": "Noël",
     "poste": "",
-    "image_url": "https://i.imgur.com/iYMTjGo.png?v=1"
+    "image_url": "https://i.imgur.com/iYMTjGo.png?v=1",
+    "saison": 1
   },
   {
     "id": "noel_21",
@@ -2173,7 +2444,8 @@
     "club": "Légendes Starligue",
     "rarete": "Noël",
     "poste": "",
-    "image_url": "https://i.imgur.com/EWXqc9R.png"
+    "image_url": "https://i.imgur.com/EWXqc9R.png",
+    "saison": 1
   },
   {
     "id": "noel_22",
@@ -2181,7 +2453,8 @@
     "club": "Légendes Starligue",
     "rarete": "Noël",
     "poste": "",
-    "image_url": "https://i.imgur.com/iiON3dw.png"
+    "image_url": "https://i.imgur.com/iiON3dw.png",
+    "saison": 1
   },
   {
     "id": "noel_23",
@@ -2189,7 +2462,8 @@
     "club": "Légendes Starligue",
     "rarete": "Noël",
     "poste": "",
-    "image_url": "https://i.imgur.com/zXWii5z.png"
+    "image_url": "https://i.imgur.com/zXWii5z.png",
+    "saison": 1
   },
   {
     "id": "noel_24",
@@ -2197,6 +2471,2329 @@
     "club": "Légendes Starligue",
     "rarete": "Noël",
     "poste": "",
-    "image_url": "https://i.imgur.com/Y4lkrqj.gif"
+    "image_url": "https://i.imgur.com/Y4lkrqj.gif",
+    "saison": 1
+  },
+  {
+    "id": "banke-gustaf",
+    "nom": "Gustaf BANKE",
+    "club": "Aix",
+    "rarete": "Peu Commun",
+    "poste": "Gardien",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/banke-gustaf.png",
+    "saison": 2
+  },
+  {
+    "id": "baznik-joze",
+    "nom": "Joze BAZNIK",
+    "club": "Aix",
+    "rarete": "Épique",
+    "poste": "Gardien",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/baznik-joze.png",
+    "saison": 2
+  },
+  {
+    "id": "de-la-breteche-lucas",
+    "nom": "Lucas DE LA BRETECHE",
+    "club": "Aix",
+    "rarete": "Commun",
+    "poste": "Demi Centre",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/de-la-breteche-lucas.png",
+    "saison": 2
+  },
+  {
+    "id": "brouzet-hugo",
+    "nom": "Hugo BROUZET",
+    "club": "Aix",
+    "rarete": "Peu Commun",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/brouzet-hugo.png",
+    "saison": 2
+  },
+  {
+    "id": "desblancs-eliott",
+    "nom": "Eliott DESBLANCS",
+    "club": "Aix",
+    "rarete": "Rare",
+    "poste": "Demi Centre",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/desblancs-eliott.png",
+    "saison": 2
+  },
+  {
+    "id": "guiraudou-paul-louis",
+    "nom": "Paul Louis GUIRAUDOU",
+    "club": "Aix",
+    "rarete": "Commun",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/guiraudou-paul-louis.png",
+    "saison": 2
+  },
+  {
+    "id": "kalandadze-nikoloz",
+    "nom": "Nikoloz KALANDADZE",
+    "club": "Aix",
+    "rarete": "Rare",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/kalandadze-nikoloz.png",
+    "saison": 2
+  },
+  {
+    "id": "loesch-gabriel",
+    "nom": "Gabriel LOESCH",
+    "club": "Aix",
+    "rarete": "Peu Commun",
+    "poste": "Ailier Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/loesch-gabriel.png",
+    "saison": 2
+  },
+  {
+    "id": "molinie-robin",
+    "nom": "Robin MOLINIE",
+    "club": "Aix",
+    "rarete": "Peu Commun",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/molinie-robin.png",
+    "saison": 2
+  },
+  {
+    "id": "sidibe-mouhamadou",
+    "nom": "Mouhamadou SIDIBE",
+    "club": "Aix",
+    "rarete": "Rare",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/sidibe-mouhamadou.png",
+    "saison": 2
+  },
+  {
+    "id": "sondena-magnus",
+    "nom": "Magnus SONDENA",
+    "club": "Aix",
+    "rarete": "Peu Commun",
+    "poste": "Arrière Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/sondena-magnus.png",
+    "saison": 2
+  },
+  {
+    "id": "stavros-alexiou",
+    "nom": "Alexiou STAVROS",
+    "club": "Aix",
+    "rarete": "Commun",
+    "poste": "Ailier Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/stavros-alexiou.png",
+    "saison": 2
+  },
+  {
+    "id": "tissot-antoine",
+    "nom": "Antoine TISSOT",
+    "club": "Aix",
+    "rarete": "Rare",
+    "poste": "Ailier Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/tissot-antoine.png",
+    "saison": 2
+  },
+  {
+    "id": "tritta-alexandre",
+    "nom": "Alexandre TRITTA",
+    "club": "Aix",
+    "rarete": "Peu Commun",
+    "poste": "Arrière Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/tritta-alexandre.png",
+    "saison": 2
+  },
+  {
+    "id": "zaepfel-aymeric",
+    "nom": "Aymeric ZAEPFEL",
+    "club": "Aix",
+    "rarete": "Épique",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/zaepfel-aymeric.png",
+    "saison": 2
+  },
+  {
+    "id": "abodogo-owen",
+    "nom": "Owen ABODOGO",
+    "club": "Caen",
+    "rarete": "Commun",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/abodogo-owen.png",
+    "saison": 2
+  },
+  {
+    "id": "allais-jordan",
+    "nom": "Jordan ALLAIS",
+    "club": "Caen",
+    "rarete": "Commun",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/allais-jordan.png",
+    "saison": 2
+  },
+  {
+    "id": "areia-antonio",
+    "nom": "Antonio AREIA",
+    "club": "Caen",
+    "rarete": "Rare",
+    "poste": "Ailier Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/areia-antonio.png",
+    "saison": 2
+  },
+  {
+    "id": "cornette-mathieu",
+    "nom": "Mathieu CORNETTE",
+    "club": "Caen",
+    "rarete": "Peu Commun",
+    "poste": "Demi Centre",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/cornette-mathieu.png",
+    "saison": 2
+  },
+  {
+    "id": "discamps-maxime",
+    "nom": "Maxime DISCAMPS",
+    "club": "Caen",
+    "rarete": "Commun",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/discamps-maxime.png",
+    "saison": 2
+  },
+  {
+    "id": "ghoul-fares",
+    "nom": "Fares GHOUL",
+    "club": "Caen",
+    "rarete": "Commun",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/ghoul-fares.png",
+    "saison": 2
+  },
+  {
+    "id": "gnago-adam",
+    "nom": "Adam GNAGO",
+    "club": "Caen",
+    "rarete": "Commun",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/gnago-adam.png",
+    "saison": 2
+  },
+  {
+    "id": "kawada-haruki",
+    "nom": "Haruki KAWADA",
+    "club": "Caen",
+    "rarete": "Peu Commun",
+    "poste": "Demi Centre",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/kawada-haruki.png",
+    "saison": 2
+  },
+  {
+    "id": "melo-nilton",
+    "nom": "Nilton MELO",
+    "club": "Caen",
+    "rarete": "Commun",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/melo-nilton.png",
+    "saison": 2
+  },
+  {
+    "id": "mocevic-milos",
+    "nom": "Milos MOCEVIC",
+    "club": "Caen",
+    "rarete": "Commun",
+    "poste": "Gardien",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/mocevic-milos.png",
+    "saison": 2
+  },
+  {
+    "id": "molliex-robin",
+    "nom": "Robin MOLLIEX",
+    "club": "Caen",
+    "rarete": "Commun",
+    "poste": "Ailier Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/molliex-robin.png",
+    "saison": 2
+  },
+  {
+    "id": "rodriguez-hanser-michel",
+    "nom": "Hanser Michel RODRIGUEZ",
+    "club": "Caen",
+    "rarete": "Commun",
+    "poste": "Ailier Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/rodriguez-hanser-michel.png",
+    "saison": 2
+  },
+  {
+    "id": "ben-salem-yassine",
+    "nom": "Yassine BEN SALEM",
+    "club": "Caen",
+    "rarete": "Commun",
+    "poste": "Arrière Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/ben-salem-yassine.png",
+    "saison": 2
+  },
+  {
+    "id": "tournellec-louis",
+    "nom": "Louis TOURNELLEC",
+    "club": "Caen",
+    "rarete": "Peu Commun",
+    "poste": "Arrière Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/tournellec-louis.png",
+    "saison": 2
+  },
+  {
+    "id": "van-zeller-tomas",
+    "nom": "Tomas VAN-ZELLER",
+    "club": "Caen",
+    "rarete": "Commun",
+    "poste": "Gardien",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/van-zeller-tomas.png",
+    "saison": 2
+  },
+  {
+    "id": "villeminot-allan",
+    "nom": "Allan VILLEMINOT",
+    "club": "Caen",
+    "rarete": "Rare",
+    "poste": "Demi Centre",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/villeminot-allan.png",
+    "saison": 2
+  },
+  {
+    "id": "baradat-alexandre",
+    "nom": "Alexandre BARADAT",
+    "club": "Cesson-Rennes",
+    "rarete": "Commun",
+    "poste": "Demi Centre",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/baradat-alexandre.png",
+    "saison": 2
+  },
+  {
+    "id": "baran-michal",
+    "nom": "Michal BARAN",
+    "club": "Cesson-Rennes",
+    "rarete": "Rare",
+    "poste": "Demi Centre",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/baran-michal.png",
+    "saison": 2
+  },
+  {
+    "id": "folques-josep",
+    "nom": "Josep FOLQUES",
+    "club": "Cesson-Rennes",
+    "rarete": "Commun",
+    "poste": "Ailier Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/folques-josep.png",
+    "saison": 2
+  },
+  {
+    "id": "hanusz-egon",
+    "nom": "Egon HANUSZ",
+    "club": "Cesson-Rennes",
+    "rarete": "Épique",
+    "poste": "Demi Centre",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/hanusz-egon.png",
+    "saison": 2
+  },
+  {
+    "id": "klimavets-andrei",
+    "nom": "Andrei KLIMAVETS",
+    "club": "Cesson-Rennes",
+    "rarete": "Commun",
+    "poste": "Demi Centre",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/klimavets-andrei.png",
+    "saison": 2
+  },
+  {
+    "id": "kouassi-jean-emmanuel",
+    "nom": "Jean-emmanuel KOUASSI",
+    "club": "Cesson-Rennes",
+    "rarete": "Rare",
+    "poste": "Gardien",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/kouassi-jean-emmanuel.png",
+    "saison": 2
+  },
+  {
+    "id": "labigang-xavier",
+    "nom": "Xavier LABIGANG",
+    "club": "Cesson-Rennes",
+    "rarete": "Rare",
+    "poste": "Ailier Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/labigang-xavier.png",
+    "saison": 2
+  },
+  {
+    "id": "nieto-marcos-asier",
+    "nom": "Asier NIETO MARCOS",
+    "club": "Cesson-Rennes",
+    "rarete": "Peu Commun",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/nieto-marcos-asier.png",
+    "saison": 2
+  },
+  {
+    "id": "moran-alex",
+    "nom": "Alex MORAN",
+    "club": "Cesson-Rennes",
+    "rarete": "Rare",
+    "poste": "Ailier Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/moran-alex.png",
+    "saison": 2
+  },
+  {
+    "id": "ooms-simon",
+    "nom": "Simon OOMS",
+    "club": "Cesson-Rennes",
+    "rarete": "Commun",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/ooms-simon.png",
+    "saison": 2
+  },
+  {
+    "id": "rodrigues-gustavo",
+    "nom": "Gustavo RODRIGUES",
+    "club": "Cesson-Rennes",
+    "rarete": "Rare",
+    "poste": "Arrière Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/rodrigues-gustavo.png",
+    "saison": 2
+  },
+  {
+    "id": "salou-mathieu",
+    "nom": "Mathieu SALOU",
+    "club": "Cesson-Rennes",
+    "rarete": "Rare",
+    "poste": "Arrière Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/salou-mathieu.png",
+    "saison": 2
+  },
+  {
+    "id": "sunjic-mate",
+    "nom": "Mate SUNJIC",
+    "club": "Cesson-Rennes",
+    "rarete": "Peu Commun",
+    "poste": "Gardien",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/sunjic-mate.png",
+    "saison": 2
+  },
+  {
+    "id": "szeitl-erik",
+    "nom": "Erik SZEITL",
+    "club": "Cesson-Rennes",
+    "rarete": "Peu Commun",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/szeitl-erik.png",
+    "saison": 2
+  },
+  {
+    "id": "bernard-david",
+    "nom": "David BERNARD",
+    "club": "Chambéry",
+    "rarete": "Peu Commun",
+    "poste": "Gardien",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/bernard-david.png",
+    "saison": 2
+  },
+  {
+    "id": "cavalcanti-gabriel",
+    "nom": "Gabriel CAVALCANTI",
+    "club": "Chambéry",
+    "rarete": "Commun",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/cavalcanti-gabriel.png",
+    "saison": 2
+  },
+  {
+    "id": "costoya-alejandro",
+    "nom": "Alejandro COSTOYA",
+    "club": "Chambéry",
+    "rarete": "Commun",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/costoya-alejandro.png",
+    "saison": 2
+  },
+  {
+    "id": "frattaruolo-sasha",
+    "nom": "Sasha FRATTARUOLO",
+    "club": "Chambéry",
+    "rarete": "Peu Commun",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/frattaruolo-sasha.png",
+    "saison": 2
+  },
+  {
+    "id": "groselj-matic",
+    "nom": "Matic GROSELJ",
+    "club": "Chambéry",
+    "rarete": "Peu Commun",
+    "poste": "Arrière Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/groselj-matic.png",
+    "saison": 2
+  },
+  {
+    "id": "johannsson-sveinn",
+    "nom": "Sveinn JOHANNSSON",
+    "club": "Chambéry",
+    "rarete": "Commun",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/johannsson-sveinn.png",
+    "saison": 2
+  },
+  {
+    "id": "rodriguez-lario-roberto",
+    "nom": "Roberto RODRÍGUEZ LARIO",
+    "club": "Chambéry",
+    "rarete": "Commun",
+    "poste": "Gardien",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/rodriguez-lario-roberto.png",
+    "saison": 2
+  },
+  {
+    "id": "loredon-gautier",
+    "nom": "Gautier LOREDON",
+    "club": "Chambéry",
+    "rarete": "Peu Commun",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/loredon-gautier.png",
+    "saison": 2
+  },
+  {
+    "id": "pettersen-simen-holand",
+    "nom": "Simen Holand PETTERSEN",
+    "club": "Chambéry",
+    "rarete": "Commun",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/pettersen-simen-holand.png",
+    "saison": 2
+  },
+  {
+    "id": "peyronnet-emilien",
+    "nom": "Emilien PEYRONNET",
+    "club": "Chambéry",
+    "rarete": "Épique",
+    "poste": "Ailier Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/peyronnet-emilien.png",
+    "saison": 2
+  },
+  {
+    "id": "sousa-andre",
+    "nom": "André SOUSA",
+    "club": "Chambéry",
+    "rarete": "Peu Commun",
+    "poste": "Demi Centre",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/sousa-andre.png",
+    "saison": 2
+  },
+  {
+    "id": "toskas-achilleas",
+    "nom": "Achilleas TOSKAS",
+    "club": "Chambéry",
+    "rarete": "Peu Commun",
+    "poste": "Arrière Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/toskas-achilleas.png",
+    "saison": 2
+  },
+  {
+    "id": "traore-queido",
+    "nom": "Queido TRAORE",
+    "club": "Chambéry",
+    "rarete": "Peu Commun",
+    "poste": "Ailier Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/traore-queido.png",
+    "saison": 2
+  },
+  {
+    "id": "vanegue-lucas",
+    "nom": "Lucas VANEGUE",
+    "club": "Chambéry",
+    "rarete": "Épique",
+    "poste": "Demi Centre",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/vanegue-lucas.png",
+    "saison": 2
+  },
+  {
+    "id": "vergely-adrien",
+    "nom": "Adrien VERGELY",
+    "club": "Chambéry",
+    "rarete": "Commun",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/vergely-adrien.png",
+    "saison": 2
+  },
+  {
+    "id": "zammit-elio",
+    "nom": "Elio ZAMMIT",
+    "club": "Chambéry",
+    "rarete": "Rare",
+    "poste": "Ailier Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/zammit-elio.png",
+    "saison": 2
+  },
+  {
+    "id": "claude-dimitri",
+    "nom": "Dimitri CLAUDE",
+    "club": "Chambéry",
+    "rarete": "Rare",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/claude-dimitri.png",
+    "saison": 2
+  },
+  {
+    "id": "araujo-edmilson",
+    "nom": "Edmilson ARAUJO",
+    "club": "Chartres",
+    "rarete": "Épique",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/araujo-edmilson.png",
+    "saison": 2
+  },
+  {
+    "id": "ben-fraj-koussay",
+    "nom": "Koussay BEN FRAJ",
+    "club": "Chartres",
+    "rarete": "Commun",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/ben-fraj-koussay.png",
+    "saison": 2
+  },
+  {
+    "id": "garcias-andre",
+    "nom": "Andre GARCIAS",
+    "club": "Chartres",
+    "rarete": "Commun",
+    "poste": "Demi Centre",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/garcias-andre.png",
+    "saison": 2
+  },
+  {
+    "id": "gourdel-paul",
+    "nom": "Paul GOURDEL",
+    "club": "Chartres",
+    "rarete": "Commun",
+    "poste": "Ailier Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/gourdel-paul.png",
+    "saison": 2
+  },
+  {
+    "id": "harbaoui-mehdi",
+    "nom": "Mehdi HARBAOUI",
+    "club": "Chartres",
+    "rarete": "Peu Commun",
+    "poste": "Gardien",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/harbaoui-mehdi.png",
+    "saison": 2
+  },
+  {
+    "id": "hosni-oussama",
+    "nom": "Oussama HOSNI",
+    "club": "Chartres",
+    "rarete": "Commun",
+    "poste": "Arrière Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/hosni-oussama.png",
+    "saison": 2
+  },
+  {
+    "id": "kempf-edouard",
+    "nom": "Edouard KEMPF",
+    "club": "Chartres",
+    "rarete": "Peu Commun",
+    "poste": "Ailier Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/kempf-edouard.png",
+    "saison": 2
+  },
+  {
+    "id": "luciani-julien",
+    "nom": "Julien LUCIANI",
+    "club": "Chartres",
+    "rarete": "Commun",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/luciani-julien.png",
+    "saison": 2
+  },
+  {
+    "id": "martinez-gabin",
+    "nom": "Gabin MARTINEZ",
+    "club": "Chartres",
+    "rarete": "Peu Commun",
+    "poste": "Arrière Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/martinez-gabin.png",
+    "saison": 2
+  },
+  {
+    "id": "meyer-julien",
+    "nom": "Julien MEYER",
+    "club": "Chartres",
+    "rarete": "Commun",
+    "poste": "Gardien",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/meyer-julien.png",
+    "saison": 2
+  },
+  {
+    "id": "minel-quentin",
+    "nom": "Quentin MINEL",
+    "club": "Chartres",
+    "rarete": "Peu Commun",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/minel-quentin.png",
+    "saison": 2
+  },
+  {
+    "id": "onufriienko-oleksandr",
+    "nom": "Oleksandr ONUFRIIENKO",
+    "club": "Chartres",
+    "rarete": "Commun",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/onufriienko-oleksandr.png",
+    "saison": 2
+  },
+  {
+    "id": "tighiouart-nael",
+    "nom": "Naël TIGHIOUART",
+    "club": "Chartres",
+    "rarete": "Commun",
+    "poste": "Ailier Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/tighiouart-nael.png",
+    "saison": 2
+  },
+  {
+    "id": "tribillon-gael",
+    "nom": "Gaël TRIBILLON",
+    "club": "Chartres",
+    "rarete": "Rare",
+    "poste": "Ailier Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/tribillon-gael.png",
+    "saison": 2
+  },
+  {
+    "id": "verin-yvan",
+    "nom": "Yvan VERIN",
+    "club": "Chartres",
+    "rarete": "Rare",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/verin-yvan.png",
+    "saison": 2
+  },
+  {
+    "id": "appolinaire-ludwig",
+    "nom": "Ludwig APPOLINAIRE",
+    "club": "Dunkerque",
+    "rarete": "Commun",
+    "poste": "Demi Centre",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/appolinaire-ludwig.png",
+    "saison": 2
+  },
+  {
+    "id": "arteaga-thibaud",
+    "nom": "Thibaud ARTEAGA",
+    "club": "Dunkerque",
+    "rarete": "Peu Commun",
+    "poste": "Ailier Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/arteaga-thibaud.png",
+    "saison": 2
+  },
+  {
+    "id": "billant-florian",
+    "nom": "Florian BILLANT",
+    "club": "Dunkerque",
+    "rarete": "Commun",
+    "poste": "Ailier Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/billant-florian.png",
+    "saison": 2
+  },
+  {
+    "id": "busselier-yanis",
+    "nom": "Yanis BUSSELIER",
+    "club": "Dunkerque",
+    "rarete": "Commun",
+    "poste": "Arrière Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/busselier-yanis.png",
+    "saison": 2
+  },
+  {
+    "id": "carabasse-geoffroy",
+    "nom": "Geoffroy CARABASSE",
+    "club": "Dunkerque",
+    "rarete": "Peu Commun",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/carabasse-geoffroy.png",
+    "saison": 2
+  },
+  {
+    "id": "romero-carreras-alejandro",
+    "nom": "Alejandro ROMERO CARRERAS",
+    "club": "Dunkerque",
+    "rarete": "Rare",
+    "poste": "Gardien",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/romero-carreras-alejandro.png",
+    "saison": 2
+  },
+  {
+    "id": "crepel-gautier",
+    "nom": "Gautier CREPEL",
+    "club": "Dunkerque",
+    "rarete": "Peu Commun",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/crepel-gautier.png",
+    "saison": 2
+  },
+  {
+    "id": "dupuy-quentin",
+    "nom": "Quentin DUPUY",
+    "club": "Dunkerque",
+    "rarete": "Commun",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/dupuy-quentin.png",
+    "saison": 2
+  },
+  {
+    "id": "marie-joseph-steve",
+    "nom": "Steve MARIE-JOSEPH",
+    "club": "Dunkerque",
+    "rarete": "Commun",
+    "poste": "Ailier Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/marie-joseph-steve.png",
+    "saison": 2
+  },
+  {
+    "id": "marmier-matthieu",
+    "nom": "Matthieu MARMIER",
+    "club": "Dunkerque",
+    "rarete": "Peu Commun",
+    "poste": "Arrière Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/marmier-matthieu.png",
+    "saison": 2
+  },
+  {
+    "id": "minotskyi-taras",
+    "nom": "Taras MINOTSKYI",
+    "club": "Dunkerque",
+    "rarete": "Rare",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/minotskyi-taras.png",
+    "saison": 2
+  },
+  {
+    "id": "oliveira-diogo",
+    "nom": "Diogo OLIVEIRA",
+    "club": "Dunkerque",
+    "rarete": "Épique",
+    "poste": "Demi Centre",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/oliveira-diogo.png",
+    "saison": 2
+  },
+  {
+    "id": "tossin-dylan",
+    "nom": "Dylan TOSSIN",
+    "club": "Dunkerque",
+    "rarete": "Commun",
+    "poste": "Ailier Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/tossin-dylan.png",
+    "saison": 2
+  },
+  {
+    "id": "vainionpaa-santeri",
+    "nom": "Santeri VAINIONPÄÄ",
+    "club": "Dunkerque",
+    "rarete": "Commun",
+    "poste": "Demi Centre",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/vainionpaa-santeri.png",
+    "saison": 2
+  },
+  {
+    "id": "villain-leo",
+    "nom": "Léo VILLAIN",
+    "club": "Dunkerque",
+    "rarete": "Peu Commun",
+    "poste": "Gardien",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/villain-leo.png",
+    "saison": 2
+  },
+  {
+    "id": "aman-valentin",
+    "nom": "Valentin AMAN",
+    "club": "Limoges",
+    "rarete": "Commun",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/aman-valentin.png",
+    "saison": 2
+  },
+  {
+    "id": "azkue-jon",
+    "nom": "Jon AZKUE",
+    "club": "Limoges",
+    "rarete": "Peu Commun",
+    "poste": "Demi Centre",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/azkue-jon.png",
+    "saison": 2
+  },
+  {
+    "id": "clarac-theo",
+    "nom": "Théo CLARAC",
+    "club": "Limoges",
+    "rarete": "Peu Commun",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/clarac-theo.png",
+    "saison": 2
+  },
+  {
+    "id": "garcia-arnau",
+    "nom": "Arnau GARCIA",
+    "club": "Limoges",
+    "rarete": "Peu Commun",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/garcia-arnau.png",
+    "saison": 2
+  },
+  {
+    "id": "hrstic-matej",
+    "nom": "Matej HRSTIC",
+    "club": "Limoges",
+    "rarete": "Commun",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/hrstic-matej.png",
+    "saison": 2
+  },
+  {
+    "id": "ivah-gauthier",
+    "nom": "Gauthier IVAH",
+    "club": "Limoges",
+    "rarete": "Rare",
+    "poste": "Gardien",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/ivah-gauthier.png",
+    "saison": 2
+  },
+  {
+    "id": "kervadec-ewan",
+    "nom": "Ewan KERVADEC",
+    "club": "Limoges",
+    "rarete": "Peu Commun",
+    "poste": "Arrière Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/kervadec-ewan.png",
+    "saison": 2
+  },
+  {
+    "id": "kieffer-valentin",
+    "nom": "Valentin KIEFFER",
+    "club": "Limoges",
+    "rarete": "Épique",
+    "poste": "Gardien",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/kieffer-valentin.png",
+    "saison": 2
+  },
+  {
+    "id": "lignieres-jules",
+    "nom": "Jules LIGNIèRES",
+    "club": "Limoges",
+    "rarete": "Peu Commun",
+    "poste": "Demi Centre",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/lignieres-jules.png",
+    "saison": 2
+  },
+  {
+    "id": "mielczarski-piotr",
+    "nom": "Piotr MIELCZARSKI",
+    "club": "Limoges",
+    "rarete": "Commun",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/mielczarski-piotr.png",
+    "saison": 2
+  },
+  {
+    "id": "varela-monteiro-jenilson",
+    "nom": "Jenilson VARELA MONTEIRO",
+    "club": "Limoges",
+    "rarete": "Peu Commun",
+    "poste": "Ailier Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/varela-monteiro-jenilson.png",
+    "saison": 2
+  },
+  {
+    "id": "ogando-maxime",
+    "nom": "Maxime OGANDO",
+    "club": "Limoges",
+    "rarete": "Rare",
+    "poste": "Ailier Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/ogando-maxime.png",
+    "saison": 2
+  },
+  {
+    "id": "parisini-andrea",
+    "nom": "Andrea PARISINI",
+    "club": "Limoges",
+    "rarete": "Rare",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/parisini-andrea.png",
+    "saison": 2
+  },
+  {
+    "id": "pelayo-tom",
+    "nom": "Tom PELAYO",
+    "club": "Limoges",
+    "rarete": "Épique",
+    "poste": "Arrière Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/pelayo-tom.png",
+    "saison": 2
+  },
+  {
+    "id": "petit-lucas",
+    "nom": "Lucas PETIT",
+    "club": "Limoges",
+    "rarete": "Commun",
+    "poste": "Ailier Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/petit-lucas.png",
+    "saison": 2
+  },
+  {
+    "id": "thuillier-noe",
+    "nom": "Noé THUILLIER",
+    "club": "Limoges",
+    "rarete": "Peu Commun",
+    "poste": "Ailier Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/thuillier-noe.png",
+    "saison": 2
+  },
+  {
+    "id": "balaguer-david",
+    "nom": "David BALAGUER",
+    "club": "Montpellier",
+    "rarete": "Légendaire",
+    "poste": "Ailier Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/balaguer-david.png",
+    "saison": 2
+  },
+  {
+    "id": "bolzinger-charles",
+    "nom": "Charles BOLZINGER",
+    "club": "Montpellier",
+    "rarete": "Légendaire",
+    "poste": "Gardien",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/bolzinger-charles.png",
+    "saison": 2
+  },
+  {
+    "id": "caille-mateo",
+    "nom": "Matéo CAILLE",
+    "club": "Montpellier",
+    "rarete": "Commun",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/caille-mateo.png",
+    "saison": 2
+  },
+  {
+    "id": "desbonnet-remi",
+    "nom": "Rémi DESBONNET",
+    "club": "Montpellier",
+    "rarete": "Rare",
+    "poste": "Gardien",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/desbonnet-remi.png",
+    "saison": 2
+  },
+  {
+    "id": "moraes-ferreira-rogerio",
+    "nom": "Rogerio MORAES FERREIRA",
+    "club": "Montpellier",
+    "rarete": "Peu Commun",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/moraes-ferreira-rogerio.png",
+    "saison": 2
+  },
+  {
+    "id": "guigon-lucas",
+    "nom": "Lucas GUIGON",
+    "club": "Montpellier",
+    "rarete": "Commun",
+    "poste": "Arrière Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/guigon-lucas.png",
+    "saison": 2
+  },
+  {
+    "id": "lenne-arthur",
+    "nom": "Arthur LENNE",
+    "club": "Montpellier",
+    "rarete": "Peu Commun",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/lenne-arthur.png",
+    "saison": 2
+  },
+  {
+    "id": "casado-agustin",
+    "nom": "Agustin CASADO",
+    "club": "Montpellier",
+    "rarete": "Rare",
+    "poste": "Demi Centre",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/casado-agustin.png",
+    "saison": 2
+  },
+  {
+    "id": "paschal-drevy",
+    "nom": "Drevy PASCHAL",
+    "club": "Montpellier",
+    "rarete": "Épique",
+    "poste": "Ailier Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/paschal-drevy.png",
+    "saison": 2
+  },
+  {
+    "id": "plantin-leo",
+    "nom": "Léo PLANTIN",
+    "club": "Montpellier",
+    "rarete": "Peu Commun",
+    "poste": "Ailier Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/plantin-leo.png",
+    "saison": 2
+  },
+  {
+    "id": "porte-valentin",
+    "nom": "Valentin PORTE",
+    "club": "Montpellier",
+    "rarete": "Légendaire",
+    "poste": "Arrière Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/porte-valentin.png",
+    "saison": 2
+  },
+  {
+    "id": "richert-benjamin",
+    "nom": "Benjamin RICHERT",
+    "club": "Montpellier",
+    "rarete": "Rare",
+    "poste": "Ailier Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/richert-benjamin.png",
+    "saison": 2
+  },
+  {
+    "id": "valero-rovira-pol",
+    "nom": "Pol VALERO ROVIRA",
+    "club": "Montpellier",
+    "rarete": "Peu Commun",
+    "poste": "Demi Centre",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/valero-rovira-pol.png",
+    "saison": 2
+  },
+  {
+    "id": "monte-dos-santos-hugo",
+    "nom": "Hugo MONTE DOS SANTOS",
+    "club": "Montpellier",
+    "rarete": "Épique",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/monte-dos-santos-hugo.png",
+    "saison": 2
+  },
+  {
+    "id": "srna-zvonimir",
+    "nom": "Zvonimir SRNA",
+    "club": "Montpellier",
+    "rarete": "Peu Commun",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/srna-zvonimir.png",
+    "saison": 2
+  },
+  {
+    "id": "thurin-jack",
+    "nom": "Jack THURIN",
+    "club": "Montpellier",
+    "rarete": "Rare",
+    "poste": "Arrière Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/thurin-jack.png",
+    "saison": 2
+  },
+  {
+    "id": "villeminot-kyllian",
+    "nom": "Kyllian VILLEMINOT",
+    "club": "Montpellier",
+    "rarete": "Rare",
+    "poste": "Demi Centre",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/villeminot-kyllian.png",
+    "saison": 2
+  },
+  {
+    "id": "abdi-ayyoub",
+    "nom": "Ayyoub ABDI",
+    "club": "Nantes",
+    "rarete": "Peu Commun",
+    "poste": "Arrière Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/abdi-ayyoub.png",
+    "saison": 2
+  },
+  {
+    "id": "antonsen-rene",
+    "nom": "René ANTONSEN",
+    "club": "Nantes",
+    "rarete": "Peu Commun",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/antonsen-rene.png",
+    "saison": 2
+  },
+  {
+    "id": "bonde-christoffer",
+    "nom": "Christoffer BONDE",
+    "club": "Nantes",
+    "rarete": "Commun",
+    "poste": "Gardien",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/bonde-christoffer.png",
+    "saison": 2
+  },
+  {
+    "id": "briet-thibaud",
+    "nom": "Thibaud BRIET",
+    "club": "Nantes",
+    "rarete": "Légendaire",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/briet-thibaud.png",
+    "saison": 2
+  },
+  {
+    "id": "gaber-matej",
+    "nom": "Matej GABER",
+    "club": "Nantes",
+    "rarete": "Commun",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/gaber-matej.png",
+    "saison": 2
+  },
+  {
+    "id": "garciandia-imanol",
+    "nom": "Imanol GARCIANDIA",
+    "club": "Nantes",
+    "rarete": "Rare",
+    "poste": "Arrière Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/garciandia-imanol.png",
+    "saison": 2
+  },
+  {
+    "id": "lagarde-romain",
+    "nom": "Romain LAGARDE",
+    "club": "Nantes",
+    "rarete": "Commun",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/lagarde-romain.png",
+    "saison": 2
+  },
+  {
+    "id": "leopold-noam",
+    "nom": "Noam LEOPOLD",
+    "club": "Nantes",
+    "rarete": "Épique",
+    "poste": "Ailier Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/leopold-noam.png",
+    "saison": 2
+  },
+  {
+    "id": "norlyk-victor",
+    "nom": "Victor NORLYK",
+    "club": "Nantes",
+    "rarete": "Peu Commun",
+    "poste": "Demi Centre",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/norlyk-victor.png",
+    "saison": 2
+  },
+  {
+    "id": "ovnicek-rok",
+    "nom": "Rok OVNICEK",
+    "club": "Nantes",
+    "rarete": "Commun",
+    "poste": "Demi Centre",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/ovnicek-rok.png",
+    "saison": 2
+  },
+  {
+    "id": "peric-luka",
+    "nom": "Luka PERIC",
+    "club": "Nantes",
+    "rarete": "Commun",
+    "poste": "Ailier Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/peric-luka.png",
+    "saison": 2
+  },
+  {
+    "id": "pesic-ivan",
+    "nom": "Ivan PESIC",
+    "club": "Nantes",
+    "rarete": "Rare",
+    "poste": "Gardien",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/pesic-ivan.png",
+    "saison": 2
+  },
+  {
+    "id": "tarrafeta-ian",
+    "nom": "Ian TARRAFETA",
+    "club": "Nantes",
+    "rarete": "Rare",
+    "poste": "Demi Centre",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/tarrafeta-ian.png",
+    "saison": 2
+  },
+  {
+    "id": "wenkegheu-tchambou-andre",
+    "nom": "Andre WENKEGHEU TCHAMBOU",
+    "club": "Nantes",
+    "rarete": "Commun",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/wenkegheu-tchambou-andre.png",
+    "saison": 2
+  },
+  {
+    "id": "tournat-nicolas",
+    "nom": "Nicolas TOURNAT",
+    "club": "Nantes",
+    "rarete": "Légendaire",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/tournat-nicolas.png",
+    "saison": 2
+  },
+  {
+    "id": "turchenko-ihor",
+    "nom": "Ihor TURCHENKO",
+    "club": "Nantes",
+    "rarete": "Épique",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/turchenko-ihor.png",
+    "saison": 2
+  },
+  {
+    "id": "odriorzola-kauldi",
+    "nom": "Kauldi ODRIORZOLA",
+    "club": "Nantes",
+    "rarete": "Rare",
+    "poste": "Ailier Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/odriorzola-kauldi.png",
+    "saison": 2
+  },
+  {
+    "id": "acquevillo-jean-jacques",
+    "nom": "Jean-jacques ACQUEVILLO",
+    "club": "Nîmes",
+    "rarete": "Rare",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/acquevillo-jean-jacques.png",
+    "saison": 2
+  },
+  {
+    "id": "anquetil-arthur",
+    "nom": "Arthur ANQUETIL",
+    "club": "Nîmes",
+    "rarete": "Commun",
+    "poste": "Ailier Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/anquetil-arthur.png",
+    "saison": 2
+  },
+  {
+    "id": "kamtchop-baril-hugo",
+    "nom": "Hugo KAMTCHOP BARIL",
+    "club": "Nîmes",
+    "rarete": "Épique",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/kamtchop-baril-hugo.png",
+    "saison": 2
+  },
+  {
+    "id": "derisbourg-lou",
+    "nom": "Lou DERISBOURG",
+    "club": "Nîmes",
+    "rarete": "Rare",
+    "poste": "Demi Centre",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/derisbourg-lou.png",
+    "saison": 2
+  },
+  {
+    "id": "faustin-jean-loup",
+    "nom": "Jean-loup FAUSTIN",
+    "club": "Nîmes",
+    "rarete": "Peu Commun",
+    "poste": "Demi Centre",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/faustin-jean-loup.png",
+    "saison": 2
+  },
+  {
+    "id": "gibelin-yoann",
+    "nom": "Yoann GIBELIN",
+    "club": "Nîmes",
+    "rarete": "Épique",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/gibelin-yoann.png",
+    "saison": 2
+  },
+  {
+    "id": "gibernon-damien",
+    "nom": "Damien GIBERNON",
+    "club": "Nîmes",
+    "rarete": "Commun",
+    "poste": "Ailier Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/gibernon-damien.png",
+    "saison": 2
+  },
+  {
+    "id": "hodzic-harun",
+    "nom": "Harun HODZIC",
+    "club": "Nîmes",
+    "rarete": "Peu Commun",
+    "poste": "Gardien",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/hodzic-harun.png",
+    "saison": 2
+  },
+  {
+    "id": "onodi-janoskuti-mate",
+    "nom": "Maté ONODI JANOSKUTI",
+    "club": "Nîmes",
+    "rarete": "Rare",
+    "poste": "Arrière Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/onodi-janoskuti-mate.png",
+    "saison": 2
+  },
+  {
+    "id": "kaczor-sebastian",
+    "nom": "Sebastian KACZOR",
+    "club": "Nîmes",
+    "rarete": "Peu Commun",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/kaczor-sebastian.png",
+    "saison": 2
+  },
+  {
+    "id": "kusio-michael",
+    "nom": "Michael KUSIO",
+    "club": "Nîmes",
+    "rarete": "Commun",
+    "poste": "Arrière Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/kusio-michael.png",
+    "saison": 2
+  },
+  {
+    "id": "peyre-remi",
+    "nom": "Remi PEYRE",
+    "club": "Nîmes",
+    "rarete": "Commun",
+    "poste": "Ailier Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/peyre-remi.png",
+    "saison": 2
+  },
+  {
+    "id": "sanad-mohammad",
+    "nom": "Mohammad SANAD",
+    "club": "Nîmes",
+    "rarete": "Épique",
+    "poste": "Ailier Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/sanad-mohammad.png",
+    "saison": 2
+  },
+  {
+    "id": "schroder-toke",
+    "nom": "Toke SCHRöDER",
+    "club": "Nîmes",
+    "rarete": "Peu Commun",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/schroder-toke.png",
+    "saison": 2
+  },
+  {
+    "id": "stasiuk-yahor",
+    "nom": "Yahor STASIUK",
+    "club": "Nîmes",
+    "rarete": "Commun",
+    "poste": "Gardien",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/stasiuk-yahor.png",
+    "saison": 2
+  },
+  {
+    "id": "vincent-gueric",
+    "nom": "Gueric VINCENT",
+    "club": "Nîmes",
+    "rarete": "Rare",
+    "poste": "Ailier Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/vincent-gueric.png",
+    "saison": 2
+  },
+  {
+    "id": "corrales-rodrigo",
+    "nom": "Rodrigo CORRALES",
+    "club": "Paris",
+    "rarete": "Épique",
+    "poste": "Gardien",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/corrales-rodrigo.png",
+    "saison": 2
+  },
+  {
+    "id": "elisson-bjarki-mar",
+    "nom": "Bjarki Mar ELISSON",
+    "club": "Paris",
+    "rarete": "Rare",
+    "poste": "Ailier Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/elisson-bjarki-mar.png",
+    "saison": 2
+  },
+  {
+    "id": "gaudin-noah",
+    "nom": "Noah GAUDIN",
+    "club": "Paris",
+    "rarete": "Peu Commun",
+    "poste": "Demi Centre",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/gaudin-noah.png",
+    "saison": 2
+  },
+  {
+    "id": "grebille-mathieu",
+    "nom": "Mathieu GREBILLE",
+    "club": "Paris",
+    "rarete": "Peu Commun",
+    "poste": "Ailier Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/grebille-mathieu.png",
+    "saison": 2
+  },
+  {
+    "id": "karabatic-luka",
+    "nom": "Luka KARABATIC",
+    "club": "Paris",
+    "rarete": "Légendaire",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/karabatic-luka.png",
+    "saison": 2
+  },
+  {
+    "id": "karlsson-sebastian",
+    "nom": "Sebastian KARLSSON",
+    "club": "Paris",
+    "rarete": "Peu Commun",
+    "poste": "Ailier Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/karlsson-sebastian.png",
+    "saison": 2
+  },
+  {
+    "id": "konan-karl",
+    "nom": "Karl KONAN",
+    "club": "Paris",
+    "rarete": "Épique",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/konan-karl.png",
+    "saison": 2
+  },
+  {
+    "id": "ladefoged-frederik",
+    "nom": "Frederik LADEFOGED",
+    "club": "Paris",
+    "rarete": "Commun",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/ladefoged-frederik.png",
+    "saison": 2
+  },
+  {
+    "id": "lovkvist-mikkel",
+    "nom": "Mikkel LOVKVIST",
+    "club": "Paris",
+    "rarete": "Épique",
+    "poste": "Gardien",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/lovkvist-mikkel.png",
+    "saison": 2
+  },
+  {
+    "id": "lyse-simen",
+    "nom": "Simen LYSE",
+    "club": "Paris",
+    "rarete": "Commun",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/lyse-simen.png",
+    "saison": 2
+  },
+  {
+    "id": "maras-mateo",
+    "nom": "Mateo MARAS",
+    "club": "Paris",
+    "rarete": "Commun",
+    "poste": "Arrière Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/maras-mateo.png",
+    "saison": 2
+  },
+  {
+    "id": "mellegard-emil",
+    "nom": "Emil MELLEGARD",
+    "club": "Paris",
+    "rarete": "Commun",
+    "poste": "Ailier Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/mellegard-emil.png",
+    "saison": 2
+  },
+  {
+    "id": "fathy-omar-yahia",
+    "nom": "Yahia FATHY OMAR",
+    "club": "Paris",
+    "rarete": "Épique",
+    "poste": "Arrière Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/fathy-omar-yahia.png",
+    "saison": 2
+  },
+  {
+    "id": "peleka-wallem",
+    "nom": "Wallem PELEKA",
+    "club": "Paris",
+    "rarete": "Peu Commun",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/peleka-wallem.png",
+    "saison": 2
+  },
+  {
+    "id": "prandi-elohim",
+    "nom": "Elohim PRANDI",
+    "club": "Paris",
+    "rarete": "Légendaire",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/prandi-elohim.png",
+    "saison": 2
+  },
+  {
+    "id": "sole-ferran",
+    "nom": "Ferran SOLE",
+    "club": "Paris",
+    "rarete": "Épique",
+    "poste": "Ailier Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/sole-ferran.png",
+    "saison": 2
+  },
+  {
+    "id": "steins-luc",
+    "nom": "Luc STEINS",
+    "club": "Paris",
+    "rarete": "Rare",
+    "poste": "Demi Centre",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/steins-luc.png",
+    "saison": 2
+  },
+  {
+    "id": "syprzak-kamil",
+    "nom": "Kamil SYPRZAK",
+    "club": "Paris",
+    "rarete": "Légendaire",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/syprzak-kamil.png",
+    "saison": 2
+  },
+  {
+    "id": "augustine-ylan",
+    "nom": "Ylan AUGUSTINE",
+    "club": "Saint-Raphaël",
+    "rarete": "Commun",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/augustine-ylan.png",
+    "saison": 2
+  },
+  {
+    "id": "bataille-benjamin",
+    "nom": "Benjamin BATAILLE",
+    "club": "Saint-Raphaël",
+    "rarete": "Peu Commun",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/bataille-benjamin.png",
+    "saison": 2
+  },
+  {
+    "id": "blyzniuk-illia",
+    "nom": "Illia BLYZNIUK",
+    "club": "Saint-Raphaël",
+    "rarete": "Commun",
+    "poste": "Arrière Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/blyzniuk-illia.png",
+    "saison": 2
+  },
+  {
+    "id": "brasseleur-micke",
+    "nom": "Micke BRASSELEUR",
+    "club": "Saint-Raphaël",
+    "rarete": "Peu Commun",
+    "poste": "Arrière Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/brasseleur-micke.png",
+    "saison": 2
+  },
+  {
+    "id": "colman-quinten",
+    "nom": "Quinten COLMAN",
+    "club": "Saint-Raphaël",
+    "rarete": "Peu Commun",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/colman-quinten.png",
+    "saison": 2
+  },
+  {
+    "id": "demaille-alexandre",
+    "nom": "Alexandre DEMAILLE",
+    "club": "Saint-Raphaël",
+    "rarete": "Épique",
+    "poste": "Gardien",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/demaille-alexandre.png",
+    "saison": 2
+  },
+  {
+    "id": "kouadio-noah",
+    "nom": "Noah KOUADIO",
+    "club": "Saint-Raphaël",
+    "rarete": "Commun",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/kouadio-noah.png",
+    "saison": 2
+  },
+  {
+    "id": "leyvigne-marc",
+    "nom": "Marc LEYVIGNE",
+    "club": "Saint-Raphaël",
+    "rarete": "Peu Commun",
+    "poste": "Ailier Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/leyvigne-marc.png",
+    "saison": 2
+  },
+  {
+    "id": "mapu-jonathan",
+    "nom": "Jonathan MAPU",
+    "club": "Saint-Raphaël",
+    "rarete": "Rare",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/mapu-jonathan.png",
+    "saison": 2
+  },
+  {
+    "id": "marescot-johannes",
+    "nom": "Johannes MARESCOT",
+    "club": "Saint-Raphaël",
+    "rarete": "Épique",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/marescot-johannes.png",
+    "saison": 2
+  },
+  {
+    "id": "mohamed-antonin",
+    "nom": "Antonin MOHAMED",
+    "club": "Saint-Raphaël",
+    "rarete": "Peu Commun",
+    "poste": "Ailier Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/mohamed-antonin.png",
+    "saison": 2
+  },
+  {
+    "id": "molina-jorge-perez",
+    "nom": "Jorge PEREZ MOLINA",
+    "club": "Saint-Raphaël",
+    "rarete": "Commun",
+    "poste": "Gardien",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/molina-jorge-perez.png",
+    "saison": 2
+  },
+  {
+    "id": "soares-neves-miguel-jose",
+    "nom": "Miguel Jose SOARES NEVES",
+    "club": "Saint-Raphaël",
+    "rarete": "Peu Commun",
+    "poste": "Demi Centre",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/soares-neves-miguel-jose.png",
+    "saison": 2
+  },
+  {
+    "id": "perez-sergio",
+    "nom": "Sergio PEREZ",
+    "club": "Saint-Raphaël",
+    "rarete": "Rare",
+    "poste": "Demi Centre",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/perez-sergio.png",
+    "saison": 2
+  },
+  {
+    "id": "vigneron-arthur",
+    "nom": "Arthur VIGNERON",
+    "club": "Saint-Raphaël",
+    "rarete": "Peu Commun",
+    "poste": "Ailier Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/vigneron-arthur.png",
+    "saison": 2
+  },
+  {
+    "id": "bois-steeven",
+    "nom": "Steeven BOIS",
+    "club": "Saran",
+    "rarete": "Commun",
+    "poste": "Demi Centre",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/bois-steeven.png",
+    "saison": 2
+  },
+  {
+    "id": "calle-eduardo",
+    "nom": "Eduardo CALLE",
+    "club": "Saran",
+    "rarete": "Commun",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/calle-eduardo.png",
+    "saison": 2
+  },
+  {
+    "id": "damiani-clement",
+    "nom": "Clément DAMIANI",
+    "club": "Saran",
+    "rarete": "Peu Commun",
+    "poste": "Arrière Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/damiani-clement.png",
+    "saison": 2
+  },
+  {
+    "id": "diarra-yoro",
+    "nom": "Yoro DIARRA",
+    "club": "Saran",
+    "rarete": "Commun",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/diarra-yoro.png",
+    "saison": 2
+  },
+  {
+    "id": "loppy-thomas",
+    "nom": "Thomas LOPPY",
+    "club": "Saran",
+    "rarete": "Commun",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/loppy-thomas.png",
+    "saison": 2
+  },
+  {
+    "id": "matovic-nikola",
+    "nom": "Nikola MATOVIC",
+    "club": "Saran",
+    "rarete": "Commun",
+    "poste": "Gardien",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/matovic-nikola.png",
+    "saison": 2
+  },
+  {
+    "id": "narcisse-noa",
+    "nom": "Noa NARCISSE",
+    "club": "Saran",
+    "rarete": "Peu Commun",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/narcisse-noa.png",
+    "saison": 2
+  },
+  {
+    "id": "orbovic-milos",
+    "nom": "Milos ORBOVIC",
+    "club": "Saran",
+    "rarete": "Commun",
+    "poste": "Arrière Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/orbovic-milos.png",
+    "saison": 2
+  },
+  {
+    "id": "pecaud-arthur",
+    "nom": "Arthur PECAUD",
+    "club": "Saran",
+    "rarete": "Commun",
+    "poste": "Ailier Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/pecaud-arthur.png",
+    "saison": 2
+  },
+  {
+    "id": "radic-zoran",
+    "nom": "Zoran RADIC",
+    "club": "Saran",
+    "rarete": "Commun",
+    "poste": "Gardien",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/radic-zoran.png",
+    "saison": 2
+  },
+  {
+    "id": "reuillard-theo",
+    "nom": "Théo REUILLARD",
+    "club": "Saran",
+    "rarete": "Commun",
+    "poste": "Ailier Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/reuillard-theo.png",
+    "saison": 2
+  },
+  {
+    "id": "saha-william",
+    "nom": "William SAHA",
+    "club": "Saran",
+    "rarete": "Commun",
+    "poste": "Demi Centre",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/saha-william.png",
+    "saison": 2
+  },
+  {
+    "id": "simonnet-alban",
+    "nom": "Alban SIMONNET",
+    "club": "Saran",
+    "rarete": "Rare",
+    "poste": "Demi Centre",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/simonnet-alban.png",
+    "saison": 2
+  },
+  {
+    "id": "sol-antoine",
+    "nom": "Antoine SOL",
+    "club": "Saran",
+    "rarete": "Peu Commun",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/sol-antoine.png",
+    "saison": 2
+  },
+  {
+    "id": "de-almeida-tavares-francisco",
+    "nom": "Francisco DE ALMEIDA TAVARES",
+    "club": "Saran",
+    "rarete": "Commun",
+    "poste": "Ailier Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/de-almeida-tavares-francisco.png",
+    "saison": 2
+  },
+  {
+    "id": "tumelin-malo-le",
+    "nom": "Malo LE TUMELIN",
+    "club": "Saran",
+    "rarete": "Commun",
+    "poste": "Ailier Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/tumelin-malo-le.png",
+    "saison": 2
+  },
+  {
+    "id": "chevalier-thibault",
+    "nom": "Thibault CHEVALIER",
+    "club": "Sélestat",
+    "rarete": "Commun",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/chevalier-thibault.png",
+    "saison": 2
+  },
+  {
+    "id": "van-ee-hugo",
+    "nom": "Hugo VAN EE",
+    "club": "Sélestat",
+    "rarete": "Commun",
+    "poste": "Demi Centre",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/van-ee-hugo.png",
+    "saison": 2
+  },
+  {
+    "id": "egermann-teo",
+    "nom": "Téo EGERMANN",
+    "club": "Sélestat",
+    "rarete": "Rare",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/egermann-teo.png",
+    "saison": 2
+  },
+  {
+    "id": "eymann-quentin",
+    "nom": "Quentin EYMANN",
+    "club": "Sélestat",
+    "rarete": "Rare",
+    "poste": "Arrière Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/eymann-quentin.png",
+    "saison": 2
+  },
+  {
+    "id": "ivanovic-miljan",
+    "nom": "Miljan IVANOVIC",
+    "club": "Sélestat",
+    "rarete": "Commun",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/ivanovic-miljan.png",
+    "saison": 2
+  },
+  {
+    "id": "jaeger-simon",
+    "nom": "Simon JAEGER",
+    "club": "Sélestat",
+    "rarete": "Peu Commun",
+    "poste": "Ailier Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/jaeger-simon.png",
+    "saison": 2
+  },
+  {
+    "id": "jorgensen-tobias",
+    "nom": "Tobias JORGENSEN",
+    "club": "Sélestat",
+    "rarete": "Peu Commun",
+    "poste": "Demi Centre",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/jorgensen-tobias.png",
+    "saison": 2
+  },
+  {
+    "id": "mandic-igor",
+    "nom": "Igor MANDIC",
+    "club": "Sélestat",
+    "rarete": "Commun",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/mandic-igor.png",
+    "saison": 2
+  },
+  {
+    "id": "mathias-romain",
+    "nom": "Romain MATHIAS",
+    "club": "Sélestat",
+    "rarete": "Épique",
+    "poste": "Gardien",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/mathias-romain.png",
+    "saison": 2
+  },
+  {
+    "id": "mendy-tony",
+    "nom": "Tony MENDY",
+    "club": "Sélestat",
+    "rarete": "Peu Commun",
+    "poste": "Arrière Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/mendy-tony.png",
+    "saison": 2
+  },
+  {
+    "id": "plat-gregoire",
+    "nom": "Grégoire PLAT",
+    "club": "Sélestat",
+    "rarete": "Épique",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/plat-gregoire.png",
+    "saison": 2
+  },
+  {
+    "id": "pompon-tom",
+    "nom": "Tom POMPON",
+    "club": "Sélestat",
+    "rarete": "Commun",
+    "poste": "Ailier Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/pompon-tom.png",
+    "saison": 2
+  },
+  {
+    "id": "portela-pedro",
+    "nom": "Pedro PORTELA",
+    "club": "Sélestat",
+    "rarete": "Peu Commun",
+    "poste": "Ailier Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/portela-pedro.png",
+    "saison": 2
+  },
+  {
+    "id": "serdarevic-denis",
+    "nom": "Denis SERDAREVIC",
+    "club": "Sélestat",
+    "rarete": "Peu Commun",
+    "poste": "Gardien",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/serdarevic-denis.png",
+    "saison": 2
+  },
+  {
+    "id": "vescovo-oreste",
+    "nom": "Oreste VESCOVO",
+    "club": "Sélestat",
+    "rarete": "Commun",
+    "poste": "Arrière Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/vescovo-oreste.png",
+    "saison": 2
+  },
+  {
+    "id": "vinatier-tom",
+    "nom": "Tom VINATIER",
+    "club": "Sélestat",
+    "rarete": "Rare",
+    "poste": "Demi Centre",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/vinatier-tom.png",
+    "saison": 2
+  },
+  {
+    "id": "weber-pierre",
+    "nom": "Pierre WEBER",
+    "club": "Sélestat",
+    "rarete": "Peu Commun",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/weber-pierre.png",
+    "saison": 2
+  },
+  {
+    "id": "bono-nicolas",
+    "nom": "Nicolas BONO",
+    "club": "Toulouse",
+    "rarete": "Peu Commun",
+    "poste": "Demi Centre",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/bono-nicolas.png",
+    "saison": 2
+  },
+  {
+    "id": "briffe-matheo",
+    "nom": "Mathéo BRIFFE",
+    "club": "Toulouse",
+    "rarete": "Commun",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/briffe-matheo.png",
+    "saison": 2
+  },
+  {
+    "id": "brolin-pontus",
+    "nom": "Pontus BROLIN",
+    "club": "Toulouse",
+    "rarete": "Peu Commun",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/brolin-pontus.png",
+    "saison": 2
+  },
+  {
+    "id": "diallo-bakary",
+    "nom": "Bakary DIALLO",
+    "club": "Toulouse",
+    "rarete": "Peu Commun",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/diallo-bakary.png",
+    "saison": 2
+  },
+  {
+    "id": "guillaume-andrea",
+    "nom": "Andrea GUILLAUME",
+    "club": "Toulouse",
+    "rarete": "Peu Commun",
+    "poste": "Ailier Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/guillaume-andrea.png",
+    "saison": 2
+  },
+  {
+    "id": "ilic-nemanja",
+    "nom": "Nemanja ILIC",
+    "club": "Toulouse",
+    "rarete": "Légendaire",
+    "poste": "Ailier Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/ilic-nemanja.png",
+    "saison": 2
+  },
+  {
+    "id": "jarry-teo",
+    "nom": "Téo JARRY",
+    "club": "Toulouse",
+    "rarete": "Peu Commun",
+    "poste": "Ailier Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/jarry-teo.png",
+    "saison": 2
+  },
+  {
+    "id": "slatinek-jovicic-enej",
+    "nom": "Enej SLATINEK JOVICIC",
+    "club": "Toulouse",
+    "rarete": "Peu Commun",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/slatinek-jovicic-enej.png",
+    "saison": 2
+  },
+  {
+    "id": "jund-hugo",
+    "nom": "Hugo JUND",
+    "club": "Toulouse",
+    "rarete": "Peu Commun",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/jund-hugo.png",
+    "saison": 2
+  },
+  {
+    "id": "kerdudo-robin",
+    "nom": "Robin KERDUDO",
+    "club": "Toulouse",
+    "rarete": "Commun",
+    "poste": "Gardien",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/kerdudo-robin.png",
+    "saison": 2
+  },
+  {
+    "id": "kojadinovic-uros",
+    "nom": "Uros KOJADINOVIC",
+    "club": "Toulouse",
+    "rarete": "Épique",
+    "poste": "Arrière Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/kojadinovic-uros.png",
+    "saison": 2
+  },
+  {
+    "id": "lettens-jef",
+    "nom": "Jef LETTENS",
+    "club": "Toulouse",
+    "rarete": "Rare",
+    "poste": "Gardien",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/lettens-jef.png",
+    "saison": 2
+  },
+  {
+    "id": "nyembo-gabriel",
+    "nom": "Gabriel NYEMBO",
+    "club": "Toulouse",
+    "rarete": "Rare",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/nyembo-gabriel.png",
+    "saison": 2
+  },
+  {
+    "id": "pineau-rossi-ernest",
+    "nom": "Ernest PINEAU-ROSSI",
+    "club": "Toulouse",
+    "rarete": "Commun",
+    "poste": "Arrière Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/pineau-rossi-ernest.png",
+    "saison": 2
+  },
+  {
+    "id": "robert-jeremy",
+    "nom": "Jérémy ROBERT",
+    "club": "Toulouse",
+    "rarete": "Commun",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/robert-jeremy.png",
+    "saison": 2
+  },
+  {
+    "id": "martins-vieira-goncalo",
+    "nom": "Gonçalo MARTINS VIEIRA",
+    "club": "Toulouse",
+    "rarete": "Rare",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/martins-vieira-goncalo.png",
+    "saison": 2
+  },
+  {
+    "id": "arsenashvili-erekle",
+    "nom": "Erekle ARSENASHVILI",
+    "club": "Tremblay",
+    "rarete": "Peu Commun",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/arsenashvili-erekle.png",
+    "saison": 2
+  },
+  {
+    "id": "barelle-mathis",
+    "nom": "Mathis BARELLE",
+    "club": "Tremblay",
+    "rarete": "Peu Commun",
+    "poste": "Ailier Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/barelle-mathis.png",
+    "saison": 2
+  },
+  {
+    "id": "bonnefoi-kevin",
+    "nom": "Kévin BONNEFOI",
+    "club": "Tremblay",
+    "rarete": "Rare",
+    "poste": "Gardien",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/bonnefoi-kevin.png",
+    "saison": 2
+  },
+  {
+    "id": "avelange-demouge-theo",
+    "nom": "Théo AVELANGE DEMOUGE",
+    "club": "Tremblay",
+    "rarete": "Peu Commun",
+    "poste": "Ailier Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/avelange-demouge-theo.png",
+    "saison": 2
+  },
+  {
+    "id": "dupoux-jean-pierre",
+    "nom": "Jean-pierre DUPOUX",
+    "club": "Tremblay",
+    "rarete": "Rare",
+    "poste": "Ailier Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/dupoux-jean-pierre.png",
+    "saison": 2
+  },
+  {
+    "id": "garaudet-thibault",
+    "nom": "Thibault GARAUDET",
+    "club": "Tremblay",
+    "rarete": "Commun",
+    "poste": "Demi Centre",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/garaudet-thibault.png",
+    "saison": 2
+  },
+  {
+    "id": "kotters-raphael",
+    "nom": "Raphael KÖTTERS",
+    "club": "Tremblay",
+    "rarete": "Rare",
+    "poste": "Arrière Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/kotters-raphael.png",
+    "saison": 2
+  },
+  {
+    "id": "leger-antoine",
+    "nom": "Antoine LEGER",
+    "club": "Tremblay",
+    "rarete": "Peu Commun",
+    "poste": "Arrière Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/leger-antoine.png",
+    "saison": 2
+  },
+  {
+    "id": "nieto-nicolas",
+    "nom": "Nicolas NIETO",
+    "club": "Tremblay",
+    "rarete": "Commun",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/nieto-nicolas.png",
+    "saison": 2
+  },
+  {
+    "id": "pardin-wesley",
+    "nom": "Wesley PARDIN",
+    "club": "Tremblay",
+    "rarete": "Rare",
+    "poste": "Gardien",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/pardin-wesley.png",
+    "saison": 2
+  },
+  {
+    "id": "petit-timmy",
+    "nom": "Timmy PETIT",
+    "club": "Tremblay",
+    "rarete": "Commun",
+    "poste": "Pivot",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/petit-timmy.png",
+    "saison": 2
+  },
+  {
+    "id": "prat-kylian",
+    "nom": "Kylian PRAT",
+    "club": "Tremblay",
+    "rarete": "Commun",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/prat-kylian.png",
+    "saison": 2
+  },
+  {
+    "id": "rigault-kylian",
+    "nom": "Kylian RIGAULT",
+    "club": "Tremblay",
+    "rarete": "Rare",
+    "poste": "Arrière Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/rigault-kylian.png",
+    "saison": 2
+  },
+  {
+    "id": "sculo-gabriel",
+    "nom": "Gabriel SCULO",
+    "club": "Tremblay",
+    "rarete": "Commun",
+    "poste": "Ailier Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/sculo-gabriel.png",
+    "saison": 2
+  },
+  {
+    "id": "zuzo-reyhan",
+    "nom": "Reyhan ZUZO",
+    "club": "Tremblay",
+    "rarete": "Commun",
+    "poste": "Demi Centre",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/zuzo-reyhan.png",
+    "saison": 2
+  },
+  {
+    "id": "ilic-vanja",
+    "nom": "Vanja ILIC",
+    "club": "Aix",
+    "rarete": "Rare",
+    "poste": "Ailier Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/ilic-vanja.png",
+    "saison": 2
+  },
+  {
+    "id": "bzdynga-antoine",
+    "nom": "Antoine BZDYNGA",
+    "club": "Caen",
+    "rarete": "Commun",
+    "poste": "Ailier Gauche",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/bzdynga-antoine.png",
+    "saison": 2
+  },
+  {
+    "id": "zaja-josip",
+    "nom": "Josip ZAJA",
+    "club": "Chambéry",
+    "rarete": "Commun",
+    "poste": "Arrière Droit",
+    "image_url": "https://raw.githubusercontent.com/Blacklorren/collection-bot/main/refs/zaja-josip.png",
+    "saison": 2
   }
 ]

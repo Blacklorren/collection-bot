@@ -39,3 +39,6 @@ env/
 # Dossiers de configuration de l'éditeur de code (ex: VS Code, PyCharm)
 .vscode/
 .idea/
+
+# Sauvegardes horodatees prises par tools/publier_s2.py et tools/migration_s2.py
+*.bak
