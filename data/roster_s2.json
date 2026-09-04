@@ -1236,7 +1236,8 @@
     "ref_file": "refs/minel-quentin.png",
     "sorti": false,
     "equipe": "pro",
-    "jersey": "navy blue"
+    "jersey": "navy blue",
+    "image_file": "C:/Users/quent/Downloads/mj/chartres/Blacklorren_portrait_headshot_semi-realistic_anime_character__6a91b13c-bc17-4773-a78e-1a5f13948ef4_3(1).png"
   },
   {
     "id": "onufriienko-oleksandr",
@@ -4364,22 +4365,6 @@
     "sorti": false,
     "equipe": "pro",
     "jersey": "red and yellow"
-  },
-  {
-    "id": "vedie-marconnes-samuel",
-    "nom": "Samuel VEDIE-MARCONNES",
-    "nom_famille": "VEDIE-MARCONNES",
-    "prenom": "Samuel",
-    "club": "Caen",
-    "rarete": "Commun",
-    "poste": "Ailier Droit",
-    "numero": null,
-    "lnh_slug": "samuel-vedie-marconnes",
-    "ref_url": null,
-    "ref_file": null,
-    "image_file": null,
-    "sorti": false,
-    "equipe": "pro"
   },
   {
     "id": "zaja-josip",

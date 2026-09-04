@@ -220,8 +220,13 @@ def main():
         def decoupe(src):
             return remove(Image.open(src).convert("RGBA"), session=session, **matting)
 
+    # Les joueurs sans rendu mais deja pourvus d'un cutout sont pris eux aussi : c'est
+    # le cas des silhouettes de tools/build_placeholder.py. Leur carte est composee
+    # depuis le cutout existant, et ils figurent donc sur la planche de leur club.
     players = [p for p in json.load(open(MANIFEST, encoding="utf-8"))
-               if not p.get("sorti") and p.get("image_file")]
+               if not p.get("sorti")
+               and (p.get("image_file")
+                    or os.path.exists(os.path.join(CUTOUTS, f"{p['id']}.webp")))]
     if args.club:
         players = [p for p in players if p["club"].lower() == args.club.lower()]
     if not players:
@@ -232,12 +237,14 @@ def main():
 
     cartes, faits, echecs = [], 0, []
     for i, p in enumerate(sorted(players, key=lambda x: x["nom"]), 1):
-        src = p["image_file"]
-        if not os.path.isabs(src):
+        src = p.get("image_file") or ""
+        if src and not os.path.isabs(src):
             src = os.path.join(ROOT, src)
         cut_path = os.path.join(CUTOUTS, f"{p['id']}.webp")
         try:
-            if os.path.exists(cut_path) and not args.force:
+            # Sans rendu source, il n'y a rien a re-detourer : --force ne doit pas
+            # jeter la silhouette de remplacement.
+            if os.path.exists(cut_path) and (not args.force or not src):
                 cut = Image.open(cut_path).convert("RGBA")
             else:
                 cut = decoupe(src)

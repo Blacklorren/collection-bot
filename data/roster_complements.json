@@ -15,12 +15,6 @@
       "rarete": "Commun"
     },
     {
-      "nom_famille": "VEDIE-MARCONNES",
-      "prenom": "Samuel",
-      "club": "Caen",
-      "rarete": "Commun"
-    },
-    {
       "nom_famille": "ZAJA",
       "prenom": "Josip",
       "club": "Chambéry",
@@ -28,7 +22,8 @@
     }
   ],
   "ignores": {
-    "causse-theophile": "Theophile CAUSSE : encore liste par la LNH a Cesson-Rennes mais ne fait plus partie de l'equipe."
+    "causse-theophile": "Theophile CAUSSE : encore liste par la LNH a Cesson-Rennes mais ne fait plus partie de l'equipe.",
+    "vedie-marconnes-samuel": "Samuel VEDIE-MARCONNES : absent de l'effectif LNH, donc aucun portrait officiel ni aucune chance d'en avoir un. Retire du jeu le 4 septembre 2026 plutot que de laisser une carte sans visage."
   },
   "postes": {
     "antonsen-rene": "Pivot"

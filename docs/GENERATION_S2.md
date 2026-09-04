@@ -1,46 +1,49 @@
 # Génération des portraits Saison 2 — mode d'emploi
 
-État au 2 septembre 2026 : **256 refs disponibles sur 259 joueurs**, 16 clubs sur 16.
-La LNH a publié les portraits des trois derniers clubs — Caen, Chartres et Dunkerque —
-soit 46 refs de plus. La collecte des refs est donc terminée, à trois joueurs près.
+État au 4 septembre 2026 : **258 joueurs, 258 cartes**. La collecte des refs, le
+collage des prompts et l'appariement des rendus sont terminés — les 16 clubs sont
+complets.
 
-**Rendus retenus : 193 sur 259**, douze clubs complets : Aix, Limoges et Nantes (générés
-avec le prompt « Semi-realistic anime »), puis Saran, Paris et Saint-Raphaël, enfin
-Cesson-Rennes, Chambéry, Nîmes, Tremblay, Sélestat et Toulouse (prompt « Stylized comic
-book » actuel). Cutouts et cartes de contrôle en place pour les 193.
+Deux cartes sur les 258 portent une **silhouette de remplacement** plutôt qu'un portrait
+(voir plus bas), et un joueur a été retiré du jeu.
 
-Restent **66 joueurs sans rendu**, sur quatre clubs :
+L'appariement des rendus n'est pas passé par le picker : ils ont été rapprochés des
+portraits LNH sur les planches de `build_match_sheets.py`, en s'appuyant surtout sur
+`data/hair.json`. La coiffure et la pilosité ayant produit le rendu, elles le désignent
+en retour, bien plus sûrement qu'une ressemblance de visage sur une image stylisée.
+Quand deux joueurs partagent la même description, il faut un autre indice : l'âge
+(Mandic a 37 ans, ça se voit), un tatouage de cou (Robert), une boucle d'oreille
+(Moraes Ferreira), des lunettes que la photo de référence a imposées au rendu (Marmier).
 
-| Club | Refs | Où ça en est | Fichier |
-|---|---|---|---|
-| Caen | 17/18 | **à coller** | `out/prompts/caen.txt` |
-| Chartres | 14/15 | **à coller** | `out/prompts/chartres.txt` |
-| Dunkerque | 15/15 | **à coller** | `out/prompts/dunkerque.txt` |
-| Montpellier | 17/17 | **à coller** (oublié à la vague du 30 août) | `out/prompts/montpellier.txt` |
+**Deux joueurs restent sans portrait de référence** — la LNH les laisse en silhouette,
+et il n'y a donc aucun prompt possible. Ils ont une **silhouette de remplacement** :
 
-**L'appariement de Sélestat et Toulouse n'est pas passé par le picker** : les rendus ont
-été rapprochés des portraits LNH sur les planches de `build_match_sheets.py`, en
-s'appuyant surtout sur `data/hair.json` — la coiffure et la pilosité ayant produit le
-rendu, elles le désignent en retour, bien plus sûrement qu'une ressemblance de visage.
-Deux cas ont demandé un autre indice : Mandic/Van Ee départagés par l'âge (Mandic a 37
-ans, ça se voit sur le rendu), Robert/Martins Vieira par le tatouage de cou de Robert,
-visible sur le rendu comme sur la photo.
+| Joueur | Club | Rareté |
+|---|---|---|
+| Oussama HOSNI | Chartres | Commun |
+| Pontus BROLIN | Toulouse | Peu Commun |
 
-**Trois joueurs restent sans portrait de référence**, et sont donc écartés de la
-génération — la LNH ne publie rien pour eux :
+```bash
+py tools/build_placeholder.py --go
+```
 
-| Joueur | Club | Rareté | Pourquoi |
-|---|---|---|---|
-| Samuel VEDIE-MARCONNES | Caen | Commun | absent de l'effectif LNH (ajouté via `roster_complements.json`) |
-| Oussama HOSNI | Chartres | Commun | fiche LNH encore en silhouette |
-| Pontus BROLIN | Toulouse | Peu Commun | fiche LNH encore en silhouette |
+La silhouette n'est pas dessinée : c'est la **médiane des cutouts de la collection**.
+Tous les rendus étant cadrés de la même façon, on empile leurs masques alpha et on garde
+ce qui est du sujet chez plus de la moitié d'entre eux — d'où une tête, des oreilles, un
+cou et des épaules aux proportions exactes du reste des cartes. Une forme géométrique ne
+marchait pas : le cadrage « buste » met la tête à 60 % de la hauteur de carte, et à cette
+taille un ovale se lit comme un œuf. Par construction, elle ne ressemble à personne.
 
-Un quatrième, **Quentin MINEL** (Chartres, Peu Commun), a bien sa référence : c'est son
-prompt qui n'est pas passé. Ligne 10 de `out/prompts/chartres.txt`.
+`finalize_s2.py` compose leur carte depuis ce cutout, et `--force` ne le détruit pas :
+sans rendu source, il n'y a rien à re-détourer. Dès que la LNH publie leur portrait,
+`fetch_lnh_s2.py` récupère la ref, `build_prompts_s2.py --skip-done` sort leur prompt,
+et le vrai rendu écrase la silhouette.
 
-Pour les débloquer sans attendre la LNH : une URL de portrait trouvée sur le site du
-club, ajoutée à `data/refs_manuelles.json`, suffit (voir « Points de vigilance »). Sinon
-`publier_s2.py` les ignorera et la saison partira à 256 cartes.
+**Samuel VEDIE-MARCONNES a été retiré du jeu** le 4 septembre 2026 : absent de
+l'effectif LNH, il n'aura jamais de portrait officiel. Il sort de `roster_complements.json`
+et la raison est consignée dans la clé `ignores`, pour ne pas avoir à re-trancher au
+prochain rebuild du manifest. **Le roster passe donc de 259 à 258 joueurs** — Commun 94,
+Peu Commun 78, Rare 51, Épique 26, Légendaire 9.
 
 **Source des données.** Le scraper interroge `clubs-effectif?team=<clef>` et non les
 pages `/equipes/<slug>` : seule la première expose le **centre de formation**, où se
@@ -283,7 +286,7 @@ Théophile CAUSSE est encore listé par la LNH à Cesson-Rennes mais ne fait plu
 l'équipe : il est volontairement écarté, et la raison est consignée dans la clé
 `ignores` du même fichier pour ne pas avoir à re-trancher à chaque comparaison.
 
-Le roster passe donc à **259 joueurs** : Commun 95, Peu Commun 78, Rare 51, Épique 26,
+Le roster passait alors à **259 joueurs** : Commun 95, Peu Commun 78, Rare 51, Épique 26,
 Légendaire 9.
 
 **Pol VALERO ROVIRA** (Montpellier) a été rapproché de `POL VALERA ROVIRA` par le

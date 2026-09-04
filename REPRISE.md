@@ -9,7 +9,9 @@ Trois choses à faire, dans cet ordre. Chaque étape a une commande de contrôle
   `/collection` (un exemplaire chacune), mais ne sont **plus tirables en pack, plus
   créables au craft, et plus alignables en duel** ;
 - **l'Elo repart à 1000 pour tout le monde** — classement de duels neuf ;
-- **les 259 cartes de la Saison 2 sont prêtes pour jeudi soir.**
+- **les 258 cartes de la Saison 2 sont prêtes.** Samuel Vedie-Marconnes a été retiré
+  du jeu (aucun portrait officiel possible), et deux joueurs encore en silhouette
+  côté LNH portent une silhouette de remplacement.
 
 ---
 
@@ -142,7 +144,7 @@ joueur qui aurait ouvert des packs entre-temps ne perd rien.
 | Commande | Ce qu'on doit voir |
 |---|---|
 | `/pack` puis `/open` | des cartes de la **saison 2** uniquement, au cadrage buste |
-| `/collection` | s'ouvre sur « Album de Collection — Saison 2 », progression sur 259 |
+| `/collection` | s'ouvre sur « Album de Collection — Saison 2 », progression sur 258 |
 | bouton **Archive S1** | la collection de la saison passée, complète, un exemplaire par carte |
 | `/points` | 0 point, 0 pack |
 | `/classement_duel` | tout le monde à 1000 |
