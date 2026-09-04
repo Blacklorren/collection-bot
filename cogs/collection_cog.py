@@ -1,6 +1,7 @@
 import discord
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
+import os
 import database
 import json
 import random
@@ -75,6 +76,18 @@ DAILY_BONUS = 100
 POINTS_PER_MESSAGE = 20
 MAX_DAILY_MESSAGE_POINTS = 300
 MESSAGE_COOLDOWN = 10
+
+# --- ANTI-TRICHE « écrire puis supprimer » ---
+# Les points d'un message ne sont pas crédités tout de suite : ils MÛRISSENT.
+# Pendant la maturation ils ne sont ni dépensables ni comptés dans le solde, donc il
+# n'existe aucun instant où l'on pourrait convertir en packs les points d'un message
+# qu'on s'apprête à effacer. Supprimer avant maturité = zéro point ; supprimer après
+# = le solde est débité (il peut devenir négatif).
+# Le quota quotidien, lui, est consommé dès l'écriture et n'est JAMAIS rendu : sinon
+# supprimer libérerait de la place pour regagner, et la triche deviendrait rentable.
+POINT_MATURATION_MINUTES = int(os.getenv("POINT_MATURATION_MINUTES", "10"))
+# Au-delà, on oublie la ligne : supprimer un très vieux message ne reprend plus rien.
+POINT_CLAWBACK_HOURS = int(os.getenv("POINT_CLAWBACK_HOURS", "48"))
 LEADERBOARD_EXCLUDED_IDS = [133711821214449665]
 # Boost de fin de collection basse rareté (Saison 2) :
 # les cartes Commun / Peu Commun MANQUANTES pèsent ×3 dans le tirage
@@ -344,7 +357,14 @@ class CollectionCog(commands.Cog):
         
         # Bonus journalier
         if user_data['last_activity_date'] != today_str:
-            database.reset_daily_and_add_first_bonus(user_id, DAILY_BONUS, POINTS_PER_MESSAGE, now_paris.isoformat())
+            # La remise à zéro quotidienne est immédiate, les points partent en
+            # maturation : le bonus de 120 doit être aussi révocable que le reste,
+            # sinon il suffirait d'un message par jour, supprimé aussitôt.
+            database.reset_daily_and_add_first_bonus(
+                user_id, DAILY_BONUS, POINTS_PER_MESSAGE, now_paris.isoformat(), credit=False)
+            database.add_pending_message_points(
+                message.id, user_id, message.channel.id,
+                DAILY_BONUS + POINTS_PER_MESSAGE, now_paris.isoformat())
             return
         
         # Cooldown anti-spam
@@ -356,7 +376,71 @@ class CollectionCog(commands.Cog):
         # Limite quotidienne
         if user_data['daily_message_points'] >= MAX_DAILY_MESSAGE_POINTS: return
 
-        database.update_on_message_activity(user_id, POINTS_PER_MESSAGE, now_paris.isoformat())
+        # Le quota est consommé maintenant, les points murissent à part.
+        database.update_on_message_activity(
+            user_id, POINTS_PER_MESSAGE, now_paris.isoformat(), credit=False)
+        database.add_pending_message_points(
+            message.id, user_id, message.channel.id, POINTS_PER_MESSAGE, now_paris.isoformat())
+
+    # === MATURATION DES POINTS & RÉVOCATION ===
+
+    async def cog_load(self):
+        self.mature_points_loop.start()
+
+    async def cog_unload(self):
+        self.mature_points_loop.cancel()
+
+    @tasks.loop(seconds=60)
+    async def mature_points_loop(self):
+        """Fait mûrir les points dont le délai est écoulé, si le message existe encore.
+
+        La vérification par `fetch_message` est une ceinture en plus de la bretelle :
+        l'écoute des suppressions suffit en temps normal, mais si le bot était hors
+        ligne au moment de l'effacement, l'événement a été perdu — sans ce contrôle,
+        il suffirait de couper au bon moment pour que la triche repasse.
+        """
+        paris_tz = pytz.timezone('Europe/Paris')
+        now = datetime.datetime.now(paris_tz)
+        due_before = (now - datetime.timedelta(minutes=POINT_MATURATION_MINUTES)).isoformat()
+        for row in database.get_due_message_points(due_before, limit=100):
+            if not await self._message_still_exists(row['channel_id'], row['message_id']):
+                database.revoke_message_points(row['message_id'])
+                continue
+            database.credit_message_points(row['message_id'])
+        database.purge_matured_message_points(
+            (now - datetime.timedelta(hours=POINT_CLAWBACK_HOURS)).isoformat())
+
+    @mature_points_loop.before_loop
+    async def before_mature_points_loop(self):
+        await self.bot.wait_until_ready()
+
+    async def _message_still_exists(self, channel_id, message_id):
+        """True si le message est toujours là. En cas de doute (salon introuvable,
+        permission manquante, coupure réseau) on répond True : mieux vaut créditer un
+        message effacé que spolier quelqu'un pour une panne."""
+        try:
+            channel = self.bot.get_channel(channel_id) or await self.bot.fetch_channel(channel_id)
+            await channel.fetch_message(message_id)
+            return True
+        except discord.NotFound:
+            return False
+        except (discord.Forbidden, discord.HTTPException, AttributeError):
+            return True
+
+    @commands.Cog.listener()
+    async def on_raw_message_delete(self, payload):
+        """Message supprimé : les points partent avec lui.
+
+        On écoute la version RAW parce que `on_message_delete` ne se déclenche que
+        pour les messages encore en cache — c'est-à-dire pas ceux d'hier, et pas
+        après un redémarrage.
+        """
+        database.revoke_message_points(payload.message_id)
+
+    @commands.Cog.listener()
+    async def on_raw_bulk_message_delete(self, payload):
+        """Purge groupée (modération, nettoyage de salon) : même traitement."""
+        database.revoke_message_points(list(payload.message_ids))
 
     # === COMMANDES SLASH ===
 
@@ -379,10 +463,19 @@ class CollectionCog(commands.Cog):
     @app_commands.command(name='points', description="Ton solde de points et packs.")
     async def points_command(self, interaction: discord.Interaction):
         data = database.get_user_data(interaction.user.id)
-        await interaction.response.send_message(
-            f"💰 **{data['points']} points** │ 🎒 **{data['packs']} packs** │ ♻️ **{data['fragments']} fragments**", 
-            ephemeral=True
-        )
+        pending = database.get_pending_message_points(interaction.user.id)
+        # Les points en attente sont annoncés à part : ils ne sont pas dépensables
+        # tant qu'ils n'ont pas mûri, autant que ce soit clair plutôt que de laisser
+        # croire à un solde qui refuse d'acheter.
+        attente = (f"\n⏳ **{pending} points** en cours d'acquisition "
+                   f"(disponibles ~{POINT_MATURATION_MINUTES} min après le message, "
+                   f"perdus si tu le supprimes)." if pending else "")
+        solde = (f"💰 **{data['points']} points** │ 🎒 **{data['packs']} packs** │ "
+                 f"♻️ **{data['fragments']} fragments**")
+        if data['points'] < 0:
+            solde += ("\n⚠️ Solde négatif : des points ont été repris parce que les "
+                      "messages correspondants ont été supprimés.")
+        await interaction.response.send_message(solde + attente, ephemeral=True)
 
     @app_commands.command(name='pack', description=f"Acheter un ou plusieurs packs ({PACK_COST} pts/pack).")
     @app_commands.describe(quantite="Nombre de packs, ou « tout » pour tout dépenser (défaut : 1).")

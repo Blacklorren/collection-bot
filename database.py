@@ -196,6 +196,25 @@ def initialize_database():
                 lineup2 TEXT
             )
         ''')
+        # Points de message EN ATTENTE de maturation.
+        # Les points d'un message ne sont pas credites tout de suite : ils murissent
+        # apres un delai. Tant qu'ils n'ont pas muri, ils ne sont NI depensables NI
+        # visibles dans le solde, donc supprimer le message ne peut rien reprendre
+        # qui aurait deja ete converti en packs. Une ligne muri=1 reste pour pouvoir
+        # debiter si le message est supprime plus tard.
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS pending_message_points (
+                message_id INTEGER PRIMARY KEY,
+                user_id    INTEGER NOT NULL,
+                channel_id INTEGER NOT NULL,
+                points     INTEGER NOT NULL,
+                created_at TIMESTAMP NOT NULL,
+                muri       INTEGER NOT NULL DEFAULT 0
+            )
+        ''')
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_pending_user ON pending_message_points(user_id, muri)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_pending_due ON pending_message_points(muri, created_at)")
+
         cur.execute("CREATE INDEX IF NOT EXISTS idx_duels_joueurs ON duels(joueur1, joueur2)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_duels_date ON duels(created_at)")
 
@@ -338,10 +357,15 @@ def update_fragments(user_id, amount):
         cur.execute("UPDATE users SET fragments = fragments + ? WHERE user_id = ?", (amount, user_id))
         con.commit()
 
-def update_on_message_activity(user_id, points_to_add, current_iso_time):
+def update_on_message_activity(user_id, points_to_add, current_iso_time, credit=True):
     """
     Met à jour les points et l'heure du dernier message pour une activité normale.
-    Version corrigée qui accepte le timestamp en argument.
+
+    `credit=False` : on consomme le QUOTA quotidien et on horodate, mais on ne
+    crédite pas le solde — les points partent en maturation (cf.
+    `add_pending_message_points`). Le quota, lui, est brûlé dès l'écriture et
+    n'est JAMAIS rendu : sans ça, supprimer un message libérerait de la place
+    pour en regagner, et la triche deviendrait rentable.
     """
     check_user(user_id)
     with _connect() as con:
@@ -353,20 +377,23 @@ def update_on_message_activity(user_id, points_to_add, current_iso_time):
                 daily_message_points = daily_message_points + ?,
                 last_message_time = ? 
             WHERE user_id = ?
-        """, (points_to_add, points_to_add, current_iso_time, user_id))
+        """, (points_to_add if credit else 0, points_to_add, current_iso_time, user_id))
         con.commit()
         
-def reset_daily_and_add_first_bonus(user_id, bonus_points, message_points, current_iso_time):
+def reset_daily_and_add_first_bonus(user_id, bonus_points, message_points, current_iso_time,
+                                    credit=True):
     """
     Réinitialise les points quotidiens et ajoute le bonus du premier message.
-    Version corrigée qui accepte le timestamp en argument.
+
+    `credit=False` : la remise à zéro quotidienne a bien lieu, mais le bonus n'est
+    pas crédité — il part en maturation comme les autres points de message.
     """
     check_user(user_id)
     with _connect() as con:
         cur = con.cursor()
         # On extrait la date de la chaîne de caractères ISO (ex: '2025-08-15')
         today_date = current_iso_time.split('T')[0]
-        total_points_to_add = bonus_points + message_points
+        total_points_to_add = (bonus_points + message_points) if credit else 0
         cur.execute("""
             UPDATE users 
             SET 
@@ -377,6 +404,104 @@ def reset_daily_and_add_first_bonus(user_id, bonus_points, message_points, curre
             WHERE user_id = ?
         """, (total_points_to_add, message_points, today_date, current_iso_time, user_id))
         con.commit()
+
+# === POINTS DE MESSAGE EN ATTENTE (anti-triche ecrire/supprimer) ===
+# Principe : les points d'un message ne deviennent depensables qu'apres un delai de
+# maturation, et seulement si le message existe toujours. Un message supprime avant
+# maturation ne rapporte rien — il n'y a donc aucune fenetre pendant laquelle des
+# points obtenus par un message qu'on s'apprete a effacer pourraient etre convertis
+# en packs. Le quota quotidien, lui, est consomme des l'ecriture et jamais rendu.
+
+def add_pending_message_points(message_id, user_id, channel_id, points, created_iso):
+    """Enregistre des points en attente de maturation. Ignore un doublon d'id."""
+    check_user(user_id)
+    with _connect() as con:
+        cur = con.cursor()
+        cur.execute("""
+            INSERT OR IGNORE INTO pending_message_points
+                (message_id, user_id, channel_id, points, created_at, muri)
+            VALUES (?, ?, ?, ?, ?, 0)
+        """, (int(message_id), user_id, int(channel_id), int(points), created_iso))
+        con.commit()
+
+def get_due_message_points(before_iso, limit=200):
+    """Lignes pas encore mûres dont le délai est écoulé, plus anciennes d'abord."""
+    with _connect() as con:
+        con.row_factory = sqlite3.Row
+        cur = con.cursor()
+        cur.execute("""
+            SELECT * FROM pending_message_points
+            WHERE muri = 0 AND datetime(created_at) <= datetime(?)
+            ORDER BY created_at ASC LIMIT ?
+        """, (before_iso, limit))
+        return [dict(r) for r in cur.fetchall()]
+
+def credit_message_points(message_id):
+    """Fait mûrir une ligne : crédite le solde et la marque `muri`.
+
+    Le passage muri 0→1 et le crédit se font dans la MÊME transaction, et la mise à
+    jour est conditionnée à `muri = 0` : si deux passages de la boucle se croisent,
+    le second ne crédite rien. Retourne True si le crédit a bien eu lieu.
+    """
+    with _connect() as con:
+        cur = con.cursor()
+        cur.execute("UPDATE pending_message_points SET muri = 1 WHERE message_id = ? AND muri = 0",
+                    (int(message_id),))
+        if cur.rowcount == 0:
+            return False
+        row = cur.execute("SELECT user_id, points FROM pending_message_points WHERE message_id = ?",
+                          (int(message_id),)).fetchone()
+        cur.execute("UPDATE users SET points = points + ? WHERE user_id = ?", (row[1], row[0]))
+        con.commit()
+        return True
+
+def revoke_message_points(message_ids):
+    """Retire les points d'un ou plusieurs messages supprimés.
+
+    - pas encore mûrs : la ligne disparaît, rien n'avait été crédité, rien à reprendre ;
+    - déjà mûrs : on débite le solde (il peut devenir négatif — le joueur ne pourra
+      plus rien acheter tant qu'il n'est pas repassé positif).
+    Le quota quotidien n'est jamais restitué. Retourne {user_id: points_retires}.
+    """
+    ids = [int(m) for m in (message_ids if isinstance(message_ids, (list, tuple, set)) else [message_ids])]
+    if not ids:
+        return {}
+    marks = ",".join("?" * len(ids))
+    debits = {}
+    with _connect() as con:
+        cur = con.cursor()
+        rows = cur.execute(
+            f"SELECT message_id, user_id, points, muri FROM pending_message_points "
+            f"WHERE message_id IN ({marks})", ids).fetchall()
+        for _mid, uid, pts, muri in rows:
+            if muri:
+                cur.execute("UPDATE users SET points = points - ? WHERE user_id = ?", (pts, uid))
+                debits[uid] = debits.get(uid, 0) + pts
+        cur.execute(f"DELETE FROM pending_message_points WHERE message_id IN ({marks})", ids)
+        con.commit()
+    return debits
+
+def get_pending_message_points(user_id):
+    """Total des points encore en maturation pour ce joueur (affichage `/points`)."""
+    with _connect() as con:
+        cur = con.cursor()
+        row = cur.execute("""
+            SELECT COALESCE(SUM(points), 0) FROM pending_message_points
+            WHERE user_id = ? AND muri = 0
+        """, (user_id,)).fetchone()
+        return row[0] if row else 0
+
+def purge_matured_message_points(before_iso):
+    """Oublie les lignes mûres et anciennes : passé ce délai, supprimer son message
+    ne reprend plus rien. Empêche la table de grossir indéfiniment."""
+    with _connect() as con:
+        cur = con.cursor()
+        cur.execute("""
+            DELETE FROM pending_message_points
+            WHERE muri = 1 AND datetime(created_at) < datetime(?)
+        """, (before_iso,))
+        con.commit()
+        return cur.rowcount
 
 def add_pack(user_id, amount=1):
     check_user(user_id)
