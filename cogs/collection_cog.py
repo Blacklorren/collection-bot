@@ -89,9 +89,14 @@ MAX_DAILY_MESSAGE_POINTS = 300
 # Un spam de quinze lignes ne peut plus être effacé discrètement dans la foulée — il
 # reste sous les yeux des modérateurs le temps de mûrir, ou il ne rapporte rien.
 POINT_MATURATION_MINUTES = int(os.getenv("POINT_MATURATION_MINUTES", "720"))
-# Au-delà, on oublie la ligne : supprimer un très vieux message ne reprend plus rien.
-# Doit rester > POINT_MATURATION_MINUTES, sinon les points seraient purgés avant
-# d'avoir mûri et personne ne serait jamais payé.
+# Durée de vie de la ligne comptable d'un message, donc fenêtre pendant laquelle le
+# supprimer peut encore reprendre les points. Passé ce délai la ligne est purgée et le
+# message est payé pour de bon : ça borne la table, et ça évite qu'un ménage dans un
+# vieux salon coûte des points gagnés il y a des mois.
+# À garder nettement au-dessus de POINT_MATURATION_MINUTES : la purge ne touche que les
+# lignes déjà mûres (`muri = 1`), donc descendre en dessous ne priverait personne de son
+# crédit, mais réduirait la fenêtre de reprise à zéro — supprimer après maturité
+# redeviendrait gratuit, et toute la protection tomberait.
 POINT_CLAWBACK_HOURS = int(os.getenv("POINT_CLAWBACK_HOURS", "48"))
 LEADERBOARD_EXCLUDED_IDS = [133711821214449665]
 # Boost de fin de collection basse rareté (Saison 2) :
