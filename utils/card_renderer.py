@@ -97,6 +97,7 @@ BUSTE_ALPHA_MIN = 128
 _BUSTE_PROFIL_H = 256     # hauteur de travail de l'analyse de silhouette
 _BUSTE_LISSAGE = 5        # moyenne glissante sur le profil reduit, en lignes
 _BUSTE_CREUX = 0.88       # le cou doit etre 12 % plus etroit que la tete pour etre cru
+_BUSTE_MENTON_MIN = 0.65  # ...et se trouver au moins a 65 % du chemin vers les epaules
 LOGO_SIZE = 180           # taille de l'ecusson dans le bandeau
 DISC_R = 108              # rayon du disque blanc sous l'ecusson (suit la taille du logo)
 
@@ -395,6 +396,15 @@ def _menton(alpha, bb):
     # Oreilles : ligne la plus large au-dessus du cou. Il faut un vrai creux dessous.
     y_or = max(range(y_cou), key=lambda y: lisse[y])
     if not (y_or < y_cou and lisse[y_cou] < _BUSTE_CREUX * lisse[y_or]):
+        return repli
+    # Un menton ne peut pas etre juste sous les oreilles. Quand le rendu est cadre si
+    # serre que les epaules montent jusqu'a la machoire, il n'y a plus d'etranglement du
+    # tout : le minimum du profil tombe alors a hauteur de BOUCHE, le visage est pris
+    # pour la tete entiere et la carte se retrouve agrandie d'un tiers, menton hors du
+    # cadre (Brasseleur, Kamtchop Baril). On exige donc que le creux soit assez bas par
+    # rapport aux epaules. Mediane mesuree sur les 258 rendus : 0,73 ; en dessous de
+    # 0,65 la detection est fausse une fois sur deux, et le repli anatomique fait mieux.
+    if y_cou / y_ep < _BUSTE_MENTON_MIN:
         return repli
     return int(round(y_cou * ech)), lisse[y_cou], True
 
