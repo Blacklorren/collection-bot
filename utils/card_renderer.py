@@ -424,16 +424,22 @@ def _cadre_buste(art_src):
     tete = ((y_menton * l_cou * BUSTE_COU_RATIO) ** 0.5
             if fiable and l_cou > 0 else y_menton)
     k = (H * BUSTE_TETE_H) / max(tete, 1)
-    # L'estimation du visage peut deraper (cou epais, cou fin) : on borne la hauteur
-    # crane -> menton qu'elle produit, sinon la tete flotte haut ou ecrase le cou.
-    k = min(max(k, (H * BUSTE_TETE_MIN) / max(y_menton, 1)),
-            (H * BUSTE_TETE_MAX) / max(y_menton, 1))
-    k = min(k, (BUSTE_MENTON_Y - BORDER + BUSTE_ROGNAGE_MAX) / max(y_menton, 1))
     # Le buste doit descendre sous le separateur, sinon un trou apparait au-dessus du
     # bandeau. Le menton etant fixe, ce qu'il reste a couvrir est ce qui est SOUS lui.
     sous_menton = bh - y_menton
     if sous_menton > 0:
         k = max(k, ((BAND_TOP + BUSTE_RECOUVREMENT) - BUSTE_MENTON_Y) / sous_menton)
+    # Les bornes de taille passent APRES le recouvrement, et non avant. Un rendu cadre
+    # en gros plan (Minel, sorti de l'ancien prompt "headshot") n'a presque rien sous le
+    # menton : pour couvrir le bandeau il fallait l'agrandir de moitie, et le sommet du
+    # crane sortait de la carte -- le recouvrement annulait la borne. Dans cet ordre
+    # c'est la taille de tete qui a le dernier mot, et il ne reste au pire que quelques
+    # pixels de fond au-dessus du bandeau, la ou le fondu en pied l'a deja noirci.
+    # L'estimation du visage peut deraper (cou epais, cou fin) : on borne la hauteur
+    # crane -> menton qu'elle produit, sinon la tete flotte haut ou ecrase le cou.
+    k = min(max(k, (H * BUSTE_TETE_MIN) / max(y_menton, 1)),
+            (H * BUSTE_TETE_MAX) / max(y_menton, 1))
+    k = min(k, (BUSTE_MENTON_Y - BORDER + BUSTE_ROGNAGE_MAX) / max(y_menton, 1))
 
     scaled = art_src.resize((max(1, round(art_src.width * k)),
                              max(1, round(art_src.height * k))), Image.Resampling.LANCZOS)
