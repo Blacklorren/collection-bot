@@ -45,14 +45,18 @@ matchs, la journée garde exactement un match de marge pour cette revanche.
   ✅ Packs quotidiens        -> daily_packs_loop : bilan de la veille -> packs (idempotent)
   ✅ Compo préremplie       -> dernière compo jouée (cartes encore possédées), sinon compo auto
   ✅ Narration              -> coup d'envoi → mi-temps → résultat (éditions successives)
+  ✅ Préparation PRIVÉE     -> le message de /defi est éphémère : le salon ne voit que le résultat
+  ✅ Résultat COMPACT       -> deux lignes dans le FIL du jour + bouton « Feuille de match »
   ✅ Entraînement solo      -> /defi en visant le BOT (testeurs uniquement) : équipe synthétique
      tirée de cards.json (paramètre `difficulte`), et RIEN n'est écrit en base.
 
 Gating : beta_guard (visible-mais-bloqué jusqu'au 25 août, cf beta.py).
 """
 import asyncio
+import json
 import os
 import random
+import re
 from datetime import date, datetime, timedelta
 
 import discord
@@ -85,6 +89,19 @@ DAILY_PAIR_CAP = int(os.getenv("DUEL_DAILY_PAIR_CAP", "2"))        # duels class
 # Ce plafond ne limite donc PAS les attaques subies (on ne peut pas empêcher les
 # autres de nous défier), seulement les MP de compte-rendu qu'elles déclenchent.
 DEFENSE_DM_CAP = int(os.getenv("DUEL_DEFENSE_DM_CAP", "5"))           # MP de compte-rendu/jour
+
+# --- Publication des résultats ---
+# Un duel = un message. À plusieurs dizaines de matchs par jour, le salon devient
+# illisible. Deux réponses cumulées : le résultat public tient en DEUX LIGNES (le
+# détail complet se demande au bouton, en éphémère), et il atterrit dans un FIL
+# quotidien — un fil n'occupe qu'UNE ligne dans le salon quel que soit le nombre de
+# messages qu'il contient, et s'archive tout seul le lendemain.
+DUEL_CHANNEL_ID = int(os.getenv("DUEL_CHANNEL_ID", "0")) or None   # 0/absent : le salon du /defi
+DUEL_USE_THREAD = os.getenv("DUEL_USE_THREAD", "1") != "0"         # 0 : publier à plat dans le salon
+
+# custom_id FIXE du bouton « Feuille de match » : c'est ce qui en fait une vue
+# persistante, donc encore cliquable des semaines plus tard, après un redémarrage.
+SHEET_CUSTOM_ID = "duel:sheet"
 
 # --- Distribution quotidienne des packs ---
 # Boucle de POLLING plutôt qu'un rendez-vous fixe à minuit : un bot redémarré à
@@ -134,6 +151,24 @@ def _fmt_date(created_at):
         return pytz.utc.localize(dt).astimezone(PARIS).strftime("%d/%m")
     except (ValueError, TypeError):
         return "?"
+
+
+_JOURS = ("lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche")
+_MOIS = ("janvier", "février", "mars", "avril", "mai", "juin",
+         "juillet", "août", "septembre", "octobre", "novembre", "décembre")
+# Le n° de match est relu dans le pied de l'embed public (cf MatchSheetView).
+_MATCH_RE = re.compile(r"Match #(\d+)")
+
+
+def _thread_name_for(now=None):
+    """Le nom du fil du jour : « ⚔️ Duels — vendredi 5 septembre ».
+
+    Les noms de jours et de mois sont écrits à la main : la locale de la machine
+    n'est pas forcément française, et strftime("%A") rendrait « Friday » sur un
+    serveur anglais. C'est aussi ce nom qui sert de CLÉ pour retrouver le fil du
+    jour — il doit donc rester strictement stable d'un appel à l'autre."""
+    now = now or datetime.now(PARIS)
+    return f"⚔️ Duels — {_JOURS[now.weekday()]} {now.day} {_MOIS[now.month - 1]}"
 
 
 class DuelSession:
@@ -327,17 +362,21 @@ class LineupPicker(discord.ui.View):
 
 
 class DuelPrepView(discord.ui.View):
-    """Message public de préparation : seul l'attaquant y touche.
+    """Message ÉPHÉMÈRE de préparation : seul l'attaquant le voit.
 
     Il n'y a plus de phase d'acceptation ni d'attente : le défenseur est absent,
-    son équipe est déjà connue, et le match part au clic.
+    son équipe est déjà connue, et le match part au clic. Personne d'autre n'a donc
+    rien à faire de ces boutons — les laisser publics revenait à poster deux messages
+    par duel dans un salon qui en encaisse des dizaines par jour. Le salon ne reçoit
+    plus que le résultat, une fois le match joué.
     """
 
     def __init__(self, cog, session):
         super().__init__(timeout=300)
         self.cog = cog
         self.s = session
-        self.message = None
+        self.message = None           # l'éphémère de l'attaquant : narration + feuille complète
+        self.origin_channel = None    # salon d'où part le /defi : c'est là qu'ira le résultat
         self.launched = False
 
     async def interaction_check(self, interaction):
@@ -431,6 +470,26 @@ class DuelPrepView(discord.ui.View):
                 pass
 
 
+class MatchSheetView(discord.ui.View):
+    """Le bouton « Feuille de match » collé sous chaque résultat public.
+
+    Vue PERSISTANTE (timeout=None, custom_id fixe) : elle doit encore répondre des
+    semaines plus tard, après n'importe quel redémarrage — sinon le fil du jour se
+    remplit de boutons morts. discord.py 2.3 n'a pas `DynamicItem`, donc impossible
+    d'encoder le n° de match dans le custom_id : on le relit dans le pied de l'embed
+    cliqué (« Match #42 »), écrit par le bot et que personne d'autre ne peut altérer.
+    """
+
+    def __init__(self, cog):
+        super().__init__(timeout=None)
+        self.cog = cog
+
+    @discord.ui.button(label="Feuille de match", emoji="📋",
+                       style=discord.ButtonStyle.grey, custom_id=SHEET_CUSTOM_ID)
+    async def sheet_btn(self, interaction, button):
+        await self.cog.send_match_sheet(interaction)
+
+
 class DuelCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -446,6 +505,12 @@ class DuelCog(commands.Cog):
         # semaine tous les quarts d'heure. Volontairement pas persisté — après un
         # redémarrage on repasse dessus, et le verrou SQL refuse le double paiement.
         self._settled_days = set()
+        # Fil du jour, par salon : {channel_id: (nom_du_jour, Thread)}. Le nom porte
+        # la date, donc l'entrée de la veille se fait remplacer d'elle-même.
+        self._daily_thread = {}
+        # Deux matchs qui se terminent dans la même seconde ne doivent pas créer
+        # deux fils concurrents pour la même journée.
+        self._thread_lock = asyncio.Lock()
 
     def jouable(self, card):
         """Une carte est alignable en duel si elle est de la saison EN COURS.
@@ -688,16 +753,21 @@ class DuelCog(commands.Cog):
         verrou : sans ça l'attaquant resterait bloqué jusqu'au redémarrage du bot,
         sans aucun message à annuler."""
         try:
-            await interaction.response.send_message(embed=embed, view=view)
+            # ephemeral : composer son équipe ne regarde que l'attaquant. Le salon ne
+            # verra que le résultat, une fois le match joué — un message par duel au
+            # lieu de deux, et plus aucun bouton public à expliquer.
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
             view.message = await interaction.original_response()
+            view.origin_channel = interaction.channel
         except discord.HTTPException:
             view._cleanup()
             view.stop()
             raise
 
     async def play_match(self, view: "DuelPrepView"):
-        """Simule, applique l'Elo de l'attaquant, enregistre, affiche, et envoie son
-        compte-rendu au défenseur absent.
+        """Simule, applique l'Elo de l'attaquant, enregistre, affiche la feuille complète
+        à l'attaquant, publie le résumé dans le fil du jour, et envoie son compte-rendu
+        au défenseur absent.
 
         Aucun crédit ici : les packs se calculent sur le bilan du jour et sont versés
         par `daily_packs_loop`. Ce que le joueur voit en fin de match n'est donc qu'un
@@ -713,11 +783,10 @@ class DuelCog(commands.Cog):
             winner = a.id if s_a > s_d else d.id if s_d > s_a else None
             mode = "🤖 Entraînement" if s.sparring else ("🏆 Classé" if s.ranked else "🤝 Amical")
 
-            # --- Narration : coup d'envoi → mi-temps → résultat ---
-            # view=None : dès le coup d'envoi les boutons DISPARAISSENT du message.
-            # Les composants Discord sont attachés au message, pas au lecteur : impossible
-            # de les montrer au seul attaquant. Les griser laissait donc trois boutons
-            # morts sous chaque résultat, pour tout le salon.
+            # --- Narration : coup d'envoi → mi-temps → résultat, dans l'éphémère ---
+            # view=None : dès le coup d'envoi les boutons DISPARAISSENT. Les griser
+            # laissait trois boutons morts sous un match déjà joué, qui ne servaient
+            # plus à personne — pas même à l'attaquant.
             kick = discord.Embed(
                 title="🟢 Coup d'envoi !",
                 description=f"**{a.display_name}** (puissance {round(pow_a)}) attaque "
@@ -756,12 +825,16 @@ class DuelCog(commands.Cog):
                 elo_a1 = E.elo_apply_attacker(elo_a0, elo_d0, result_a, k=k)
                 database.set_user_elo(a.id, elo_a1)
 
+            duel_id = None
             if not s.sparring:
                 # elo2_before == elo2_after : la trace montre explicitement que le
                 # défenseur n'a rien mis en jeu.
-                database.record_duel(a.id, d.id, s_a, s_d, winner, s.ranked,
-                                     elo_a0, elo_d0, elo_a1, elo_d0,
-                                     self._lineup_card_ids(lu_a), self._lineup_card_ids(lu_d))
+                # L'id retourné est ce qui rendra la feuille de match rejouable :
+                # c'est lui qu'on inscrit au pied du résumé public.
+                duel_id = database.record_duel(a.id, d.id, s_a, s_d, winner, s.ranked,
+                                               elo_a0, elo_d0, elo_a1, elo_d0,
+                                               self._lineup_card_ids(lu_a),
+                                               self._lineup_card_ids(lu_d))
 
             # --- Embed résultat ---
             ms = " (mort subite)" if overtime else ""
@@ -803,6 +876,13 @@ class DuelCog(commands.Cog):
             view.stop()
 
             if not s.sparring:
+                # L'attaquant garde la feuille complète ci-dessus, dans son éphémère.
+                # Le salon, lui, ne reçoit que deux lignes : c'est ce qui permet
+                # d'encaisser des dizaines de matchs par jour sans le noyer.
+                # L'entraînement, lui, ne sort jamais en public : c'est un banc d'essai.
+                compact = self._compact_result_embed(duel_id, a, d, s_a, s_d, winner,
+                                                     overtime, s.ranked, elo_a0, elo_a1, mvp, soft)
+                await self._publish_result(view.origin_channel, compact, duel_id)
                 await self._notify_defender(a, d, s_a, s_d, winner, s.ranked)
         finally:
             # Quoi qu'il arrive (exception comprise), on libère l'attaquant.
@@ -980,6 +1060,175 @@ class DuelCog(commands.Cog):
                 lines.append(f"`{slot}` — *(vide)*")
         return "\n".join(lines)
 
+    # === PUBLICATION : deux lignes dans le salon, la feuille complète au bouton ===
+
+    def _compact_result_embed(self, duel_id, a, d, s_a, s_d, winner, overtime,
+                              ranked, elo_a0, elo_a1, mvp, soft):
+        """Le résultat tel que le SALON le voit : un titre-score, une ligne de méta.
+
+        L'attaquant est toujours à gauche du score, même quand il perd. Empilés dans
+        le fil du jour, quarante résultats se lisent alors comme une colonne de
+        scores — et pas comme quarante blocs à déchiffrer un par un.
+        """
+        # ⚔️ / 🛡️ : les symboles que le cog donne déjà aux deux camps, donc le titre
+        # dit d'un coup d'œil QUEL CAMP l'emporte. Surtout pas 🏆 ici : dans tout le
+        # bot il signifie « classé » (cf /historique_duel), et il le signifie encore
+        # sur la ligne juste en dessous.
+        if winner is None:
+            icon, color = "🤝", discord.Color.greyple()
+        elif winner == a.id:
+            icon, color = "⚔️", discord.Color.gold()
+        else:
+            icon, color = "🛡️", discord.Color.blue()
+
+        bits = ["🏆 Classé" if ranked else "🤝 Amical"]
+        if overtime:
+            bits.append("⚡ mort subite")
+        if ranked:
+            # Seul l'Elo de l'attaquant bouge : afficher celui du défenseur n'ajouterait
+            # qu'une valeur immobile, ligne après ligne.
+            bits.append(f"📊 {elo_a0} → **{elo_a1}** ({elo_a1 - elo_a0:+d})")
+            if soft:
+                bits.append("⚖️ hors bande")
+        if mvp:
+            bits.append(f"⭐ {mvp['nom']}")
+
+        e = discord.Embed(
+            title=f"{icon} {a.display_name} {s_a} – {s_d} {d.display_name}",
+            description=" · ".join(bits), color=color)
+        if duel_id:
+            # Ce pied n'est pas décoratif : c'est là que le bouton relit le n° de match.
+            e.set_footer(text=f"Match #{duel_id}")
+        return e
+
+    def _lineup_from_ids(self, raw):
+        """`lineup1`/`lineup2` de la base ({slot: card_id} en JSON) -> {slot: carte}.
+
+        `jouable()` n'a rien à dire ici : une carte d'une saison passée reste
+        affichable, c'est une archive et pas une compo à rejouer."""
+        if isinstance(raw, str):
+            try:
+                raw = json.loads(raw)
+            except ValueError:
+                raw = {}
+        raw = raw or {}
+        return {slot: self.get_card(raw.get(slot)) for slot in E.SLOTS}
+
+    def _sheet_embed(self, guild, row):
+        """La feuille de match complète, reconstruite depuis la base."""
+        def nom_de(uid):
+            m = guild.get_member(uid) if guild else None
+            return m.display_name if m else "Inconnu"
+
+        a_nom, d_nom = nom_de(row["joueur1"]), nom_de(row["joueur2"])
+        s_a, s_d = row["score1"], row["score2"]
+        lu_a = self._lineup_from_ids(row["lineup1"])
+        lu_d = self._lineup_from_ids(row["lineup2"])
+        _, det_a = E.team_power(lu_a)
+        _, det_d = E.team_power(lu_d)
+
+        if row["gagnant"] is None:
+            title, color = f"🤝 Match nul {s_a} - {s_d}", discord.Color.greyple()
+        else:
+            vainqueur = a_nom if row["gagnant"] == row["joueur1"] else d_nom
+            title = f"🏆 {vainqueur} l'emporte {max(s_a, s_d)} - {min(s_a, s_d)} !"
+            color = discord.Color.gold()
+
+        e = discord.Embed(title=title, color=color)
+        e.add_field(name=f"⚔️ {a_nom}", value=self._team_summary(lu_a, det_a, s_a), inline=True)
+        e.add_field(name=f"🛡️ {d_nom}", value=self._team_summary(lu_d, det_d, s_d), inline=True)
+        mvp = self._mvp(lu_a if s_a >= s_d else lu_d)
+        if mvp:
+            e.add_field(name="⭐ Homme du match",
+                        value=f"{RARITY_EMOJI.get(mvp['rarete'], '🔹')} {mvp['nom']}", inline=False)
+        if row["classe"]:
+            e.add_field(name="📊 Elo",
+                        value=f"{a_nom} : {row['elo1_before']} → **{row['elo1_after']}**\n"
+                              f"{d_nom} : {row['elo2_before']} (inchangé — en défense, on ne risque rien)",
+                        inline=False)
+        else:
+            e.set_footer(text="Match amical — aucun impact sur l'Elo.")
+        return e
+
+    async def send_match_sheet(self, interaction):
+        """Rejoue la feuille complète en ÉPHÉMÈRE, pour qui la demande.
+
+        C'est tout l'équilibre du dispositif : le détail n'a pas disparu, il a
+        simplement cessé d'être imposé aux quarante autres lecteurs du fil."""
+        duel_id = None
+        if interaction.message and interaction.message.embeds:
+            trouve = _MATCH_RE.search(interaction.message.embeds[0].footer.text or "")
+            if trouve:
+                duel_id = int(trouve.group(1))
+        row = database.get_duel(duel_id) if duel_id else None
+        if not row:
+            return await interaction.response.send_message(
+                "Feuille de match introuvable.", ephemeral=True)
+        await interaction.response.send_message(
+            embed=self._sheet_embed(interaction.guild, row), ephemeral=True)
+
+    async def _results_destination(self, channel):
+        """Où publier un résultat : le FIL du jour, sinon le salon lui-même.
+
+        Le fil est ce qui rend la chose tenable à l'échelle : il n'occupe qu'UNE
+        ligne dans le salon quel que soit le nombre de matchs qu'il contient, et il
+        s'archive tout seul après 24 h. Si quoi que ce soit échoue (droit manquant,
+        salon introuvable), on retombe sur le salon : un problème de RANGEMENT ne
+        doit jamais empêcher la publication d'un duel déjà joué.
+        """
+        if DUEL_CHANNEL_ID:
+            channel = self.bot.get_channel(DUEL_CHANNEL_ID) or channel
+        if channel is None or not DUEL_USE_THREAD:
+            return channel
+        if not isinstance(channel, discord.TextChannel):
+            return channel      # déjà un fil, un forum, un MP : on publie tel quel
+
+        nom = _thread_name_for()
+        async with self._thread_lock:
+            nom_cache, fil_cache = self._daily_thread.get(channel.id, (None, None))
+            if nom_cache == nom and fil_cache is not None:
+                return fil_cache
+            # Après un redémarrage le cache est vide : on récupère le fil du jour
+            # déjà ouvert au lieu d'en créer un second.
+            fil = next((t for t in channel.threads if t.name == nom and not t.archived), None)
+            if fil is None:
+                try:
+                    fil = await channel.create_thread(
+                        name=nom, type=discord.ChannelType.public_thread,
+                        auto_archive_duration=1440, reason="Fil quotidien des duels")
+                except (discord.Forbidden, discord.HTTPException):
+                    return channel
+            self._daily_thread[channel.id] = (nom, fil)
+            return fil
+
+    async def _publish_result(self, origin_channel, embed, duel_id):
+        """Publie le résumé public.
+
+        Un échec ne casse rien de VITAL — le duel est enregistré, l'Elo appliqué et
+        l'attaquant a lu sa feuille de match — mais perdre le résumé priverait le
+        salon du seul signal social du duel. D'où le repli : si le fil refuse
+        l'envoi (droit manquant, fil verrouillé), on publie dans le salon parent et
+        on oublie ce fil, pour ne pas rejouer l'échec au match suivant.
+        """
+        if origin_channel is None:
+            return
+        view = MatchSheetView(self) if duel_id else None
+        try:
+            dest = await self._results_destination(origin_channel)
+        except (discord.Forbidden, discord.HTTPException):
+            dest = origin_channel
+        try:
+            return await dest.send(embed=embed, view=view)
+        except (discord.Forbidden, discord.HTTPException):
+            parent = getattr(dest, "parent", None) or origin_channel
+            if parent is None or parent.id == dest.id:
+                return
+            self._daily_thread.pop(parent.id, None)
+        try:
+            await parent.send(embed=embed, view=view)
+        except (discord.Forbidden, discord.HTTPException):
+            pass
+
     @app_commands.command(name="ma_defense", description="Voir l'équipe qui te défend quand on t'attaque.")
     @beta_guard()
     async def ma_defense(self, interaction: discord.Interaction):
@@ -1088,4 +1337,8 @@ class DuelCog(commands.Cog):
 
 
 async def setup(bot):
-    await bot.add_cog(DuelCog(bot))
+    cog = DuelCog(bot)
+    await bot.add_cog(cog)
+    # Vue persistante : sans ce ré-enregistrement au démarrage, tous les boutons
+    # « Feuille de match » déjà publiés deviendraient muets au premier redémarrage.
+    bot.add_view(MatchSheetView(cog))

@@ -1406,6 +1406,20 @@ def get_last_duel_lineup(user_id):
     except ValueError:
         return None
 
+def get_duel(duel_id):
+    """Un duel par son id, ou None.
+
+    Sert à rejouer la FEUILLE DE MATCH longtemps après : le résultat publié dans le
+    salon ne porte que deux lignes, le détail complet est reconstruit ici à la
+    demande. Le bouton qui l'appelle est persistant — il survit aux redémarrages,
+    donc cette lecture doit rester possible indéfiniment.
+    """
+    with _connect() as con:
+        con.row_factory = sqlite3.Row
+        cur = con.cursor()
+        row = cur.execute("SELECT * FROM duels WHERE id = ?", (duel_id,)).fetchone()
+        return dict(row) if row else None
+
 def get_user_duels(user_id, limit=10):
     """Derniers duels d'un joueur (classés et amicaux), plus récents d'abord."""
     with _connect() as con:

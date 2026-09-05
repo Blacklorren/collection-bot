@@ -18,6 +18,7 @@ test, ouverture publique automatique le **25 août 2026**). Voir `beta.py`.
 | 5 | DB duels | `database.py` | ✅ testé |
 | 5 | Cog duel (baseline auto) | `cogs/duel_cog.py` | ✅ compile · ⚠️ à tester en vrai |
 | 5 | **Composition MANUELLE** | `cogs/duel_cog.py` (`DuelLineupView`/`LineupPicker`) | ✅ compile · ⚠️ à tester en vrai |
+| 5 | Publication : éphémère + résumé compact + fil du jour | `cogs/duel_cog.py`, `database.get_duel` | ✅ testé hors-ligne · ⚠️ à tester en vrai |
 | 6 | Corrections revue (verrous, annulation, off-by-one) | `cogs/duel_cog.py` | ✅ compile · ⚠️ à tester en vrai |
 | 6 | Bande Elo douce (hors bande = K réduit) | `duel_engine.py`, `cogs/duel_cog.py` | ✅ testé hors-ligne |
 | 6 | UX : compo préremplie, narration, `/historique_duel` | `cogs/duel_cog.py`, `database.py` | ✅ compile · ⚠️ à tester en vrai |
@@ -176,9 +177,12 @@ c'est aussi pourquoi la puissance de la défense est affichée avant l'attaque.
   un revenu passif non plus : les packs se gagnent en attaquant.
 
 ### Flux
-- `/defi @membre` ouvre directement la **phase de préparation** (`DuelPrepView`) :
-  puissance de l'attaquant, puissance de la défense adverse, et boutons
-  **« Composer mon équipe »**, **« Attaquer »** et **« Annuler »**.
+- `/defi @membre` ouvre directement la **phase de préparation** (`DuelPrepView`),
+  **en éphémère** : puissance de l'attaquant, puissance de la défense adverse, et
+  boutons **« Composer mon équipe »**, **« Attaquer »** et **« Annuler »**. Le salon
+  n'en voit rien — ces boutons ne regardent que l'attaquant, et les composants
+  Discord sont attachés au *message*, pas au lecteur : impossible de les cacher aux
+  spectateurs d'un message public.
 - La compo de l'attaquant est **préremplie** (`initial_lineup`) : dernière compo
   jouée (cartes encore possédées, via `database.get_last_duel_lineup`), sinon
   compo auto. Le joueur pressé clique directement « Attaquer ».
@@ -190,6 +194,11 @@ c'est aussi pourquoi la puissance de la défense est affichée avant l'attaque.
   - boutons **« Vider le poste »**, **« Compo automatique »** (réutilise
     `auto_lineup()`) et **« Lancer l'attaque »**.
 - Le match (`play_match`) part au clic. Il lit `DuelSession.lineup_a/lineup_d`.
+- **Ce que voit l'attaquant** : la narration puis la **feuille de match complète**,
+  dans son éphémère. **Ce que voit le salon** : un résumé de **deux lignes**
+  (`_compact_result_embed`), publié dans le **fil du jour**, avec un bouton
+  « 📋 Feuille de match » qui rejoue le détail en éphémère pour qui le demande.
+  L'entraînement contre le bot ne sort jamais en public.
 
 ### Détails d'implémentation
 - Une même carte ne peut occuper qu'un seul slot : la placer la **retire**
@@ -207,6 +216,25 @@ c'est aussi pourquoi la puissance de la défense est affichée avant l'attaque.
 - **Narration** : le match s'affiche en trois temps (coup d'envoi → mi-temps →
   résultat, via `duel_engine.simulate_match` qui expose le score à la mi-temps
   et le flag mort subite).
+- **Publication** (`_publish_result` → `_results_destination`) : à plusieurs
+  dizaines de matchs par jour, un pavé de 28 lignes par duel rend le salon
+  illisible. D'où deux réponses cumulées : le résumé public tient en deux lignes,
+  et il atterrit dans un **fil quotidien** (`_thread_name_for`, ex. « ⚔️ Duels —
+  vendredi 5 septembre ») — un fil n'occupe qu'**une ligne** dans le salon quel
+  que soit le nombre de messages qu'il contient, et s'archive seul après 24 h.
+  Repli systématique sur le salon parent si le fil est refusé ou verrouillé :
+  un problème de rangement ne doit jamais faire perdre un résultat.
+- **Feuille de match** (`MatchSheetView`, `send_match_sheet`) : vue **persistante**
+  (`timeout=None`, `custom_id` fixe, ré-enregistrée dans `setup()`), donc encore
+  cliquable après un redémarrage. discord.py 2.3 n'a pas `DynamicItem` : le n° de
+  match est donc relu dans le **pied de l'embed** (« Match #42 ») puis rechargé via
+  `database.get_duel`. Ce couplage pied ↔ bouton est gardé par
+  `tools/test_duel_publication.py` — changer le libellé du pied casserait en
+  silence tous les boutons déjà publiés.
+- Dans le titre du résumé, l'attaquant est **toujours à gauche** du score, même
+  quand il perd : empilés dans le fil, quarante résultats se lisent alors comme une
+  colonne de scores. ⚔️ = l'attaque passe, 🛡️ = la défense tient, 🤝 = nul (le 🏆
+  reste réservé à « classé », comme partout ailleurs dans le bot).
 - **`/historique_duel [membre]`** : 10 derniers duels (⚔️ attaque / 🛡️ défense,
   V/N/D, score, mode, delta Elo), via `database.get_user_duels`.
 - **`/defenses [membre]`** : les 10 dernières attaques subies et le nombre de
@@ -374,7 +402,11 @@ journée, idempotence).
   `BETA_CHANNEL_ID=441230079100715008`, et options
   `DUEL_ELO_BAND`, `DUEL_SOFT_K`, `DUEL_DAILY_PAIR_CAP` (2),
   `DUEL_DAILY_MATCH_CAP` (6), `DUEL_DEFENSE_DM_CAP` (5),
-  `DUEL_DAILY_PACKS_CHECK_MINUTES` (15), `DUEL_DAILY_PACKS_CATCHUP_DAYS` (7).
+  `DUEL_DAILY_PACKS_CHECK_MINUTES` (15), `DUEL_DAILY_PACKS_CATCHUP_DAYS` (7),
+  `DUEL_CHANNEL_ID` (vide = le salon d'où part le `/defi`) et `DUEL_USE_THREAD`
+  (`1` par défaut ; `0` publie à plat dans le salon, sans fil quotidien).
+  ⚠️ Avec les fils, le bot a besoin de **Créer des fils publics** et **Envoyer des
+  messages dans les fils** sur le salon concerné — sinon il retombe à plat.
   ⚠️ `DUEL_DAILY_REWARD_CAP` et `DUEL_DEFENSE_REWARD_CAP` n'existent plus : si
   elles traînent dans le `.env` de prod, elles sont simplement ignorées.
 - **Postes** : déjà dans `cards.json` (rien à faire ; l'outil xlsx reste dispo au cas où).
