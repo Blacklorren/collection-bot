@@ -84,7 +84,7 @@ def load_from_cog(funcs=(), consts=()):
         tree = ast.parse(f.read(), filename=path)
 
     ns = {"datetime": datetime, "pytz": pytz, "PARIS": PARIS, "E": E,
-          "json": json, "re": re, "discord": FakeDiscord,
+          "json": json, "re": re, "os": os, "discord": FakeDiscord,
           "RARITY_EMOJI": {"Rare": "R", "Legendaire": "L"}}
 
     trouves = set()
@@ -120,8 +120,10 @@ def load_from_cog(funcs=(), consts=()):
     return ns
 
 
-COG = load_from_cog(funcs=("_thread_name_for", "_compact_result_embed", "_lineup_from_ids"),
+COG = load_from_cog(funcs=("_thread_name_for", "_compact_result_embed", "_lineup_from_ids",
+                           "_env_channel_id"),
                     consts=("_JOURS", "_MOIS", "_MATCH_RE"))
+_env_channel_id = COG["_env_channel_id"]
 _thread_name_for = COG["_thread_name_for"]
 _compact_result_embed = COG["_compact_result_embed"]
 _lineup_from_ids = COG["_lineup_from_ids"]
@@ -251,6 +253,25 @@ def test_relecture_compo():
     verifie("carte inconnue toleree", _lineup_from_ids(faux, {"GB": 99999})["GB"] is None)
 
 
+# --------------------------------------------------------------------------
+# 5. Les reglages d'environnement ne doivent JAMAIS tuer le demarrage
+# --------------------------------------------------------------------------
+def test_reglages_environnement():
+    print("\n=== DUEL_CHANNEL_ID LU DEPUIS L'ENVIRONNEMENT ===")
+    # Le cog est charge dans setup_hook sans try/except : une ValueError ici
+    # empecherait le bot ENTIER de demarrer, pour un simple reglage de rangement.
+    cas = [("", None), ("   ", None), ("123456789", 123456789),
+           (" 123456789 ", 123456789), ('"123456789"', 123456789),
+           ("#duels", None), ("abc", None), ("12.5", None)]
+    for brut, attendu in cas:
+        os.environ["TEST_DUEL_CHANNEL"] = brut
+        obtenu = _env_channel_id("TEST_DUEL_CHANNEL")
+        verifie("%-13r -> %s" % (brut, attendu), obtenu == attendu, "obtenu %r" % obtenu)
+    os.environ.pop("TEST_DUEL_CHANNEL", None)
+    verifie("variable absente  -> None", _env_channel_id("TEST_DUEL_ABSENTE") is None)
+
+
+test_reglages_environnement()
 test_nom_du_fil()
 test_numero_de_match()
 test_resume_compact()

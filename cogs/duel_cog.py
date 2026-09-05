@@ -96,8 +96,33 @@ DEFENSE_DM_CAP = int(os.getenv("DUEL_DEFENSE_DM_CAP", "5"))           # MP de co
 # détail complet se demande au bouton, en éphémère), et il atterrit dans un FIL
 # quotidien — un fil n'occupe qu'UNE ligne dans le salon quel que soit le nombre de
 # messages qu'il contient, et s'archive tout seul le lendemain.
-DUEL_CHANNEL_ID = int(os.getenv("DUEL_CHANNEL_ID", "0")) or None   # 0/absent : le salon du /defi
-DUEL_USE_THREAD = os.getenv("DUEL_USE_THREAD", "1") != "0"         # 0 : publier à plat dans le salon
+
+
+def _env_channel_id(nom):
+    """Un identifiant de salon lu dans l'environnement, ou None.
+
+    Volontairement TOLÉRANT. Cette valeur se saisit à la main dans un panneau
+    d'hébergeur, où une variable déclarée mais vide, un espace collé au bout ou une
+    coquille sont la norme. Or le cog est chargé dans `setup_hook` sans filet : une
+    ValueError ici empêcherait le bot ENTIER de démarrer — pour un simple réglage de
+    rangement. On préfère perdre le salon dédié et le dire dans les logs.
+    """
+    brut = (os.getenv(nom) or "").strip().strip('"\'')
+    if not brut:
+        return None
+    try:
+        return int(brut)
+    except ValueError:
+        print(f"⚠️ (DUELS) {nom}={brut!r} n'est pas un identifiant de salon : ignoré, "
+              f"les résultats resteront dans le salon du /defi.")
+        return None
+
+
+DUEL_CHANNEL_ID = _env_channel_id("DUEL_CHANNEL_ID")               # vide : le salon du /defi
+# Même tolérance que ci-dessus : « false » ou « non » saisis dans un panneau
+# d'hébergeur doivent désactiver les fils, pas être lus comme un « oui » muet.
+DUEL_USE_THREAD = ((os.getenv("DUEL_USE_THREAD") or "1").strip().lower()
+                   not in ("0", "false", "non", "no", "off"))
 
 # custom_id FIXE du bouton « Feuille de match » : c'est ce qui en fait une vue
 # persistante, donc encore cliquable des semaines plus tard, après un redémarrage.

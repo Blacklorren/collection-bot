@@ -404,7 +404,11 @@ journée, idempotence).
   `DUEL_DAILY_MATCH_CAP` (6), `DUEL_DEFENSE_DM_CAP` (5),
   `DUEL_DAILY_PACKS_CHECK_MINUTES` (15), `DUEL_DAILY_PACKS_CATCHUP_DAYS` (7),
   `DUEL_CHANNEL_ID` (vide = le salon d'où part le `/defi`) et `DUEL_USE_THREAD`
-  (`1` par défaut ; `0` publie à plat dans le salon, sans fil quotidien).
+  (`1` par défaut ; `0`/`false`/`non` publie à plat, sans fil quotidien).
+  Ces deux-là sont lus avec indulgence — guillemets, espaces, valeur vide ou
+  coquille : on retombe sur le comportement par défaut avec un avertissement
+  dans les logs. Le cog est chargé sans `try` dans `setup_hook` : une
+  `ValueError` sur une variable d'hébergeur tuerait le bot ENTIER.
   ⚠️ Avec les fils, le bot a besoin de **Créer des fils publics** et **Envoyer des
   messages dans les fils** sur le salon concerné — sinon il retombe à plat.
   ⚠️ `DUEL_DAILY_REWARD_CAP` et `DUEL_DEFENSE_REWARD_CAP` n'existent plus : si
