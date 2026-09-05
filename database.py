@@ -364,6 +364,74 @@ def mass_add_points(amount):
         con.commit()
         return cur.rowcount
 
+def get_all_user_ids():
+    """Tous les joueurs enregistrés dans le bot (une ligne de `users` = un compte)."""
+    with _connect() as con:
+        return [r[0] for r in con.cursor().execute("SELECT user_id FROM users").fetchall()]
+
+
+def get_points_earned_since(since_iso, include_pronos=True):
+    """Points GAGNÉS par joueur depuis `since_iso` : {user_id: points}.
+
+    « Gagnés », pas « crédités » : les points de message mûrissent 12 h avant
+    d'entrer dans le solde, donc une bonne partie de la fenêtre récente est encore
+    en attente. On les compte quand même — ils ont bien été obtenus, et les lignes
+    des messages supprimés ont déjà disparu de la table (cf `revoke_message_points`).
+
+    ⚠️ Fenêtre max fiable = POINT_CLAWBACK_HOURS (48 h par défaut) : au-delà,
+    `purge_matured_message_points` a effacé les lignes et le total serait sous-évalué.
+
+    Les gains de pronostic sont datés par `matchs.date_match` : l'attribution ne
+    laisse aucun horodatage propre (elle n'écrit que `points_gagnes`), et la boucle
+    de résultats crédite peu après la fin du match. C'est donc une approximation.
+    Les dons admin (`/addpoints`, `/addpointsall`) ne sont tracés nulle part et ne
+    peuvent pas être comptés.
+    """
+    gains = {}
+    with _connect() as con:
+        cur = con.cursor()
+        # Points de message (bonus du 1er message du jour inclus : il part dans la
+        # même ligne de maturation que le message qui le déclenche).
+        for uid, pts in cur.execute("""
+            SELECT user_id, COALESCE(SUM(points), 0)
+            FROM pending_message_points
+            WHERE datetime(created_at) >= datetime(?)
+            GROUP BY user_id
+        """, (since_iso,)).fetchall():
+            gains[uid] = gains.get(uid, 0) + pts
+
+        if include_pronos:
+            for uid, pts in cur.execute("""
+                SELECT p.user_id, COALESCE(SUM(p.points_gagnes), 0)
+                FROM pronostics p
+                JOIN matchs m ON m.id = p.match_id
+                WHERE p.points_gagnes > 0
+                  AND datetime(m.date_match) >= datetime(?)
+                GROUP BY p.user_id
+            """, (since_iso,)).fetchall():
+                gains[uid] = gains.get(uid, 0) + pts
+    return gains
+
+
+def mass_add_points_variable(grants):
+    """Crédite un montant DIFFÉRENT par joueur, en UNE transaction.
+
+    `grants` : {user_id: points à ajouter}. Tout passe ou rien ne passe — une
+    distribution à moitié appliquée serait impossible à rattraper proprement,
+    puisque rien ne journalise les dons admin.
+    Retourne le nombre de joueurs crédités.
+    """
+    if not grants:
+        return 0
+    with _connect() as con:
+        cur = con.cursor()
+        cur.executemany(
+            "UPDATE users SET points = points + ? WHERE user_id = ?",
+            [(int(pts), int(uid)) for uid, pts in grants.items()])
+        con.commit()
+        return len(grants)
+
+
 def update_fragments(user_id, amount):
     """Ajoute ou retire des fragments à un utilisateur."""
     check_user(user_id)

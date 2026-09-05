@@ -1251,6 +1251,77 @@ class CollectionCog(commands.Cog):
             f"✅ **{montant} points** ajoutés à **{count}** joueur(s) enregistré(s).\n"
             f"ℹ️ *Aucune notification envoyée.*", ephemeral=True)
 
+    @app_commands.command(
+        name='rattrapage',
+        description="[Admin] Compléter chaque joueur jusqu'à N points gagnés sur la période.")
+    @app_commands.describe(
+        cible="Total visé sur la période, ex. 300",
+        heures=f"Fenêtre regardée en arrière (défaut 24 h, max fiable {POINT_CLAWBACK_HOURS} h)",
+        simuler="Vrai = aperçu sans rien créditer (défaut). Mets Faux pour appliquer.")
+    @app_commands.default_permissions(manage_guild=True)
+    async def rattrapage_command(self, interaction: discord.Interaction,
+                                 cible: int, heures: int = 24, simuler: bool = True):
+        if cible <= 0:
+            return await interaction.response.send_message(
+                "❌ La cible doit être positive : on ne fait que compléter, jamais retirer.",
+                ephemeral=True)
+        if heures <= 0:
+            return await interaction.response.send_message(
+                "❌ La fenêtre doit être positive.", ephemeral=True)
+
+        await interaction.response.defer(ephemeral=True)
+
+        paris_tz = pytz.timezone('Europe/Paris')
+        now = datetime.datetime.now(paris_tz)
+        since = now - datetime.timedelta(hours=heures)
+
+        gains = database.get_points_earned_since(since.isoformat())
+        joueurs = database.get_all_user_ids()
+
+        # max(0, ...) : personne ne perd de points parce qu'il a déjà dépassé la cible.
+        dons = {}
+        deja = 0
+        for uid in joueurs:
+            manque = cible - gains.get(uid, 0)
+            if manque > 0:
+                dons[uid] = manque
+            else:
+                deja += 1
+
+        total = sum(dons.values())
+        pleins = sum(1 for v in dons.values() if v == cible)  # n'ont rien gagné sur la fenêtre
+
+        e = discord.Embed(
+            title=("🧮 Rattrapage — simulation" if simuler else "✅ Rattrapage appliqué"),
+            description=(f"Cible : **{cible} pts** sur les **{heures} dernières heures**\n"
+                         f"*(depuis le {since.strftime('%d/%m %H:%M')}, heure de Paris)*"),
+            color=(discord.Color.blurple() if simuler else discord.Color.green()))
+        e.add_field(name="Joueurs enregistrés", value=f"**{len(joueurs)}**", inline=True)
+        e.add_field(name="À créditer", value=f"**{len(dons)}**", inline=True)
+        e.add_field(name="Déjà à la cible", value=f"**{deja}** (reçoivent 0)", inline=True)
+        e.add_field(name="Total distribué", value=f"**{total} pts**", inline=True)
+        e.add_field(name=f"Reçoivent les {cible} pts entiers",
+                    value=f"**{pleins}** (aucun gain sur la période)", inline=True)
+        e.add_field(name="Don moyen",
+                    value=f"**{total // len(dons) if dons else 0} pts**", inline=True)
+
+        # Au-delà de la fenêtre de reprise, les lignes de message ont été purgées :
+        # les gains paraîtraient plus faibles qu'ils ne l'ont été, donc on sur-donnerait.
+        if heures > POINT_CLAWBACK_HOURS:
+            e.add_field(
+                name="⚠️ Fenêtre trop large",
+                value=(f"Au-delà de {POINT_CLAWBACK_HOURS} h les lignes de points de message "
+                       "sont purgées : les gains sont sous-évalués, donc les dons trop généreux."),
+                inline=False)
+
+        if simuler:
+            e.set_footer(text="Rien n'a été crédité. Relance avec simuler:Faux pour appliquer.")
+            return await interaction.followup.send(embed=e, ephemeral=True)
+
+        credites = database.mass_add_points_variable(dons)
+        e.set_footer(text=f"{credites} joueur(s) crédité(s). Aucune notification envoyée.")
+        await interaction.followup.send(embed=e, ephemeral=True)
+
     @app_commands.command(name='donnercarte', description="[Admin] Donner une carte précise à un joueur.")
     @app_commands.describe(membre="Le joueur qui reçoit la carte", carte="Nom de la carte à donner")
     @app_commands.default_permissions(manage_guild=True)
