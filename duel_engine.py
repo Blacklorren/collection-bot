@@ -2,8 +2,8 @@
 Moteur de duel (Saison 2) — logique PURE, sans Discord ni base de données.
 
 Le duel est ASYMÉTRIQUE : un seul joueur est connecté, l'attaquant. Le défenseur
-est représenté par sa compo automatique et ne met rien en jeu — voir
-`elo_apply_attacker` et les constantes DEFENSE_*.
+est représenté par sa compo automatique : il ne met rien en jeu, et ne gagne
+rien non plus — voir `elo_apply_attacker` et `packs_for_wins`.
 
 Concept : chaque joueur aligne 7 cartes sur les 7 postes du handball.
 La puissance d'équipe dépend de la rareté des cartes, d'un bonus si chaque
@@ -76,22 +76,39 @@ ELO_START = 1000
 ELO_K = 32
 ELO_BAND = 150            # au-delà : duel classé « hors bande » (configurable côté cog)
 ELO_K_SOFT = 8            # K réduit pour un classé hors bande (bande douce)
-SOFT_REWARD_FACTOR = 0.5  # récompenses réduites hors bande
 
-# --- RÉCOMPENSES (classé uniquement) ---
-DUEL_WIN_POINTS = 100     # base ; scalé par l'écart d'Elo
-DUEL_LOSS_POINTS = 20     # lot de consolation
+# --- RÉCOMPENSES : DES PACKS, EN FIN DE JOURNÉE ---
+# Un match ne rapporte QUE de l'Elo. Aucun point n'est crédité pendant le duel :
+# les packs sont distribués une fois par jour, par PALIERS, selon le nombre de
+# VICTOIRES EN ATTAQUE de la journée (cf packs_for_wins).
+#
+# ⚠️ « Une victoire » = UN ADVERSAIRE DISTINCT battu. Rebattre la même personne
+# dans la journée ne compte qu'une fois (`database.count_beaten_opponents_for`,
+# COUNT DISTINCT). C'est l'anti-farm : le palier haut exige cinq adversaires
+# différents, ce que deux collections faibles ne peuvent pas fournir. Sans ça, le
+# chemin le plus sûr vers les 2 packs était de matraquer les trois débutants du
+# serveur — à puissance moitié moindre, l'attaquant gagne 99,7 % du temps.
+#
+# Pourquoi des paliers plutôt qu'un gain par match : un gain par match se cumulait
+# aux points de messages et laissait entrevoir ~10 packs/jour. Un palier borne le
+# revenu quotidien par construction — 2 packs, quoi qu'il arrive — et rend la
+# journée lisible : « il me manque une victoire », pas « il me manque 47 points ».
+#
+# Calibré sur le plafond de 6 attaques classées/jour (DUEL_DAILY_MATCH_CAP, côté
+# cog) : 3 adversaires = la moitié de sa journée, 5 = le palier haut.
+#
+# 5 sur 6 et non 6 sur 6 : ça laisse exactement UN match de marge. On peut perdre
+# une fois et décrocher quand même les deux packs, ou dépenser ce match en
+# revanche sur la cible qui nous a battu (auquel cas elle finit dans les cinq).
+# Exiger le sans-faute rendait le palier haut hostile — une seule mauvaise
+# rencontre condamnait la journée entière dès le premier match.
+DAILY_PACK_LADDER = ((5, 2), (3, 1))   # (adversaires distincts battus, packs) — décroissant
 
 # --- DUEL ASYMÉTRIQUE (le défenseur n'est pas connecté) ---
-# Le défenseur ne met RIEN en jeu : son Elo ne bouge pas, il ne perd pas de points.
-# En revanche sa défense lui rapporte quand elle tient — se faire attaquer est une
-# bonne nouvelle, jamais une punition subie pendant son sommeil.
-# Calibré sur PACK_COST = 150 : avec le plafond de 5 défenses récompensées par jour
-# (DUEL_DEFENSE_REWARD_CAP), une journée de défense parfaite vaut environ UN pack.
-# Assez pour que se faire attaquer soit une bonne surprise, trop peu pour que rester
-# hors ligne devienne une stratégie de revenu.
-DEFENSE_HOLD_POINTS = 35  # sa compo gagne le match
-DEFENSE_DRAW_POINTS = 10  # match nul (n'arrive qu'en amical : le classé va en mort subite)
+# Le défenseur ne met RIEN en jeu et ne gagne RIEN : son Elo ne bouge pas, sa
+# défense ne lui rapporte aucun pack. Elle PROTÈGE son classement, elle ne le fait
+# pas monter. Rester hors ligne n'est donc pas une source de revenus — c'était le
+# risque de l'ancien DEFENSE_HOLD_POINTS, qui payait le sommeil.
 
 
 def _clamp(x, lo, hi):
@@ -215,7 +232,33 @@ def within_band(elo_a, elo_b, band=ELO_BAND):
     return abs(elo_a - elo_b) <= band
 
 
-def duel_reward(winner_elo, loser_elo, base=DUEL_WIN_POINTS):
-    """Récompense scalée : battre plus fort rapporte plus, écraser un faible rapporte peu."""
-    factor = _clamp(1 + (loser_elo - winner_elo) / 400.0, 0.25, 2.0)
-    return round(base * factor)
+def packs_for_wins(wins):
+    """Packs mérités pour `wins` ADVERSAIRES DISTINCTS battus dans la journée.
+
+    Paliers, pas cumul : 5 adversaires valent 2 packs, pas 2 + 1. Le tableau est
+    trié par exigence décroissante, on renvoie le premier palier atteint.
+    """
+    for seuil, packs in DAILY_PACK_LADDER:
+        if wins >= seuil:
+            return packs
+    return 0
+
+
+def ladder_text():
+    """Le barème en une ligne : « 3 adversaires = 1 pack · 5 adversaires = 2 packs ».
+
+    Rendu depuis DAILY_PACK_LADDER, jamais réécrit à la main : un rééquilibrage ne
+    doit pas laisser derrière lui des textes d'aide qui annoncent l'ancien barème.
+    """
+    return " · ".join(
+        "%d adversaires = %d pack%s" % (seuil, packs, "s" if packs > 1 else "")
+        for seuil, packs in sorted(DAILY_PACK_LADDER))
+
+
+def next_pack_tier(wins):
+    """(adversaires_manquants, packs_du_palier) pour le prochain palier, ou None si
+    le joueur est déjà au sommet. Sert à afficher « encore 1 adversaire → 2 packs »."""
+    for seuil, packs in sorted(DAILY_PACK_LADDER):
+        if wins < seuil:
+            return seuil - wins, packs
+    return None

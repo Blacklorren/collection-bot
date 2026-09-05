@@ -11,15 +11,26 @@ jouable, et le match se résout immédiatement.
     à jour toute seule quand sa collection grandit, et elle est impossible à
     saboter — personne ne peut laisser une défense fantoche pour offrir des
     victoires à ses amis.
-  - Le défenseur NE RISQUE RIEN : son Elo ne bouge pas, il ne perd aucun point.
-    Sa défense lui RAPPORTE quand elle tient (DEFENSE_HOLD_POINTS), et il reçoit
-    un compte-rendu en MP. Se faire attaquer est une bonne nouvelle, jamais une
-    punition subie pendant son sommeil.
+  - Le défenseur NE RISQUE RIEN et NE GAGNE RIEN : son Elo ne bouge pas, il ne
+    perd aucun pack, et sa défense ne lui en rapporte aucun. Elle protège son
+    classement, elle ne le fait pas monter. Il reçoit un compte-rendu en MP.
+    Se faire attaquer pendant son sommeil est donc neutre — jamais une punition,
+    jamais un revenu passif non plus.
+
+RÉCOMPENSES : un match ne rapporte QUE de l'Elo. Les packs tombent une fois par
+jour, par paliers (cf duel_engine.DAILY_PACK_LADDER et la boucle
+daily_packs_loop), et le barème compte des **adversaires DISTINCTS battus en
+attaque** — rebattre la même cible dans la journée ne compte qu'une fois. C'est
+l'anti-farm : les 2 packs exigent cinq adversaires différents, hors de portée en
+matraquant les deux ou trois collections les plus faibles du serveur. Corollaire :
+la 2ᵉ attaque autorisée sur une même cible est un droit à la REVANCHE, utile
+seulement si on a perdu la première — et comme le palier haut est à 5 sur 6
+matchs, la journée garde exactement un match de marge pour cette revanche.
 
 ÉTAT (handoff) :
   ✅ Moteur d'équilibrage   -> duel_engine.py (testé Monte-Carlo)
   ✅ Fonctions DB           -> database.py (elo, record_duel, anti-farm, leaderboard)
-  ✅ Flux ASYNCHRONE        -> /defi @membre [amical] : composition -> match -> Elo -> récompenses
+  ✅ Flux ASYNCHRONE        -> /defi @membre [amical] : composition -> match -> Elo
   ✅ Compo du défenseur     -> auto_lineup() sur sa collection, figée au lancement de l'attaque
   ✅ Composition MANUELLE   -> DuelPrepView / LineupPicker : l'attaquant ajuste son équipe
      slot par slot dans un menu privé (éphémère), avec un bouton « Compo automatique ».
@@ -27,7 +38,8 @@ jouable, et le match se résout immédiatement.
   ✅ Compte-rendu défenseur -> MP après chaque attaque subie (plafonné)
   ✅ Classement             -> /classement_duel
   ✅ Historique             -> /historique_duel [membre] · /defenses [membre]
-  ✅ Bande Elo DOUCE        -> classé hors bande autorisé, mais K et récompenses réduits
+  ✅ Bande Elo DOUCE        -> classé hors bande autorisé, mais K réduit
+  ✅ Packs quotidiens        -> daily_packs_loop : bilan de la veille -> packs (idempotent)
   ✅ Compo préremplie       -> dernière compo jouée (cartes encore possédées), sinon compo auto
   ✅ Narration              -> coup d'envoi → mi-temps → résultat (éditions successives)
   ✅ Entraînement solo      -> /defi en visant le BOT (testeurs uniquement) : équipe synthétique
@@ -38,12 +50,12 @@ Gating : beta_guard (visible-mais-bloqué jusqu'au 25 août, cf beta.py).
 import asyncio
 import os
 import random
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
 import discord
 import pytz
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 import database
 import duel_engine as E
@@ -55,14 +67,29 @@ PARIS = pytz.timezone("Europe/Paris")
 # --- Réglages anti-farm (surchargeables via .env) ---
 DUEL_ELO_BAND = int(os.getenv("DUEL_ELO_BAND", str(E.ELO_BAND)))   # au-delà : classé « hors bande »
 DUEL_SOFT_K = int(os.getenv("DUEL_SOFT_K", str(E.ELO_K_SOFT)))     # K réduit hors bande
-DAILY_PAIR_CAP = int(os.getenv("DUEL_DAILY_PAIR_CAP", "3"))        # duels classés/jour entre 2 mêmes joueurs
-DAILY_REWARD_CAP = int(os.getenv("DUEL_DAILY_REWARD_CAP", "10"))   # attaques récompensées/jour/joueur
 
-# Plafonds propres à la défense. Ils ne limitent PAS le nombre d'attaques subies
-# (on ne peut pas empêcher les autres de nous défier) mais ce qu'elles produisent :
-# au-delà, la défense continue de jouer, sans rapporter ni notifier.
-DEFENSE_REWARD_CAP = int(os.getenv("DUEL_DEFENSE_REWARD_CAP", "5"))   # défenses récompensées/jour
+# Plafond DUR : passé DAILY_MATCH_CAP attaques classées, la journée est terminée.
+# Ce n'est plus un plafond de récompenses (les gains par match n'existent plus),
+# c'est la LONGUEUR de la journée de jeu — et donc ce qui borne les paliers de packs.
+DAILY_MATCH_CAP = int(os.getenv("DUEL_DAILY_MATCH_CAP", "6"))      # attaques classées/jour/joueur
+# Deux attaques par cible et par jour. Depuis que le barème compte des adversaires
+# DISTINCTS, ce plafond n'est plus l'anti-farm principal : il sert surtout de droit
+# à la revanche (la 2ᵉ attaque ne rapporte un pack que si la 1ʳᵉ a été perdue) et
+# de garde-fou contre le harcèlement d'une seule cible.
+DAILY_PAIR_CAP = int(os.getenv("DUEL_DAILY_PAIR_CAP", "2"))        # duels classés/jour entre 2 mêmes joueurs
+
+# La défense ne rapporte plus rien — elle protège l'Elo, elle ne le fait pas monter.
+# Ce plafond ne limite donc PAS les attaques subies (on ne peut pas empêcher les
+# autres de nous défier), seulement les MP de compte-rendu qu'elles déclenchent.
 DEFENSE_DM_CAP = int(os.getenv("DUEL_DEFENSE_DM_CAP", "5"))           # MP de compte-rendu/jour
+
+# --- Distribution quotidienne des packs ---
+# Boucle de POLLING plutôt qu'un rendez-vous fixe à minuit : un bot redémarré à
+# 00 h 02 raterait le rendez-vous, et personne ne serait payé ce jour-là. Ici on
+# repasse régulièrement et on solde les journées en retard — le bot peut tomber
+# une nuit entière, la journée sera payée à son réveil.
+DAILY_PACKS_CHECK_MINUTES = int(os.getenv("DUEL_DAILY_PACKS_CHECK_MINUTES", "15"))
+DAILY_PACKS_CATCHUP_DAYS = int(os.getenv("DUEL_DAILY_PACKS_CATCHUP_DAYS", "7"))
 
 # --- Entraînement solo : /defi en visant le bot (testeurs uniquement, cf beta.is_tester).
 # Le bot n'est pas un joueur : son équipe est synthétique et RIEN n'est écrit en base.
@@ -75,11 +102,26 @@ SPAR_DEFAULT_RARITY = "Rare"
 ACTIVE_DUELISTS = set()
 
 
+def _midnight_utc(jour: date) -> str:
+    """Minuit (Europe/Paris) d'un jour donné, au format comparable par SQLite (UTC)."""
+    minuit = PARIS.localize(datetime(jour.year, jour.month, jour.day))
+    return minuit.astimezone(pytz.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+
 def _today_start_iso():
     """Minuit (Europe/Paris) du jour courant, au format comparable par SQLite (UTC)."""
-    now = datetime.now(PARIS)
-    midnight = PARIS.localize(datetime(now.year, now.month, now.day))
-    return midnight.astimezone(pytz.utc).strftime("%Y-%m-%d %H:%M:%S")
+    return _midnight_utc(datetime.now(PARIS).date())
+
+
+def _day_bounds(jour: date):
+    """(début inclus, fin exclue) d'une journée de Paris, en UTC.
+
+    La borne haute est calculée à partir de la DATE du lendemain, jamais par
+    `début + 24 h` : les deux nuits de changement d'heure durent 23 h et 25 h, et
+    un décalage d'une heure ferait basculer les duels de fin de soirée dans la
+    mauvaise journée — donc dans le mauvais décompte de victoires.
+    """
+    return _midnight_utc(jour), _midnight_utc(jour + timedelta(days=1))
 
 
 def _fmt_date(created_at):
@@ -273,12 +315,10 @@ class LineupPicker(discord.ui.View):
         if not any(self.lineup().values()):
             return await interaction.response.send_message(
                 "Aligne au moins une carte (ou clique « Compo automatique »).", ephemeral=True)
-        for c in self.children:
-            c.disabled = True
         e = self._embed()
         e.title = "⚔️ Équipe validée — le match se joue…"
         e.color = discord.Color.green()
-        await interaction.response.edit_message(embed=e, view=self)
+        await interaction.response.edit_message(embed=e, view=None)
         self.stop()
         await self.main_view.launch()
 
@@ -359,12 +399,10 @@ class DuelPrepView(discord.ui.View):
             return await interaction.response.defer()
         self.s.cancelled = True
         self._cleanup()
-        for c in self.children:
-            c.disabled = True
         e = self.build_embed()
         e.title = "❌ Attaque annulée"
         e.color = discord.Color.red()
-        await interaction.response.edit_message(embed=e, view=self)
+        await interaction.response.edit_message(embed=e, view=None)
         self.stop()
 
     async def launch(self):
@@ -373,8 +411,6 @@ class DuelPrepView(discord.ui.View):
             return
         self.launched = True
         self.s.cancelled = True   # invalide un picker resté ouvert
-        for c in self.children:
-            c.disabled = True
         await self.cog.play_match(self)
 
     async def on_timeout(self):
@@ -383,13 +419,11 @@ class DuelPrepView(discord.ui.View):
         self.s.cancelled = True
         self._cleanup()
         if self.message:
-            for c in self.children:
-                c.disabled = True
             e = self.build_embed()
             e.title = "⌛ Attaque expirée (composition trop longue)"
             e.color = discord.Color.greyple()
             try:
-                await self.message.edit(embed=e, view=self)
+                await self.message.edit(embed=e, view=None)
             except discord.HTTPException:
                 pass
 
@@ -405,6 +439,10 @@ class DuelCog(commands.Cog):
         for c in self.all_cards:
             self.card_map[c["id"]] = c
             self.card_map[str(c["id"])] = c
+        # Journées déjà soldées pendant CETTE session : évite de re-scanner la même
+        # semaine tous les quarts d'heure. Volontairement pas persisté — après un
+        # redémarrage on repasse dessus, et le verrou SQL refuse le double paiement.
+        self._settled_days = set()
 
     def jouable(self, card):
         """Une carte est alignable en duel si elle est de la saison EN COURS.
@@ -521,7 +559,7 @@ class DuelCog(commands.Cog):
 
     @app_commands.command(name="defi", description="Attaquer un autre joueur — il n'a pas besoin d'être connecté.")
     @app_commands.describe(membre="Le joueur à attaquer (les testeurs peuvent viser le bot pour s'entraîner)",
-                           amical="Match amical (sans Elo ni récompense)",
+                           amical="Match amical : ni Elo, ni pack, et hors quota quotidien",
                            difficulte="Entraînement contre le bot : rareté de son équipe")
     @app_commands.choices(difficulte=[app_commands.Choice(name=r, value=r) for r in SPAR_RARITIES])
     @beta_guard()
@@ -566,14 +604,34 @@ class DuelCog(commands.Cog):
         if ranked:
             elo_a, elo_d = database.get_user_elo(attacker.id), database.get_user_elo(defender.id)
             if not E.within_band(elo_a, elo_d, DUEL_ELO_BAND):
-                # Bande DOUCE : le duel classé reste possible, mais K et récompenses réduits.
+                # Bande DOUCE : le duel classé reste possible, mais avec un K réduit.
                 soft_note = (f"\n⚖️ Écart d'Elo important ({elo_a} vs {elo_d}, bande ±{DUEL_ELO_BAND}) : "
-                             f"attaque **hors bande** — gains d'Elo et récompenses réduits.")
+                             f"attaque **hors bande** — gain d'Elo réduit.")
             since = _today_start_iso()
+
+            # Le plafond de la JOURNÉE passe avant celui de la cible : inutile de
+            # renvoyer le joueur vers un autre adversaire s'il n'a plus de match à jouer.
+            matchs, battus, _packs = self._daily_status(attacker.id, since)
+            if matchs >= DAILY_MATCH_CAP:
+                return await interaction.response.send_message(
+                    f"🏁 Journée terminée : tes **{DAILY_MATCH_CAP} matchs classés** sont joués.\n"
+                    f"{self._daily_progress_text(matchs, battus)}\n\n"
+                    f"Tu peux continuer en **amical** — sans Elo, et sans pack.", ephemeral=True)
+
             if database.count_ranked_attacks_between(attacker.id, defender.id, since) >= DAILY_PAIR_CAP:
                 return await interaction.response.send_message(
                     f"🚫 Tu as déjà attaqué {defender.display_name} {DAILY_PAIR_CAP} fois en classé "
                     f"aujourd'hui. Vise quelqu'un d'autre, ou joue en **amical**.", ephemeral=True)
+
+            # Avertissement, pas blocage : la 2ᵉ attaque reste utile pour l'Elo, et
+            # c'est la seule façon de rattraper une cible qu'on avait ratée. Mais si
+            # on l'a DÉJÀ battue, le match ne rapportera aucun pack — mieux vaut le
+            # savoir avant de composer son équipe qu'après le coup de sifflet final.
+            if database.count_ranked_attacks_between(
+                    attacker.id, defender.id, since, wins_only=True):
+                soft_note += (f"\n♻️ Tu as déjà battu {defender.display_name} aujourd'hui : "
+                              f"ce match jouera l'Elo, mais **ne comptera pas** pour les packs "
+                              f"(un adversaire ne compte qu'une fois).")
 
         ACTIVE_DUELISTS.add(attacker.id)
         # La défense est FIGÉE ici : la puissance annoncée est celle qui sera jouée,
@@ -600,8 +658,12 @@ class DuelCog(commands.Cog):
             raise
 
     async def play_match(self, view: "DuelPrepView"):
-        """Simule, applique l'Elo de l'attaquant + les récompenses, enregistre, affiche,
-        et envoie son compte-rendu au défenseur absent."""
+        """Simule, applique l'Elo de l'attaquant, enregistre, affiche, et envoie son
+        compte-rendu au défenseur absent.
+
+        Aucun crédit ici : les packs se calculent sur le bilan du jour et sont versés
+        par `daily_packs_loop`. Ce que le joueur voit en fin de match n'est donc qu'un
+        état d'avancement, pas un gain."""
         s = view.s
         try:
             a, d = s.attacker, s.defender
@@ -614,13 +676,17 @@ class DuelCog(commands.Cog):
             mode = "🤖 Entraînement" if s.sparring else ("🏆 Classé" if s.ranked else "🤝 Amical")
 
             # --- Narration : coup d'envoi → mi-temps → résultat ---
+            # view=None : dès le coup d'envoi les boutons DISPARAISSENT du message.
+            # Les composants Discord sont attachés au message, pas au lecteur : impossible
+            # de les montrer au seul attaquant. Les griser laissait donc trois boutons
+            # morts sous chaque résultat, pour tout le salon.
             kick = discord.Embed(
                 title="🟢 Coup d'envoi !",
                 description=f"**{a.display_name}** (puissance {round(pow_a)}) attaque "
                             f"**{d.display_name}** (puissance {round(pow_d)})…",
                 color=discord.Color.blurple())
             kick.set_footer(text=mode)
-            await view.message.edit(embed=kick, view=view)
+            await view.message.edit(embed=kick, view=None)
             await asyncio.sleep(2.5)
 
             ht = discord.Embed(
@@ -628,7 +694,7 @@ class DuelCog(commands.Cog):
                 description=f"**{a.display_name}** {half[0]} · {half[1]} **{d.display_name}**",
                 color=discord.Color.blurple())
             ht.set_footer(text=mode)
-            await view.message.edit(embed=ht, view=view)
+            await view.message.edit(embed=ht, view=None)
             await asyncio.sleep(2.5)
 
             if s.sparring:
@@ -638,12 +704,12 @@ class DuelCog(commands.Cog):
             else:
                 elo_a0, elo_d0 = database.get_user_elo(a.id), database.get_user_elo(d.id)
             elo_a1 = elo_a0
-            reward_line = ""
-            defense_gain = 0
             soft = False
 
             if s.ranked:
-                # Bande douce : hors bande, le duel compte mais K et récompenses réduits.
+                # Bande douce : hors bande, le duel compte mais avec un K réduit. Les
+                # packs, eux, ne dépendent pas de l'écart d'Elo — une victoire vaut
+                # une victoire, quelle que soit la cible.
                 soft = not E.within_band(elo_a0, elo_d0, DUEL_ELO_BAND)
                 k = DUEL_SOFT_K if soft else E.ELO_K
                 result_a = 1.0 if winner == a.id else 0.0 if winner == d.id else 0.5
@@ -651,7 +717,6 @@ class DuelCog(commands.Cog):
                 # pas choisi ce match, il ne peut pas le perdre.
                 elo_a1 = E.elo_apply_attacker(elo_a0, elo_d0, result_a, k=k)
                 database.set_user_elo(a.id, elo_a1)
-                reward_line, defense_gain = self._apply_rewards(a, d, winner, elo_a0, elo_d0, soft)
 
             if not s.sparring:
                 # elo2_before == elo2_after : la trace montre explicitement que le
@@ -676,70 +741,158 @@ class DuelCog(commands.Cog):
             if mvp:
                 e.add_field(name="⭐ Homme du match", value=f"{RARITY_EMOJI.get(mvp['rarete'], '🔹')} {mvp['nom']}", inline=False)
             if s.ranked:
-                elo_note = " · ⚖️ hors bande (gains réduits)" if soft else ""
+                elo_note = " · ⚖️ hors bande (gain d'Elo réduit)" if soft else ""
                 e.add_field(name="📊 Elo",
                             value=f"{a.display_name} : {elo_a0} → **{elo_a1}**{elo_note}\n"
                                   f"{d.display_name} : {elo_d0} (inchangé — en défense, on ne risque rien)",
                             inline=False)
-                if reward_line:
-                    e.add_field(name="🎁 Récompenses", value=reward_line, inline=False)
+                # Le duel vient d'être enregistré en base : ce décompte inclut donc
+                # le match qu'on est en train d'afficher.
+                matchs, battus, _packs = self._daily_status(a.id)
+                bilan = self._daily_progress_text(matchs, battus)
+                # Une victoire sur une cible déjà battue laisse le compteur immobile.
+                # Sans un mot ici, ça se lit comme un bug — c'est exactement le
+                # moment où il faut expliquer la règle, pas dans une page d'aide.
+                if winner == a.id and database.count_ranked_attacks_between(
+                        a.id, d.id, _today_start_iso(), wins_only=True) > 1:
+                    bilan += ("\n⚠️ Tu avais **déjà battu ce joueur aujourd'hui** : cette "
+                              "victoire compte pour l'Elo, pas pour les packs.")
+                e.add_field(name="🎁 Packs du jour", value=bilan, inline=False)
             else:
                 e.set_footer(text="🤖 Entraînement — rien n'est enregistré (ni Elo, ni historique)."
                                   if s.sparring else "Match amical — aucun impact sur l'Elo.")
-            await view.message.edit(embed=e, view=view)
+            await view.message.edit(embed=e, view=None)
             view.stop()
 
             if not s.sparring:
-                await self._notify_defender(a, d, s_a, s_d, winner, defense_gain, s.ranked)
+                await self._notify_defender(a, d, s_a, s_d, winner, s.ranked)
         finally:
             # Quoi qu'il arrive (exception comprise), on libère l'attaquant.
             view._cleanup()
 
-    def _apply_rewards(self, a, d, winner, elo_a0, elo_d0, soft=False):
-        """Récompenses d'un duel asymétrique. Retourne (lignes_embed, gain_défenseur).
+    # === LA JOURNÉE DE DUEL : plafond de matchs, paliers de packs ===
+    #
+    # Un match ne crédite plus rien au moment où il se joue — il ne bouge que l'Elo.
+    # Ce qui paie, c'est le BILAN de la journée, versé en packs la nuit suivante
+    # (cf _settle_day). Les deux helpers ci-dessous sont donc en LECTURE SEULE : ils
+    # affichent où en est le joueur, ils ne créditent jamais.
 
-        Attaquant : gain scalé par l'Elo s'il gagne, consolation s'il perd — plafonné
-        au nombre d'ATTAQUES du jour (subir des attaques n'entame pas son quota).
-        Défenseur : rien s'il perd (il n'était pas là, on ne punit pas une absence),
-        DEFENSE_HOLD_POINTS si sa défense tient — plafonné séparément pour qu'une
-        cible populaire n'encaisse pas passivement toute la journée.
-        `soft` : duel hors bande Elo → récompenses réduites (SOFT_REWARD_FACTOR).
+    def _daily_status(self, user_id, since=None):
+        """(matchs joués, adversaires distincts battus, packs mérités en l'état).
+
+        Le second terme n'est PAS le nombre de victoires brutes : rebattre la même
+        cible dans la journée ne compte qu'une fois (cf `count_beaten_opponents_for`).
         """
-        since = _today_start_iso()
-        factor = E.SOFT_REWARD_FACTOR if soft else 1.0
-        lines = []
-        defense_gain = 0
+        since = since or _today_start_iso()
+        matchs = database.count_ranked_attacks_for(user_id, since)
+        battus = database.count_beaten_opponents_for(user_id, since)
+        return matchs, battus, E.packs_for_wins(battus)
 
-        # NB : le compte exclut le duel en cours (record_duel est appelé après),
-        # d'où le `<` strict pour respecter exactement les plafonds.
-        attacks_today = database.count_ranked_attacks_for(a.id, since)
-        if attacks_today < DAILY_REWARD_CAP:
-            if winner == a.id:
-                gain = max(1, round(E.duel_reward(elo_a0, elo_d0) * factor))
-                lines.append(f"🥇 {a.display_name} : +{gain} points")
-            elif winner is None:
-                gain = max(1, round(E.DUEL_LOSS_POINTS * factor))
-                lines.append(f"🤝 {a.display_name} : +{gain} points (match nul)")
-            else:
-                gain = max(1, round(E.DUEL_LOSS_POINTS * factor))
-                lines.append(f"🥈 {a.display_name} : +{gain} points (consolation)")
-            database.update_points(a.id, gain)
+    @staticmethod
+    def _daily_progress_text(matchs, battus):
+        """Bilan du jour + prochain palier, chiffré en ADVERSAIRES BATTUS.
+
+        On dit « adversaires battus » et jamais « victoires » : c'est ce que le
+        barème compte réellement, et le joueur qui vient de rebattre la même cible
+        doit comprendre du premier coup d'œil pourquoi son compteur n'a pas bougé.
+        Quand les matchs restants ne suffisent plus à décrocher le palier, on le
+        dit — mieux vaut une journée annoncée close qu'un espoir entretenu.
+        """
+        packs = E.packs_for_wins(battus)
+        restants = max(0, DAILY_MATCH_CAP - matchs)
+        s_b = "s" if battus > 1 else ""
+        s_p = "s" if packs > 1 else ""
+        lignes = [f"**{battus} adversaire{s_b} battu{s_b}** en {matchs}/{DAILY_MATCH_CAP} matchs "
+                  f"→ **{packs} pack{s_p}** cette nuit"]
+        palier = E.next_pack_tier(battus)
+        if not restants:
+            lignes.append("🏁 Journée close : ce bilan est définitif.")
+        elif palier is None:
+            lignes.append("🏅 Palier maximum : les matchs restants ne jouent plus que l'Elo.")
         else:
-            lines.append(f"⚔️ {a.display_name} : plafond quotidien atteint (0 pt)")
-
-        if winner == d.id or winner is None:
-            defenses_today = database.count_defenses_for(d.id, since)
-            if defenses_today < DEFENSE_REWARD_CAP:
-                base = E.DEFENSE_HOLD_POINTS if winner == d.id else E.DEFENSE_DRAW_POINTS
-                defense_gain = max(1, round(base * factor))
-                database.update_points(d.id, defense_gain)
-                verbe = "a tenu" if winner == d.id else "a résisté"
-                lines.append(f"🛡️ {d.display_name} : +{defense_gain} points (sa défense {verbe})")
+            manque, cible = palier
+            s_m = "s" if manque > 1 else ""
+            s_c = "s" if cible > 1 else ""
+            if manque <= restants:
+                lignes.append(f"Encore **{manque} adversaire{s_m} différent{s_m}** "
+                              f"→ {cible} pack{s_c}.")
             else:
-                lines.append(f"🛡️ {d.display_name} : plafond de défense atteint (0 pt)")
-        return "\n".join(lines), defense_gain
+                lignes.append("Le palier suivant n'est plus atteignable aujourd'hui.")
+        return "\n".join(lignes)
 
-    async def _notify_defender(self, a, d, s_a, s_d, winner, defense_gain, ranked):
+    # === DISTRIBUTION QUOTIDIENNE DES PACKS ===
+
+    async def cog_load(self):
+        self.daily_packs_loop.start()
+
+    async def cog_unload(self):
+        self.daily_packs_loop.cancel()
+
+    @tasks.loop(minutes=DAILY_PACKS_CHECK_MINUTES)
+    async def daily_packs_loop(self):
+        """Solde les journées écoulées : compte les victoires, crédite les packs.
+
+        JAMAIS la journée en cours : tant qu'il reste des matchs à jouer, le bilan
+        n'est pas définitif. On part donc de la veille et on remonte jusqu'à
+        DAILY_PACKS_CATCHUP_DAYS jours en arrière — c'est ce qui rattrape les nuits
+        où le bot était éteint, sans quoi une coupure à minuit volerait une journée
+        de jeu à tout le monde.
+        """
+        aujourdhui = datetime.now(PARIS).date()
+        for recul in range(DAILY_PACKS_CATCHUP_DAYS, 0, -1):
+            jour = aujourdhui - timedelta(days=recul)
+            if jour in self._settled_days:
+                continue
+            try:
+                await self._settle_day(jour)
+            except Exception as err:
+                # Une journée qui échoue ne doit ni bloquer les autres, ni tuer la
+                # boucle : on la laisse hors de _settled_days, elle sera retentée.
+                print(f"❌ (DUEL) Packs du {jour} : {type(err).__name__} : {err}")
+                continue
+            self._settled_days.add(jour)
+
+    @daily_packs_loop.before_loop
+    async def before_daily_packs_loop(self):
+        await self.bot.wait_until_ready()
+
+    async def _settle_day(self, jour):
+        """Crédite les packs mérités par chaque attaquant pour la journée `jour`."""
+        debut, fin = _day_bounds(jour)
+        for user_id in database.get_ranked_attackers_between(debut, fin):
+            battus = database.count_beaten_opponents_for(user_id, debut, fin)
+            packs = E.packs_for_wins(battus)
+            if not packs:
+                continue
+            # grant_duel_daily_packs EST le verrou : il ne renvoie True qu'au premier
+            # crédit de la journée. Relancer la boucle ne peut donc pas payer deux fois,
+            # et le MP ne part qu'avec le crédit réel.
+            if database.grant_duel_daily_packs(user_id, jour.isoformat(), battus, packs):
+                await self._notify_daily_packs(user_id, jour, battus, packs)
+
+    async def _notify_daily_packs(self, user_id, jour, battus, packs):
+        """MP de bilan. Un joueur injoignable (MP fermés, compte parti) ne fait pas
+        échouer la distribution : les packs sont déjà crédités, il les verra au
+        prochain /ouvrir."""
+        try:
+            user = self.bot.get_user(user_id) or await self.bot.fetch_user(user_id)
+        except (discord.NotFound, discord.HTTPException):
+            return
+        s_b = "s" if battus > 1 else ""
+        s_p = "s" if packs > 1 else ""
+        quand = jour.strftime("%d/%m")
+        e = discord.Embed(
+            title=f"🎁 {packs} pack{s_p} pour ta journée de duels",
+            description=f"**{battus} adversaire{s_b} différent{s_b} battu{s_b}** le {quand} "
+                        f"→ **{packs} pack{s_p}** crédité{s_p}. À ouvrir avec `/ouvrir`.",
+            color=discord.Color.gold())
+        e.set_footer(text=f"{DAILY_MATCH_CAP} matchs classés par jour · {E.ladder_text()}")
+        try:
+            await user.send(embed=e)
+        except (discord.Forbidden, discord.HTTPException):
+            pass
+
+    async def _notify_defender(self, a, d, s_a, s_d, winner, ranked):
         """Compte-rendu en MP au défenseur absent.
 
         Plafonné à DEFENSE_DM_CAP par jour : une cible populaire ne doit pas se
@@ -759,10 +912,15 @@ class DuelCog(commands.Cog):
                     f"Ton équipe automatique {'a gagné' if held else 'a fait match nul' if winner is None else 'a perdu'} "
                     f"**{s_d} - {s_a}**.")
             e = discord.Embed(title=title, description=desc, color=color)
-            if ranked and defense_gain:
-                e.add_field(name="🎁 Récompense", value=f"+{defense_gain} points", inline=False)
-            e.set_footer(text="En défense tu ne risques rien : ton Elo n'a pas bougé. "
-                              "Enrichis ta collection pour renforcer ta défense automatique.")
+            if ranked:
+                e.add_field(
+                    name="🛡️ Ce que tu risquais",
+                    value="Rien. En défense ton Elo ne bouge pas et tu ne perds aucun pack — "
+                          "mais une défense qui tient n'en rapporte pas non plus : "
+                          "les packs se gagnent en **attaquant**.",
+                    inline=False)
+            e.set_footer(text="Enrichis ta collection pour renforcer ta défense automatique, "
+                              "et lance tes propres attaques avec /defi.")
             await d.send(embed=e)
         except (discord.Forbidden, discord.HTTPException):
             pass   # MP fermés : tant pis, le résultat reste dans /defenses
@@ -874,7 +1032,9 @@ class DuelCog(commands.Cog):
             desc += (f"{medal} **{name}** — {row['elo']} Elo "
                      f"(⚔️ {row['victoires']}/{row['matchs']} V{defense})\n")
         e = discord.Embed(title="🏆 Classement des duels", description=desc, color=discord.Color.gold())
-        e.set_footer(text="L'Elo se gagne à l'attaque · 🛡️ défenses tenues (elles rapportent des points, pas d'Elo)")
+        e.set_footer(text=f"L'Elo et les packs se gagnent à l'attaque · "
+                          f"🛡️ défenses tenues (elles ne rapportent rien, elles protègent) · "
+                          f"{E.ladder_text()}")
         await interaction.response.send_message(embed=e)
 
 

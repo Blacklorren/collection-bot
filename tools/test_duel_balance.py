@@ -84,6 +84,12 @@ n1, n2 = E.elo_apply(1000, 1300, 1.0)  # outsider gagne
 print(f"  1000 bat 1300 -> {n1} / {n2}")
 assert n1 > 1025
 assert E.within_band(1000, 1100) and not E.within_band(1000, 1200)
-print(f"  Recompense: battre +200 Elo = {E.duel_reward(1000,1200)} pts ; ecraser -300 = {E.duel_reward(1300,1000)} pts")
+# Paliers de packs : le bareme quotidien remplace l'ancien gain par match.
+assert E.packs_for_wins(0) == 0 and E.packs_for_wins(2) == 0
+assert E.packs_for_wins(3) == 1 and E.packs_for_wins(4) == 1
+assert E.packs_for_wins(5) == 2 and E.packs_for_wins(99) == 2
+assert E.next_pack_tier(0) == (3, 1) and E.next_pack_tier(4) == (1, 2)
+assert E.next_pack_tier(5) is None and E.next_pack_tier(6) is None
+print(f"  Packs/jour: {E.ladder_text()}")
 
 print("\nTOUS LES TESTS DUEL PASSENT")

@@ -196,6 +196,22 @@ def initialize_database():
                 lineup2 TEXT
             )
         ''')
+
+        # Packs de duel versés en fin de journée, UNE ligne par (joueur, jour).
+        # Cette table n'est pas un journal décoratif : c'est le VERROU d'idempotence.
+        # La distribution tourne à minuit, rattrape les jours manqués au démarrage et
+        # peut être relancée à la main — sans clé primaire (user_id, jour), un simple
+        # redémarrage à 00 h 05 paierait la journée deux fois.
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS duel_daily_rewards (
+                user_id INTEGER NOT NULL,
+                jour TEXT NOT NULL,               -- 'AAAA-MM-JJ', jour de PARIS
+                victoires INTEGER NOT NULL,
+                packs INTEGER NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, jour)
+            )
+        ''')
         # Points de message EN ATTENTE de maturation.
         # Les points d'un message ne sont pas credites tout de suite : ils murissent
         # apres un delai. Tant qu'ils n'ont pas muri, ils ne sont NI depensables NI
@@ -1213,20 +1229,27 @@ def record_duel(joueur1, joueur2, score1, score2, gagnant, classe,
         con.commit()
         return cur.lastrowid
 
-def count_ranked_attacks_between(attaquant, defenseur, since_iso):
+def count_ranked_attacks_between(attaquant, defenseur, since_iso, wins_only=False):
     """Nb d'ATTAQUES classées de `attaquant` CONTRE `defenseur` depuis `since_iso`.
 
     Anti-farm de paire, mais DIRECTIONNEL : en duel asymétrique, se faire attaquer
     trois fois le matin ne doit pas empêcher de riposter l'après-midi — la victime
     n'a rien fait pour mériter d'être bloquée.
+
+    `wins_only` ne garde que les attaques GAGNÉES : sert à repérer qu'on vient de
+    rebattre quelqu'un qu'on avait déjà battu aujourd'hui, pour le dire dans
+    l'embed de résultat plutôt que de laisser le compteur de packs stagner sans
+    explication (ce qui passerait pour un bug).
     """
+    clause = " AND gagnant = ?" if wins_only else ""
+    params = [since_iso, attaquant, defenseur] + ([attaquant] if wins_only else [])
     with _connect() as con:
         cur = con.cursor()
-        return cur.execute("""
+        return cur.execute(f"""
             SELECT COUNT(*) FROM duels
             WHERE classe = 1 AND datetime(created_at) >= datetime(?)
-              AND joueur1 = ? AND joueur2 = ?
-        """, (since_iso, attaquant, defenseur)).fetchone()[0]
+              AND joueur1 = ? AND joueur2 = ?{clause}
+        """, params).fetchone()[0]
 
 def count_ranked_duels_for(user_id, since_iso):
     """Nb de duels CLASSÉS joués par un utilisateur depuis `since_iso`, attaque ET
@@ -1270,6 +1293,84 @@ def count_defenses_for(user_id, since_iso, ranked_only=True):
             WHERE {clause}datetime(created_at) >= datetime(?)
               AND joueur2 = ?
         """, (since_iso, user_id)).fetchone()[0]
+
+def count_beaten_opponents_for(user_id, since_iso, until_iso=None):
+    """Nb d'ADVERSAIRES DISTINCTS battus en attaque classée sur une fenêtre.
+
+    `COUNT(DISTINCT joueur2)`, et c'est tout l'anti-farm : battre trois fois le
+    même débutant ne vaut qu'une victoire. Pour décrocher les deux packs il faut
+    cinq adversaires différents, ce qu'aucune paire de collections faibles ne peut
+    fournir. Effet de bord voulu : la seconde attaque autorisée sur une même cible
+    (`DUEL_DAILY_PAIR_CAP`) devient un droit à la REVANCHE — utile seulement si on
+    a perdu la première, sans valeur si on l'a déjà gagnée.
+
+    Uniquement `joueur1` : une défense qui tient n'est pas une victoire au sens
+    des packs — elle protège l'Elo, elle ne le fait pas monter, et surtout elle ne
+    se plafonne pas (on ne choisit pas d'être attaqué).
+    `until_iso` est EXCLU, pour découper des journées franches sans recouvrement.
+    """
+    sql = """
+        SELECT COUNT(DISTINCT joueur2) FROM duels
+        WHERE classe = 1 AND joueur1 = ? AND gagnant = ?
+          AND datetime(created_at) >= datetime(?)
+    """
+    params = [user_id, user_id, since_iso]
+    if until_iso is not None:
+        sql += " AND datetime(created_at) < datetime(?)"
+        params.append(until_iso)
+    with _connect() as con:
+        return con.cursor().execute(sql, params).fetchone()[0]
+
+
+def get_ranked_attackers_between(since_iso, until_iso):
+    """Tous les joueurs ayant lancé au moins une attaque classée dans la fenêtre.
+
+    Sert à la distribution quotidienne : on ne parcourt pas la table `users` (qui
+    contient tous les bavards du serveur) mais les seuls joueurs ayant réellement
+    joué ce jour-là.
+    """
+    with _connect() as con:
+        rows = con.cursor().execute("""
+            SELECT DISTINCT joueur1 FROM duels
+            WHERE classe = 1
+              AND datetime(created_at) >= datetime(?)
+              AND datetime(created_at) < datetime(?)
+        """, (since_iso, until_iso)).fetchall()
+        return [r[0] for r in rows]
+
+
+def grant_duel_daily_packs(user_id, jour, victoires, packs):
+    """Crédite les packs du jour, UNE SEULE FOIS par (joueur, jour).
+
+    L'insertion du verrou et le crédit des packs sont dans la MÊME transaction :
+    si le bot meurt entre les deux, la journée est soit entièrement payée, soit
+    pas payée du tout — jamais à moitié, jamais deux fois.
+
+    Renvoie True si le crédit vient d'être effectué, False si cette journée avait
+    déjà été payée (relance, redémarrage, double boucle).
+    """
+    with _connect() as con:
+        check_user(user_id, con)
+        cur = con.cursor()
+        cur.execute("""
+            INSERT OR IGNORE INTO duel_daily_rewards (user_id, jour, victoires, packs)
+            VALUES (?, ?, ?, ?)
+        """, (user_id, jour, victoires, packs))
+        if cur.rowcount == 0:
+            return False
+        cur.execute("UPDATE users SET packs = packs + ? WHERE user_id = ?", (packs, user_id))
+        return True
+
+
+def get_duel_daily_reward(user_id, jour):
+    """Ce qui a été versé à un joueur pour un jour donné, ou None s'il n'a rien reçu."""
+    with _connect() as con:
+        con.row_factory = sqlite3.Row
+        row = con.cursor().execute("""
+            SELECT * FROM duel_daily_rewards WHERE user_id = ? AND jour = ?
+        """, (user_id, jour)).fetchone()
+        return dict(row) if row else None
+
 
 def get_user_defenses(user_id, limit=10):
     """Dernières attaques subies par un joueur (il était `joueur2`), plus récentes d'abord."""
