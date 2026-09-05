@@ -349,6 +349,21 @@ def update_points(user_id, amount):
         cur.execute("UPDATE users SET points = points + ? WHERE user_id = ?", (amount, user_id))
         con.commit()
 
+def mass_add_points(amount):
+    """Ajoute des points à TOUS les joueurs enregistrés (chaque ligne de `users`).
+
+    « Tout le monde » = les joueurs connus du bot, pas les membres du serveur :
+    qui n'a jamais déclenché `check_user` n'a pas de ligne, donc ne reçoit rien.
+    Volontairement additif seulement (garde-fou côté `/addpointsall`) : un retrait
+    de masse ferait passer des soldes sous zéro sans aucune vérification.
+    Retourne le nombre de joueurs crédités.
+    """
+    with _connect() as con:
+        cur = con.cursor()
+        cur.execute("UPDATE users SET points = points + ?", (amount,))
+        con.commit()
+        return cur.rowcount
+
 def update_fragments(user_id, amount):
     """Ajoute ou retire des fragments à un utilisateur."""
     check_user(user_id)

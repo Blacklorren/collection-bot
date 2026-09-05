@@ -1231,6 +1231,26 @@ class CollectionCog(commands.Cog):
         try: await membre.send(f"🎁 Un admin t'a donné **{montant} points** !")
         except: pass
 
+    @app_commands.command(name='addpointsall',
+                          description="[Admin] Donner des points à TOUS les joueurs enregistrés.")
+    @app_commands.describe(montant="Points ajoutés à chaque joueur (positif uniquement)")
+    @app_commands.default_permissions(manage_guild=True)
+    async def add_points_all_command(self, interaction: discord.Interaction, montant: int):
+        # Additif uniquement : un retrait de masse n'a aucun garde-fou (soldes
+        # négatifs, points déjà dépensés) et n'a pas de cas d'usage ici.
+        if montant <= 0:
+            return await interaction.response.send_message(
+                "❌ Le montant doit être positif : cette commande sert uniquement à ajouter.",
+                ephemeral=True)
+
+        # Contrairement à /addpoints, aucun MP n'est envoyé et rien n'est posté dans
+        # le salon : à l'échelle de tous les joueurs ça ferait autant de MP que de
+        # comptes. Seul l'admin voit le récap.
+        count = database.mass_add_points(montant)
+        await interaction.response.send_message(
+            f"✅ **{montant} points** ajoutés à **{count}** joueur(s) enregistré(s).\n"
+            f"ℹ️ *Aucune notification envoyée.*", ephemeral=True)
+
     @app_commands.command(name='donnercarte', description="[Admin] Donner une carte précise à un joueur.")
     @app_commands.describe(membre="Le joueur qui reçoit la carte", carte="Nom de la carte à donner")
     @app_commands.default_permissions(manage_guild=True)
