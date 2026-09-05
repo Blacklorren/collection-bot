@@ -67,7 +67,8 @@ def load_from_cog(*names):
     return ns
 
 
-COG = load_from_cog("_midnight_utc", "_day_bounds", "_settle_day", "_daily_progress_text")
+COG = load_from_cog("_midnight_utc", "_day_bounds", "_settle_day", "_daily_progress_text",
+                    "playable_count", "missing_slots")
 _day_bounds = COG["_day_bounds"]
 _settle_day = COG["_settle_day"]
 _daily_progress_text = COG["_daily_progress_text"]
@@ -280,5 +281,65 @@ assert "definitif" in _daily_progress_text(6, 2).replace("é", "e")
 # Le farmeur : 6 matchs joues, 2 adversaires, rien.
 assert "**2 adversaires battus** en 6/6 matchs" in _daily_progress_text(6, 2)
 assert "**0 pack**" in _daily_progress_text(6, 2)
+
+
+# --------------------------------------------------------------------------
+# 5. Ticket d'entree : 7 cartes DISTINCTES pour etre defiable (et pour defier)
+# --------------------------------------------------------------------------
+class FakeRoster(object):
+    """Juste ce dont playable_count / missing_slots ont besoin.
+
+    `injouables` simule les cartes hors saison (ou Noel) : possedees, mais pas
+    alignables. Le compte doit les ignorer comme le fait cog.jouable().
+    """
+
+    def __init__(self, injouables=()):
+        self.injouables = set(injouables)
+
+    def get_card(self, cid):
+        return {"id": cid}
+
+    def jouable(self, card):
+        return bool(card) and card["id"] not in self.injouables
+
+
+# missing_slots appelle self.playable_count : on greffe la vraie methode du cog.
+FakeRoster.playable_count = COG["playable_count"]
+
+
+def set_collection(user_id, card_ids):
+    database.check_user(user_id)
+    with database._connect() as con:
+        con.execute("DELETE FROM user_cards WHERE user_id = ?", (user_id,))
+        con.executemany("INSERT INTO user_cards (user_id, card_id) VALUES (?, ?)",
+                        [(user_id, cid) for cid in card_ids])
+
+
+print("\n=== TICKET D'ENTREE (7 postes) ===")
+roster = FakeRoster()
+N = len(E.SLOTS)
+
+CAS = [
+    ("collection vide",              201, [],                        (),        0, N),
+    ("3 cartes",                     202, [1, 2, 3],                 (),        3, N - 3),
+    ("6 cartes : il en manque une",  203, list(range(1, 7)),         (),        6, 1),
+    ("7 cartes pile",                204, list(range(1, 8)),         (),        7, 0),
+    ("12 cartes",                    205, list(range(1, 13)),        (),       12, 0),
+    # Le piege : 21 lignes en base, mais seulement 3 cartes differentes.
+    ("3 cartes en 7 exemplaires",    206, [1, 2, 3] * 7,             (),        3, N - 3),
+    # 8 possedees dont 2 hors saison -> 6 alignables, equipe incomplete.
+    ("8 dont 2 hors saison",         207, list(range(1, 9)),     (7, 8),        6, 1),
+]
+for libelle, uid, cartes, injouables, attendu_count, attendu_manque in CAS:
+    set_collection(uid, cartes)
+    r = FakeRoster(injouables)
+    count = r.playable_count(uid)
+    manque = COG["missing_slots"](r, uid)
+    etat = "defiable" if manque == 0 else "protege (manque %d)" % manque
+    print("  %-28s %2d lignes -> %2d cartes -> %s" % (libelle, len(cartes), count, etat))
+    assert count == attendu_count, "%s : %d cartes attendues, %d obtenues" % (
+        libelle, attendu_count, count)
+    assert manque == attendu_manque, "%s : manque %d attendu, %d obtenu" % (
+        libelle, attendu_manque, manque)
 
 print("\nTOUS LES TESTS PACKS PASSENT")

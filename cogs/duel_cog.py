@@ -2,8 +2,11 @@
 Duels entre joueurs (Saison 2) — ASYMÉTRIQUES.
 
 PRINCIPE : un duel n'exige plus que les deux joueurs soient connectés en même
-temps. On attaque qui on veut, dès que la cible possède au moins une carte
-jouable, et le match se résout immédiatement.
+temps. On attaque qui on veut, dès lors que les DEUX camps peuvent aligner une
+ÉQUIPE COMPLÈTE (7 cartes distinctes de la saison), et le match se résout
+immédiatement. Une collection qui débute est donc intouchable : un poste vide
+vaut une Commune sans club ni bonus, sa défense n'était pas un match mais un
+cadeau. Seul l'entraînement contre le bot reste ouvert à toute collection.
 
   - L'ATTAQUANT est présent : il compose son équipe, puis lance l'attaque.
   - Le DÉFENSEUR est absent : son équipe est sa COMPO AUTOMATIQUE, c'est-à-dire
@@ -456,11 +459,32 @@ class DuelCog(commands.Cog):
     def get_card(self, cid):
         return self.card_map.get(cid) or self.card_map.get(str(cid))
 
+    def playable_count(self, user_id):
+        """Nombre de cartes DISTINCTES alignables par ce joueur.
+
+        Distinctes, car `auto_lineup` dédoublonne par id : posséder trois
+        exemplaires de la même carte ne remplit pas trois postes, seulement un.
+        Compter les lignes de `user_cards` annoncerait donc des équipes complètes
+        qui ne le sont pas.
+        """
+        return len({cid for cid in database.get_user_collection(user_id)
+                    if self.jouable(self.get_card(cid))})
+
     def has_playable_cards(self, user_id):
-        """True si le joueur possède au moins une carte alignable — le seul critère
-        pour être défiable en duel asynchrone."""
-        return any(self.jouable(self.get_card(c))
-                   for c in database.get_user_collection(user_id))
+        """True si le joueur peut aligner au moins une carte. Suffisant pour
+        s'entraîner contre le bot, pas pour un vrai duel (cf `missing_slots`)."""
+        return self.playable_count(user_id) > 0
+
+    def missing_slots(self, user_id):
+        """Cartes manquantes pour remplir les 7 postes. 0 = équipe complète.
+
+        C'est le ticket d'entrée du duel, des DEUX côtés. Un joueur à trois cartes
+        défendait avec quatre postes vides, et un poste vide vaut une Commune sans
+        club ni bonus : sa défense était un cadeau, pas un match. L'attaquant y
+        gagnait un adversaire distinct à moindres frais, et lui ne récoltait que
+        des MP de défaite.
+        """
+        return max(0, len(E.SLOTS) - self.playable_count(user_id))
 
     async def cog_app_command_error(self, interaction, error):
         msg = error.user_message if isinstance(error, BetaLocked) else None
@@ -593,11 +617,25 @@ class DuelCog(commands.Cog):
             await self._open_prep(interaction, view, view.build_embed())
             return
 
-        # Le SEUL prérequis côté cible : posséder des cartes jouables.
-        if not self.has_playable_cards(defender.id):
+        # ÉQUIPE COMPLÈTE des deux côtés : c'est le prérequis d'un vrai duel.
+        # L'entraînement contre le bot, lui, reste ouvert à toute collection — on
+        # s'entraîne justement pour combler les trous, et rien n'y est enregistré.
+        manque = self.missing_slots(attacker.id)
+        if manque:
+            s_m = "s" if manque > 1 else ""
             return await interaction.response.send_message(
-                f"{defender.display_name} n'a aucune carte jouable de la saison en cours : "
-                f"impossible de l'attaquer.", ephemeral=True)
+                f"⛔ Il te manque **{manque} carte{s_m}** de la saison en cours pour aligner "
+                f"une équipe complète ({len(E.SLOTS)} postes). Ouvre des packs avec `/pack` "
+                f"et `/ouvrir`, ou complète ta collection avec `/echange`.", ephemeral=True)
+
+        manque_d = self.missing_slots(defender.id)
+        if manque_d:
+            s_d = "s" if manque_d > 1 else ""
+            return await interaction.response.send_message(
+                f"🛡️ {defender.display_name} ne peut pas encore aligner une équipe complète "
+                f"(il lui manque **{manque_d} carte{s_d}**) : impossible de l'attaquer.\n"
+                f"Une collection qui débute n'est pas un adversaire, c'est une victime.",
+                ephemeral=True)
 
         ranked = not amical
         soft_note = ""
@@ -947,15 +985,26 @@ class DuelCog(commands.Cog):
     async def ma_defense(self, interaction: discord.Interaction):
         """La défense étant automatique, il faut au moins pouvoir la consulter :
         c'est ce qui rend lisible le lien « ouvrir des packs → mieux se défendre »."""
+        manque = self.missing_slots(interaction.user.id)
         if not self.has_playable_cards(interaction.user.id):
             return await interaction.response.send_message(
                 "Tu n'as aucune carte jouable : personne ne peut t'attaquer pour l'instant.", ephemeral=True)
         lineup = self.defense_lineup(interaction.user.id)
         pow_, det = E.team_power(lineup)
+        # Une collection incomplète est INTOUCHABLE : on l'annonce comme une
+        # protection assortie d'un objectif chiffré, pas comme un manque.
+        if manque:
+            s_m = "s" if manque > 1 else ""
+            desc = (f"🔒 Personne ne peut t'attaquer : il te manque **{manque} carte{s_m}** "
+                    f"pour aligner les {len(E.SLOTS)} postes. Ta collection est protégée "
+                    f"le temps de la compléter — et c'est aussi le moment où tu pourras "
+                    f"attaquer à ton tour.")
+        else:
+            desc = ("C'est cette équipe qui joue quand un autre joueur t'attaque, "
+                    "même hors ligne. Elle se met à jour toute seule quand ta collection grandit.")
         e = discord.Embed(
             title="🛡️ Ta défense automatique",
-            description="C'est cette équipe qui joue quand un autre joueur t'attaque, "
-                        "même hors ligne. Elle se met à jour toute seule quand ta collection grandit.",
+            description=desc,
             color=discord.Color.blurple())
         e.add_field(name="Composition", value=self._team_summary(lineup, det), inline=False)
         e.set_footer(text=f"Puissance {round(pow_)} · Elo {database.get_user_elo(interaction.user.id)} "

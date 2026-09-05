@@ -126,8 +126,24 @@ Implémenté dans `cogs/duel_cog.py` (pattern repris de `TradePicker`).
 ### Pourquoi asynchrone
 Exiger deux joueurs connectés en même temps rendait le duel quasi injouable sur un
 Discord où personne n'est là aux mêmes heures. **On attaque désormais qui on veut,
-dès que la cible possède au moins une carte jouable** — c'est le seul prérequis.
+dès lors que les deux camps peuvent aligner une équipe complète** (7 cartes
+distinctes de la saison en cours, cf `missing_slots`) — c'est le seul prérequis.
 `DuelChallengeView` (accepter / refuser) a disparu : il n'y a plus rien à accepter.
+
+**Le ticket d'entrée à 7 cartes** (ajouté le 5 septembre 2026) : un joueur à trois
+cartes défendait avec quatre postes vides, et un poste vide vaut une Commune sans
+club ni bonus (`team_power`). Sa défense n'était pas un match mais un cadeau —
+l'attaquant y gagnait un adversaire distinct à moindres frais, et lui ne récoltait
+que des MP de défaite. La règle vaut **des deux côtés** : on ne peut pas non plus
+attaquer avec une équipe incomplète, ce qui serait une défaite garantie et un
+match de quota gaspillé. Elle compte des cartes **distinctes**, car `auto_lineup`
+dédoublonne par id : trois exemplaires de la même carte ne remplissent qu'un poste.
+Seul l'**entraînement contre le bot** échappe à la règle (rien n'y est enregistré,
+et on s'entraîne justement pour combler ses trous).
+
+⚠️ **Effet de bord sur les packs** : les cibles éligibles se raréfient. Le palier
+haut demande 5 adversaires distincts, donc **5 joueurs avec une équipe complète**
+sur le serveur — à surveiller au lancement.
 
 ### L'équipe du défenseur absent
 C'est **sa compo automatique** (`defense_lineup` → `auto_lineup`) : ses meilleures
@@ -276,7 +292,13 @@ n'est plus discret, c'est tout. Pour l'empêcher vraiment il faudrait étaler le
    - **rebattre la même cible** : la préparation affiche l'avertissement `♻️`, et
      l'embed de résultat le `⚠️ Tu avais déjà battu ce joueur aujourd'hui` — le
      compteur d'adversaires ne doit PAS bouger, l'Elo si ;
-   - attaquer un compte **sans carte jouable** → refus explicite.
+   - attaquer un compte à **moins de 7 cartes jouables** → refus, avec le nombre
+     exact de cartes qui lui manquent ;
+   - **attaquer avec** moins de 7 cartes → refus symétrique, renvoi vers `/pack`
+     et `/echange` ; mais `/defi` sur le **bot** doit rester possible ;
+   - `/ma_defense` sur une collection incomplète → message « 🔒 personne ne peut
+     t'attaquer », avec le compte de cartes manquantes ;
+   - trois exemplaires d'une même carte ne comptent que pour **une** dans ce total.
 5. `/ma_defense`, `/defenses`, `/classement_duel` et `/historique_duel`.
 6. Hors testeurs / hors salon → message « arrive la saison prochaine ».
 
