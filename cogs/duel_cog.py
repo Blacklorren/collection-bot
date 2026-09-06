@@ -204,23 +204,55 @@ class DuelSession:
     qu'il affrontera, même s'il met dix minutes à composer.
     """
 
-    def __init__(self, attacker, defender, ranked, lineup_a, lineup_d, sparring=False):
+    def __init__(self, attacker, defender, ranked, lineup_a, lineup_d, sparring=False,
+                 lineup_best=None):
         self.attacker = attacker          # discord.Member (présent)
         self.defender = defender          # discord.Member (absent, ou le bot en entraînement)
         self.ranked = ranked
         self.sparring = sparring          # adversaire = le bot : aucune lecture/écriture en base
         self.lineup_a = lineup_a if lineup_a is not None else {s: None for s in E.SLOTS}
         self.lineup_d = lineup_d if lineup_d is not None else {s: None for s in E.SLOTS}
+        # La MEILLEURE équipe possible, figée à l'ouverture comme celle du défenseur.
+        # Elle sert de repère : la compo préremplie est la dernière compo jouée, qui
+        # peut avoir vieilli de plusieurs packs sans que le joueur s'en aperçoive.
+        self.lineup_best = lineup_best
         self.cancelled = False            # annulation/expiration : invalide le picker ouvert
 
     def defender_power(self):
         return E.team_power(self.lineup_d)[0]
 
+    def best_power(self):
+        """Puissance de l'équipe optimale, ou None si on ne l'a pas calculée."""
+        return E.team_power(self.lineup_best)[0] if self.lineup_best else None
+
+    def best_gain(self):
+        """Ce que le joueur laisse sur la table, en points entiers, ou 0.
+
+        Comparaison sur les valeurs ARRONDIES : c'est ce que le joueur lit à
+        l'écran, et annoncer « +1 » quand les deux compos affichent le même
+        nombre passerait pour un bug."""
+        best = self.best_power()
+        if best is None:
+            return 0
+        return max(0, round(best) - round(E.team_power(self.lineup_a)[0]))
+
 
 class LineupPicker(discord.ui.View):
-    """Sélecteur privé (éphémère) : l'attaquant compose son équipe poste par poste.
-    Choix d'un slot (1) → parcours d'un club (2) → placement d'une carte (3).
-    Une même carte ne peut occuper qu'un seul slot (déplacée automatiquement)."""
+    """Sélecteur privé (éphémère) : un poste, puis le joueur qui l'occupe.
+
+    Il n'y a PLUS d'étape « club ». Elle demandait au joueur de deviner dans quel
+    club se trouvait son meilleur gardien : le club est un critère de rangement,
+    pas de décision. On pense « mon meilleur gardien », jamais « un Nantais ».
+
+    À la place, la liste des joueurs est celle du poste courant, triée par ce que
+    chaque carte RAPPORTE réellement à l'équipe — synergie comprise. Le meilleur
+    choix est donc toujours en première ligne, et deux Rares à leur poste cessent
+    d'être indiscernables. Composer coûte deux interactions par poste au lieu de
+    trois, et surtout plus rien à deviner.
+
+    Une même carte ne peut occuper qu'un seul slot : elle est déplacée, et le
+    montant affiché tient déjà compte du poste qu'elle laisse vide en partant.
+    """
 
     def __init__(self, cog, session, main_view):
         super().__init__(timeout=180)
@@ -229,7 +261,7 @@ class LineupPicker(discord.ui.View):
         self.main_view = main_view
         self.user_id = session.attacker.id
         self.current_slot = E.SLOTS[0]
-        self.current_club = None
+        self._cards = None            # collection jouable, lue une fois
         self._refresh_components()
 
     async def interaction_check(self, interaction):
@@ -245,65 +277,101 @@ class LineupPicker(discord.ui.View):
     def lineup(self):
         return self.s.lineup_a
 
-    def _grouped_owned(self):
-        """{club: [card_dict, ...]} des cartes jouables possédées (dédupliquées par carte)."""
-        clubs, seen = {}, set()
-        for cid in database.get_user_collection(self.user_id):
-            if cid in seen:
-                continue
-            seen.add(cid)
-            card = self.cog.get_card(cid)
-            if self.cog.jouable(card):
-                clubs.setdefault(card["club"], []).append(card)
-        return clubs
+    def _owned_cards(self):
+        """Les cartes jouables possédées, dédupliquées, lues UNE fois.
+
+        Le picker se rafraîchit à chaque clic et la collection ne peut pas bouger
+        pendant la préparation : relire la base à chaque interaction ne servirait
+        qu'à payer sept requêtes pour composer une équipe."""
+        if self._cards is None:
+            seen, cards = set(), []
+            for cid in database.get_user_collection(self.user_id):
+                if cid in seen:
+                    continue
+                seen.add(cid)
+                card = self.cog.get_card(cid)
+                if self.cog.jouable(card):
+                    cards.append(card)
+            self._cards = cards
+        return self._cards
 
     def _placed_slots(self):
         """{card_id: slot} des cartes déjà alignées."""
         return {c["id"]: slot for slot, c in self.lineup().items() if c}
 
+    def _with_card(self, card, slot):
+        """La compo telle qu'elle serait si `card` occupait `slot`.
+
+        La carte est retirée du poste qu'elle occupait éventuellement : c'est un
+        DÉPLACEMENT, pas une copie, et le poste laissé vide compte dans le total."""
+        essai = dict(self.lineup())
+        for s, c in essai.items():
+            if c and c["id"] == card["id"]:
+                essai[s] = None
+        essai[slot] = card
+        return essai
+
+    def _candidates(self, slot):
+        """[(carte, gain), …] pour `slot`, du meilleur choix au pire.
+
+        Le gain est la vraie différence de puissance d'équipe, synergie comprise :
+        c'est le seul chiffre qui permette de choisir sans essayer chaque carte
+        l'une après l'autre. Trier dessus met le meilleur choix en première ligne.
+
+        Discord plafonne un menu à 25 entrées. La coupe se fait donc APRÈS le tri,
+        sur les choix les moins utiles — et la carte déjà en place est gardée quoi
+        qu'il arrive, sinon elle disparaîtrait de son propre poste."""
+        actuel = E.team_power(self.lineup())[0]
+        notes = [(c, E.team_power(self._with_card(c, slot))[0] - actuel)
+                 for c in self._owned_cards()]
+        notes.sort(key=lambda t: (-t[1], str(t[0].get("nom", ""))))
+        en_place = self.lineup().get(slot)
+        garde = notes[:25]
+        if en_place and not any(c["id"] == en_place["id"] for c, _ in garde):
+            garde = garde[:24] + [(en_place, 0.0)]
+        return garde
+
     def _refresh_components(self):
-        clubs = self._grouped_owned()
         placed = self._placed_slots()
+        en_place = self.lineup().get(self.current_slot)
 
-        # 1) Sélecteur de poste (slot)
-        slot_opts = []
-        for slot in E.SLOTS:
-            card = self.lineup().get(slot)
-            slot_opts.append(discord.SelectOption(
+        # 1) Le poste sur lequel on travaille. La description montre qui l'occupe,
+        #    pour qu'on repère d'un coup d'œil le trou à combler.
+        self.slot_select.options = [
+            discord.SelectOption(
                 label=f"{slot} · {E.SLOT_LABELS[slot]}"[:100], value=slot,
-                description=(card["nom"][:100] if card else "(vide)"),
-                default=(slot == self.current_slot)))
-        self.slot_select.options = slot_opts
+                description=((self.lineup()[slot]["nom"] if self.lineup().get(slot)
+                              else "(vide)")[:100]),
+                default=(slot == self.current_slot))
+            for slot in E.SLOTS]
 
-        # 2) Sélecteur de club
-        club_opts = []
-        for club in sorted(clubs.keys()):
-            club_opts.append(discord.SelectOption(
-                label=club[:100], value=club[:100],
-                description=f"{len(clubs[club])} carte(s)",
-                default=(club == self.current_club)))
-        self.club_select.options = club_opts[:25] or [
-            discord.SelectOption(label="(aucune carte jouable)", value="__none__")]
-        self.club_select.disabled = not clubs
-
-        # 3) Sélecteur de carte (dans le club choisi) pour le slot courant
+        # 2) Qui joue à ce poste. Trié par gain, description chiffrée : le joueur
+        #    n'a plus à essayer les cartes une par une pour comparer.
         card_opts = []
-        if self.current_club and self.current_club in clubs:
-            for card in clubs[self.current_club][:25]:
-                where = placed.get(card["id"])
-                if where and where != self.current_slot:
-                    desc = f"{card['rarete']} — déjà aligné en {where}"
-                else:
-                    fit = "à son poste ✓" if E.normalize_poste(card.get("poste")) == self.current_slot else "hors poste ✗"
-                    desc = f"{card['rarete']} — {fit}"
-                card_opts.append(discord.SelectOption(
-                    label=card["nom"][:100], value=str(card["id"]),
-                    description=desc[:100],
-                    emoji=RARITY_EMOJI.get(card["rarete"], "🔹")))
+        for card, gain in self._candidates(self.current_slot):
+            fit = ("à son poste" if E.normalize_poste(card.get("poste")) == self.current_slot
+                   else "hors poste")
+            if en_place and card["id"] == en_place["id"]:
+                bout = "en place"
+            elif abs(round(gain)) < 1:
+                bout = "sans changement"
+            else:
+                # Même signe moins que les pourcentages de la feuille de match
+                # (U+2212) : un trait d'union se lit comme une puce d'énumération
+                # au milieu des séparateurs « · ».
+                bout = f"+{round(gain)}" if gain > 0 else f"−{abs(round(gain))}"
+            venu = placed.get(card["id"])
+            if venu and venu != self.current_slot:
+                bout += f" · quitte {venu}"
+            card_opts.append(discord.SelectOption(
+                label=card["nom"][:100], value=str(card["id"]),
+                description=f"{card['rarete']} · {fit} · {bout}"[:100],
+                emoji=RARITY_EMOJI.get(card["rarete"], "🔹"),
+                default=bool(en_place and card["id"] == en_place["id"])))
         self.card_select.options = card_opts or [
-            discord.SelectOption(label="(choisis d'abord un club)", value="__none__")]
+            discord.SelectOption(label="(aucune carte jouable)", value="__none__")]
         self.card_select.disabled = not card_opts
-        self.card_select.placeholder = f"3️⃣ Place une carte sur {self.current_slot}…"
+        self.card_select.placeholder = f"2️⃣ Qui joue {E.SLOT_LABELS[self.current_slot].lower()} ?"
 
     def _embed(self):
         lu = self.lineup()
@@ -322,6 +390,14 @@ class LineupPicker(discord.ui.View):
         e = discord.Embed(title="🛠️ Compose ton équipe", description="\n".join(lines), color=discord.Color.gold())
         e.add_field(name="🛡️ Défense adverse",
                     value=f"puissance **{round(self.s.defender_power())}**", inline=False)
+        # Le picker ne peut plus rendre l'équipe plus forte que « Optimale » : il sert
+        # à aligner qui on veut. Autant dire ce que ça coûte, plutôt que de laisser
+        # croire qu'un réglage manuel pourrait faire mieux.
+        manque = self.s.best_gain()
+        if manque:
+            e.add_field(name="✨ Compo optimale",
+                        value=f"puissance **{round(self.s.best_power())}** (+{manque})",
+                        inline=False)
         # Le bonus de poste en POURCENTAGE, comme sur la feuille de match : c'est le
         # même bonus, il doit se dire avec les mêmes mots des deux côtés de l'écran.
         e.set_footer(text=f"{filled}/7 postes · ta puissance {round(pow_)} · "
@@ -333,21 +409,22 @@ class LineupPicker(discord.ui.View):
         await interaction.response.edit_message(embed=self._embed(), view=self)
         await self.main_view.refresh()
 
-    @discord.ui.select(placeholder="1️⃣ Choisis un poste à remplir…", row=0)
+    async def _goto(self, interaction, pas):
+        """Poste suivant/précédent. Enchaîner les sept postes sans repasser par le
+        menu, c'est ce qui fait tomber la composition complète de 21 interactions
+        à 14 — et le picker expire au bout de 180 s."""
+        i = (E.SLOTS.index(self.current_slot) + pas) % len(E.SLOTS)
+        self.current_slot = E.SLOTS[i]
+        self._refresh_components()
+        await interaction.response.edit_message(embed=self._embed(), view=self)
+
+    @discord.ui.select(placeholder="1️⃣ Sur quel poste ?", row=0)
     async def slot_select(self, interaction, select):
         self.current_slot = select.values[0]
         self._refresh_components()
         await interaction.response.edit_message(embed=self._embed(), view=self)
 
-    @discord.ui.select(placeholder="2️⃣ Parcours un club…", row=1)
-    async def club_select(self, interaction, select):
-        if select.values[0] == "__none__":
-            return await interaction.response.defer()
-        self.current_club = select.values[0]
-        self._refresh_components()
-        await interaction.response.edit_message(embed=self._embed(), view=self)
-
-    @discord.ui.select(placeholder="3️⃣ Place une carte…", row=2)
+    @discord.ui.select(placeholder="2️⃣ Qui joue ici ?", row=1)
     async def card_select(self, interaction, select):
         val = select.values[0]
         if val == "__none__":
@@ -363,12 +440,23 @@ class LineupPicker(discord.ui.View):
         lu[self.current_slot] = card
         await self._apply(interaction)
 
-    @discord.ui.button(label="Vider le poste", emoji="🗑️", style=discord.ButtonStyle.grey, row=3)
+    @discord.ui.button(emoji="◀", style=discord.ButtonStyle.grey, row=2)
+    async def prev_btn(self, interaction, button):
+        await self._goto(interaction, -1)
+
+    @discord.ui.button(emoji="▶", style=discord.ButtonStyle.grey, row=2)
+    async def next_btn(self, interaction, button):
+        await self._goto(interaction, +1)
+
+    @discord.ui.button(label="Vider", emoji="🗑️", style=discord.ButtonStyle.grey, row=2)
     async def clear_btn(self, interaction, button):
         self.lineup()[self.current_slot] = None
         await self._apply(interaction)
 
-    @discord.ui.button(label="Compo automatique", emoji="🎲", style=discord.ButtonStyle.blurple, row=3)
+    # « Optimale » et pas « automatique », sans dé : depuis que `best_lineup` rend
+    # l'optimum exact, ce bouton ne tire plus rien au sort — il donne la meilleure
+    # équipe possible. Un dé faisait fuir précisément ceux qui la cherchaient.
+    @discord.ui.button(label="Optimale", emoji="✨", style=discord.ButtonStyle.blurple, row=2)
     async def auto_btn(self, interaction, button):
         auto = self.cog.auto_lineup(self.user_id)
         lu = self.lineup()
@@ -376,7 +464,7 @@ class LineupPicker(discord.ui.View):
         lu.update(auto)
         await self._apply(interaction)
 
-    @discord.ui.button(label="Lancer l'attaque", emoji="⚔️", style=discord.ButtonStyle.green, row=3)
+    @discord.ui.button(label="Lancer l'attaque", emoji="⚔️", style=discord.ButtonStyle.green, row=2)
     async def launch_btn(self, interaction, button):
         if not any(self.lineup().values()):
             return await interaction.response.send_message(
@@ -406,6 +494,19 @@ class DuelPrepView(discord.ui.View):
         self.message = None           # l'éphémère de l'attaquant : narration + feuille complète
         self.origin_channel = None    # salon d'où part le /defi : c'est là qu'ira le résultat
         self.launched = False
+        self._sync_optimal_btn()
+
+    def _sync_optimal_btn(self):
+        """Le bouton « compo optimale » n'existe que s'il y a un écart à combler.
+
+        Le proposer alors que l'optimale est déjà en place ferait douter de ce qui
+        est aligné, et pousserait à cliquer pour rien avant chaque attaque."""
+        present = self.optimal_btn in self.children
+        utile = bool(self.s.best_gain())
+        if utile and not present:
+            self.add_item(self.optimal_btn)
+        elif present and not utile:
+            self.remove_item(self.optimal_btn)
 
     async def interaction_check(self, interaction):
         if interaction.user.id != self.s.attacker.id:
@@ -436,6 +537,15 @@ class DuelPrepView(discord.ui.View):
         e = discord.Embed(title=title, description=desc, color=discord.Color.blurple())
         e.add_field(name=f"⚔️ {s.attacker.display_name}", value=f"puissance **{pow_a}**", inline=True)
         e.add_field(name=def_label, value=f"puissance **{pow_d}**", inline=True)
+        # La compo préremplie est la DERNIÈRE compo jouée : elle peut avoir vieilli de
+        # plusieurs packs sans que le joueur s'en aperçoive. On ne la remplace pas
+        # d'office — c'est peut-être son équipe fétiche — mais on chiffre le retard,
+        # sinon il attaque avec une équipe périmée sans jamais le savoir.
+        manque = s.best_gain()
+        if manque:
+            e.add_field(name="⚠️ Tu peux faire mieux",
+                        value=f"Ta compo optimale vaudrait **{round(s.best_power())}** "
+                              f"(+{manque}).", inline=False)
         e.set_footer(text=mode)
         return e
 
@@ -443,11 +553,21 @@ class DuelPrepView(discord.ui.View):
         ACTIVE_DUELISTS.discard(self.s.attacker.id)
 
     async def refresh(self):
+        self._sync_optimal_btn()
         if self.message:
             try:
                 await self.message.edit(embed=self.build_embed(), view=self)
             except discord.HTTPException:
                 pass
+
+    @discord.ui.button(label="Utiliser la compo optimale", emoji="✨",
+                       style=discord.ButtonStyle.blurple, row=1)
+    async def optimal_btn(self, interaction, button):
+        if self.launched or self.s.cancelled:
+            return await interaction.response.defer()
+        self.s.lineup_a = dict(self.s.lineup_best)
+        self._sync_optimal_btn()
+        await interaction.response.edit_message(embed=self.build_embed(), view=self)
 
     @discord.ui.button(label="Composer mon équipe", emoji="🛠️", style=discord.ButtonStyle.blurple, row=0)
     async def compose_btn(self, interaction, button):
@@ -695,7 +815,8 @@ class DuelCog(commands.Cog):
             session = DuelSession(attacker, defender, ranked=False,
                                   lineup_a=self.initial_lineup(attacker.id),
                                   lineup_d=self.sparring_lineup(rarete),
-                                  sparring=True)
+                                  sparring=True,
+                                  lineup_best=self.auto_lineup(attacker.id))
             ACTIVE_DUELISTS.add(attacker.id)
             view = DuelPrepView(self, session)
             await self._open_prep(interaction, view, view.build_embed())
@@ -758,9 +879,13 @@ class DuelCog(commands.Cog):
         ACTIVE_DUELISTS.add(attacker.id)
         # La défense est FIGÉE ici : la puissance annoncée est celle qui sera jouée,
         # même si la cible ouvre un pack pendant que l'attaquant compose.
+        # `lineup_best` est calcule UNE fois ici, comme la defense adverse : le
+        # picker s'en sert comme repere a chaque clic, et le recalculer a chaque
+        # rafraichissement relirait la collection sept fois pour rien.
         session = DuelSession(attacker, defender, ranked,
                               lineup_a=self.initial_lineup(attacker.id),
-                              lineup_d=self.defense_lineup(defender.id))
+                              lineup_d=self.defense_lineup(defender.id),
+                              lineup_best=self.auto_lineup(attacker.id))
         view = DuelPrepView(self, session)
         e = view.build_embed()
         if soft_note:

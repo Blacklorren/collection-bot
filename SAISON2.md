@@ -256,6 +256,61 @@ c'est aussi pourquoi la puissance de la défense est affichée avant l'attaque.
   Jamais une punition — c'est ce qui rend l'asymétrie acceptable — mais jamais
   un revenu passif non plus : les packs se gagnent en attaquant.
 
+### Le sélecteur de composition — 6 septembre 2026
+**L'étape « club » a disparu.** Elle demandait au joueur de deviner dans quel club
+se trouvait son meilleur gardien : le club est un critère de *rangement*, pas de
+*décision*. On pense « mon meilleur gardien », jamais « un Nantais ». Trois
+sélecteurs en cascade, aucun tri, aucun chiffre pour comparer, et 21 interactions
+pour une équipe complète — sous un `timeout=180`.
+
+Le menu montre maintenant **les joueurs du poste courant, triés par ce que chaque
+carte rapporte réellement** (`_candidates`), synergie comprise :
+
+```
+2️⃣ Qui joue gardien ?
+   🟨 Rémi DESBONNET     Légendaire · à son poste · +19
+   🟪 Karl KONAN         Épique · hors poste · +9 · quitte ALG
+   🟦 Nikola MATOVIC     Rare · à son poste · en place
+```
+
+Trois choses à ne pas re-litiger :
+
+1. **Le tri est sur le gain RÉEL, pas sur la rareté ni sur le poste.** Un Épique
+   hors poste (note 12) passe devant un Rare à son poste (8 × 1,4 = 11,2), et c'est
+   voulu : c'est le vrai compromis, l'ancien menu le rendait simplement invisible.
+2. **Le montant tient compte du poste que la carte QUITTE** (`_with_card` la
+   déplace au lieu de la copier). Sans ça, déplacer un titulaire aurait annoncé un
+   gain en cachant le trou créé ailleurs.
+3. **Discord plafonne un menu à 25 entrées** : la coupe se fait APRÈS le tri, donc
+   sur les choix les moins utiles — et la carte déjà en place est gardée quoi qu'il
+   arrive, sinon elle disparaîtrait de son propre poste. Mesuré : un filtre par
+   poste tient sous 25 jusqu'à ~100 cartes en collection (médiane 20).
+
+**« 🎲 Compo automatique » → « ✨ Optimale ».** Le dé annonçait du hasard alors que
+`best_lineup()` est déterministe et prouvé optimal : il faisait fuir précisément
+ceux qui cherchaient la meilleure équipe.
+
+**Le repère d'écart.** `initial_lineup()` préremplit avec la *dernière compo jouée*,
+qui peut avoir vieilli de plusieurs packs. On ne la remplace pas d'office — c'est
+peut-être une équipe fétiche — mais `DuelSession.best_gain()` chiffre le retard, et
+l'écran de préparation affiche alors *« Ta compo optimale vaudrait 84 (+9) »* avec
+un bouton **« ✨ Utiliser la compo optimale »**. Le bouton n'existe que s'il y a un
+écart (`_sync_optimal_btn`) : le proposer quand l'optimale est déjà en place ferait
+douter de ce qui est aligné.
+
+⚠️ **Le picker n'est plus un outil d'optimisation.** Depuis que `best_lineup()` rend
+l'optimum exact, aucun réglage manuel ne peut faire mieux — il ne sert qu'à aligner
+qui on veut. C'est pourquoi il affiche ce que ça coûte plutôt que de laisser croire
+l'inverse.
+
+`lineup_best` est calculé **une fois** à l'ouverture du `/defi`, comme la défense
+adverse, et `_owned_cards()` lit la collection une seule fois : le picker se
+rafraîchit à chaque clic, et recalculer à chaque fois relirait la base sept fois
+pour composer une équipe.
+
+Test : `py -3 tools/test_duel_picker.py` — ordre du menu, gain réel avec poste
+libéré, libellés, plafond des 25, collection vide, et le repère d'écart.
+
 ### Flux
 - `/defi @membre` ouvre directement la **phase de préparation** (`DuelPrepView`),
   **en éphémère** : puissance de l'attaquant, puissance de la défense adverse, et
@@ -267,12 +322,11 @@ c'est aussi pourquoi la puissance de la défense est affichée avant l'attaque.
   jouée (cartes encore possédées, via `database.get_last_duel_lineup`), sinon
   compo auto. Le joueur pressé clique directement « Attaquer ».
 - Il peut ouvrir son **sélecteur privé** (`LineupPicker`, éphémère) :
-  - **select de poste** (`GB…ALD`) — choisit quel slot éditer (montre la carte
-    actuelle par slot),
-  - **select de club** puis **select de carte** — place n'importe quelle carte
-    possédée jouable ; ✓/✗ indique si elle est à son poste (bonus ×1.4),
-  - boutons **« Vider le poste »**, **« Compo automatique »** (réutilise
-    `auto_lineup()`) et **« Lancer l'attaque »**.
+  - **select de poste** (`GB…ALD`) — quel slot on édite, avec l'occupant en
+    description,
+  - **select de joueur** — qui joue à CE poste, trié par gain décroissant,
+  - boutons **`◀`**, **`▶`** (poste précédent/suivant), **« Vider »**,
+    **« ✨ Optimale »** (`auto_lineup()`) et **« Lancer l'attaque »**.
 - Le match (`play_match`) part au clic. Il lit `DuelSession.lineup_a/lineup_d`.
 - **Ce que voit l'attaquant** : la narration puis la **feuille de match complète**,
   dans son éphémère. **Ce que voit le salon** : un résumé de **deux lignes**
@@ -474,7 +528,8 @@ Tests logiques hors-ligne (sans Discord) :
 journée, idempotence), `py -3 tools/test_duel_lineup.py` (composition
 automatique : optimum exact, non-régression, déterminisme) et
 `py -3 tools/test_duel_feuille.py` (feuille de match : pourcentages, forme du
-jour, migration `forme1`/`forme2`).
+jour, migration `forme1`/`forme2`) et `py -3 tools/test_duel_picker.py`
+(sélecteur de composition : tri par gain, libellés, plafond des 25).
 
 ---
 
