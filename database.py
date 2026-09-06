@@ -193,9 +193,22 @@ def initialize_database():
                 elo1_after INTEGER,
                 elo2_after INTEGER,
                 lineup1 TEXT,
-                lineup2 TEXT
+                lineup2 TEXT,
+                forme1 REAL,
+                forme2 REAL
             )
         ''')
+
+        # Forme du jour des deux équipes, ajoutée quand elle est passée à l'écran.
+        # Sans elle en base, la feuille de match rejouée depuis l'historique
+        # contredirait celle que l'attaquant a vue en direct. Les duels d'avant
+        # restent à NULL — la ligne de forme est alors simplement masquée.
+        try:
+            cur.execute("ALTER TABLE duels ADD COLUMN forme1 REAL")
+        except sqlite3.OperationalError: pass
+        try:
+            cur.execute("ALTER TABLE duels ADD COLUMN forme2 REAL")
+        except sqlite3.OperationalError: pass
 
         # Packs de duel versés en fin de journée, UNE ligne par (joueur, jour).
         # Cette table n'est pas un journal décoratif : c'est le VERROU d'idempotence.
@@ -1213,19 +1226,25 @@ def set_user_elo(user_id, elo):
         con.commit()
 
 def record_duel(joueur1, joueur2, score1, score2, gagnant, classe,
-                elo1_before, elo2_before, elo1_after, elo2_after, lineup1, lineup2):
-    """Enregistre un duel joué. lineup1/lineup2 : dicts {slot: card_id} (sérialisés en JSON)."""
+                elo1_before, elo2_before, elo1_after, elo2_after, lineup1, lineup2,
+                forme1=None, forme2=None):
+    """Enregistre un duel joué. lineup1/lineup2 : dicts {slot: card_id} (sérialisés en JSON).
+
+    `forme1`/`forme2` : la forme du jour tirée pour chaque équipe. Elle est stockée
+    parce qu'elle s'affiche : la feuille rejouée doit montrer le même match que
+    celle vue en direct."""
     import json as _json
     with _connect() as con:
         cur = con.cursor()
         cur.execute("""
             INSERT INTO duels
                 (joueur1, joueur2, score1, score2, gagnant, classe,
-                 elo1_before, elo2_before, elo1_after, elo2_after, lineup1, lineup2)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 elo1_before, elo2_before, elo1_after, elo2_after, lineup1, lineup2,
+                 forme1, forme2)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (joueur1, joueur2, score1, score2, gagnant, 1 if classe else 0,
               elo1_before, elo2_before, elo1_after, elo2_after,
-              _json.dumps(lineup1), _json.dumps(lineup2)))
+              _json.dumps(lineup1), _json.dumps(lineup2), forme1, forme2))
         con.commit()
         return cur.lastrowid
 

@@ -322,7 +322,10 @@ class LineupPicker(discord.ui.View):
         e = discord.Embed(title="🛠️ Compose ton équipe", description="\n".join(lines), color=discord.Color.gold())
         e.add_field(name="🛡️ Défense adverse",
                     value=f"puissance **{round(self.s.defender_power())}**", inline=False)
-        e.set_footer(text=f"{filled}/7 postes · ta puissance {round(pow_)} · ✓ = à son poste (×{E.POSTE_BONUS})")
+        # Le bonus de poste en POURCENTAGE, comme sur la feuille de match : c'est le
+        # même bonus, il doit se dire avec les mêmes mots des deux côtés de l'écran.
+        e.set_footer(text=f"{filled}/7 postes · ta puissance {round(pow_)} · "
+                          f"✓ = à son poste ({E.pct_text(E.POSTE_BONUS)})")
         return e
 
     async def _apply(self, interaction):
@@ -589,12 +592,18 @@ class DuelCog(commands.Cog):
 
     # --- Compositions ---
     def auto_lineup(self, user_id):
-        """Aligne la meilleure carte possédée sur chaque poste (glouton par note de poste).
+        """Meilleure compo possible avec la collection du joueur (`E.best_lineup`).
         Retourne {slot: card_dict | None}.
 
         C'est AUSSI la compo de défense en duel asymétrique : elle ne demande aucune
         action au joueur, suit sa collection sans qu'il y pense, et ne peut pas être
-        bradée volontairement pour offrir des victoires."""
+        bradée volontairement pour offrir des victoires.
+
+        L'optimisation est déléguée au moteur : elle raisonne sur la compo ENTIÈRE et
+        non poste par poste. Un glouton « la meilleure carte restante pour ce poste »
+        déraillait, l'écart de rareté pesant plus lourd que le bonus de poste — c'est
+        ce qui alignait des joueurs hors poste alors que le titulaire était dispo.
+        """
         seen, cards = set(), []
         for cid in database.get_user_collection(user_id):
             if cid in seen:
@@ -603,22 +612,7 @@ class DuelCog(commands.Cog):
             card = self.get_card(cid)
             if self.jouable(card):
                 cards.append(card)
-
-        lineup = {s: None for s in E.SLOTS}
-        used = set()
-        for slot in E.SLOTS:
-            best, best_note, best_key = None, -1.0, None
-            for card in cards:
-                key = id(card)
-                if key in used:
-                    continue
-                note = E.card_note(card, slot)
-                if note > best_note:
-                    best, best_note, best_key = card, note, key
-            if best is not None:
-                lineup[slot] = best
-                used.add(best_key)
-        return lineup
+        return E.best_lineup(cards)
 
     def defense_lineup(self, user_id):
         """Équipe qui défend quand ce joueur est attaqué en son absence."""
@@ -804,7 +798,7 @@ class DuelCog(commands.Cog):
             pow_a, det_a = E.team_power(lu_a)
             pow_d, det_d = E.team_power(lu_d)
 
-            s_a, s_d, half, overtime = E.simulate_match(pow_a, pow_d, allow_draw=False)
+            s_a, s_d, half, overtime, formes = E.simulate_match(pow_a, pow_d, allow_draw=False)
             winner = a.id if s_a > s_d else d.id if s_d > s_a else None
             mode = "🤖 Entraînement" if s.sparring else ("🏆 Classé" if s.ranked else "🤝 Amical")
 
@@ -859,7 +853,8 @@ class DuelCog(commands.Cog):
                 duel_id = database.record_duel(a.id, d.id, s_a, s_d, winner, s.ranked,
                                                elo_a0, elo_d0, elo_a1, elo_d0,
                                                self._lineup_card_ids(lu_a),
-                                               self._lineup_card_ids(lu_d))
+                                               self._lineup_card_ids(lu_d),
+                                               formes[0], formes[1])
 
             # --- Embed résultat ---
             ms = " (mort subite)" if overtime else ""
@@ -871,8 +866,10 @@ class DuelCog(commands.Cog):
                 title = f"🏆 {win_member.display_name} l'emporte {max(s_a, s_d)} - {min(s_a, s_d)}{ms} !"
                 color = discord.Color.gold()
             e = discord.Embed(title=title, color=color)
-            e.add_field(name=f"⚔️ {a.display_name}", value=self._team_summary(lu_a, det_a, s_a), inline=True)
-            e.add_field(name=f"🛡️ {d.display_name}", value=self._team_summary(lu_d, det_d, s_d), inline=True)
+            e.add_field(name=f"⚔️ {a.display_name}",
+                        value=self._team_summary(lu_a, det_a, s_a, formes[0]), inline=True)
+            e.add_field(name=f"🛡️ {d.display_name}",
+                        value=self._team_summary(lu_d, det_d, s_d, formes[1]), inline=True)
             mvp = self._mvp(lu_a if s_a >= s_d else lu_d)
             if mvp:
                 e.add_field(name="⭐ Homme du match", value=f"{RARITY_EMOJI.get(mvp['rarete'], '🔹')} {mvp['nom']}", inline=False)
@@ -1068,13 +1065,44 @@ class DuelCog(commands.Cog):
         except (discord.Forbidden, discord.HTTPException):
             pass   # MP fermés : tant pis, le résultat reste dans /defenses
 
-    def _team_summary(self, lineup, details, score=None):
-        """Résumé d'une équipe. `score=None` : hors match (consultation de sa défense)."""
+    def _team_summary(self, lineup, details, score=None, forme=None):
+        """La colonne d'une équipe sur la feuille de match.
+
+        Elle se lit de haut en bas comme un CALCUL : la valeur brute des cartes, puis
+        chaque bonus qui la fait bouger, puis la puissance qui en sort. La puissance
+        est en DERNIER parce qu'elle est le résultat, pas la donnée de départ.
+
+        Tout est en pourcentages, plus aucun multiplicateur : « ×1.12 » se lit comme
+        une ligne de barème interne, « +12 % » comme quelque chose que le joueur a
+        gagné. Même raison pour « 3 joueurs » à la place de « max 3 » — « max »
+        était un mot d'implémentation.
+
+        `score=None` : hors match (consultation de sa défense).
+        `forme=None` : pas de forme du jour à montrer — soit il n'y a pas de match
+        derrière, soit c'est un duel joué avant qu'on la stocke. La ligne saute, et
+        la puissance affichée redevient celle de la compo au repos.
+        """
+        raw = details.get("raw_total") or details["base_total"]
+        power = details["base_total"] * details["synergy"]
         lines = []
         if score is not None:
             lines.append(f"**Score : {score}**")
-        lines += [f"Puissance : {round(details['base_total'] * details['synergy'])}",
-                  f"Synergie club : ×{details['synergy']} (max {details['max_club_group']})", ""]
+        lines.append(f"Valeur des cartes : {round(raw)}")
+
+        postes = E.pct_text(details["base_total"] / raw if raw else 1.0)
+        lines.append(f"Postes respectés : {details.get('poste_ok', 0)} sur {len(E.SLOTS)}"
+                     + (f" ({postes})" if postes else ""))
+
+        synergie = E.pct_text(details["synergy"])
+        lines.append(f"Synergie club : {details['max_club_group']} joueurs ({synergie})"
+                     if synergie else "Synergie club : aucune")
+
+        if forme is None:
+            lines.append(f"**Puissance : {round(power)}**")
+        else:
+            lines.append(f"Forme du jour : {E.form_text(forme)}")
+            lines.append(f"**Puissance sur le terrain : {round(power * forme)}**")
+        lines.append("")
         for slot in E.SLOTS:
             card = lineup.get(slot)
             if card:
@@ -1160,8 +1188,11 @@ class DuelCog(commands.Cog):
             color = discord.Color.gold()
 
         e = discord.Embed(title=title, color=color)
-        e.add_field(name=f"⚔️ {a_nom}", value=self._team_summary(lu_a, det_a, s_a), inline=True)
-        e.add_field(name=f"🛡️ {d_nom}", value=self._team_summary(lu_d, det_d, s_d), inline=True)
+        # Duels d'avant le stockage de la forme : `row.get` rend None, la ligne saute.
+        e.add_field(name=f"⚔️ {a_nom}",
+                    value=self._team_summary(lu_a, det_a, s_a, row.get("forme1")), inline=True)
+        e.add_field(name=f"🛡️ {d_nom}",
+                    value=self._team_summary(lu_d, det_d, s_d, row.get("forme2")), inline=True)
         mvp = self._mvp(lu_a if s_a >= s_d else lu_d)
         if mvp:
             e.add_field(name="⭐ Homme du match",

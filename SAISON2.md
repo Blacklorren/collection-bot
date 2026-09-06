@@ -46,6 +46,11 @@ pas de bonus de poste pour elles, sans gravité.
 - **Puissance équipe** = (Σ notes) × synergie.
 - **Simulation** : 50 possessions, conversion ~55 % modulée par la puissance
   relative, variance « forme du jour » (±12 %), mort subite si égalité.
+
+> 🔤 **Ces coefficients ne sortent JAMAIS tels quels à l'écran** (6 sept. 2026).
+> Un `×1.12` se lit comme une ligne de barème interne, un `+12 %` comme un bonus
+> gagné. `duel_engine.pct_text()` fait la conversion, et c'est le seul endroit où
+> elle se fait — cf. « La feuille de match » plus bas.
 - **Elo** : départ 1000, K=32, **bande DOUCE** ±150 (env `DUEL_ELO_BAND`) —
   un classé hors bande reste possible mais K passe à 8 (env `DUEL_SOFT_K`,
   const `ELO_K_SOFT`). Plus de blocage sec. Les packs, eux, ne dépendent plus de
@@ -146,6 +151,52 @@ et on s'entraîne justement pour combler ses trous).
 haut demande 5 adversaires distincts, donc **5 joueurs avec une équipe complète**
 sur le serveur — à surveiller au lancement.
 
+### La feuille de match — 6 septembre 2026
+La colonne d'une équipe se lit de haut en bas comme un **calcul**, et la puissance
+est le **dernier** terme parce qu'elle en est le résultat :
+
+```
+**Score : 34**
+Valeur des cartes : 56
+Postes respectés : 2 sur 7 (+11 %)
+Synergie club : aucune
+Forme du jour : 🔥 Grand jour (+20 %)
+**Puissance sur le terrain : 75**
+```
+
+Trois choses ont changé, et aucune n'est cosmétique :
+
+1. **Plus un seul multiplicateur à l'écran.** `×1.05` → `+5 %`, `(max 2)` →
+   `2 joueurs` (« max » était un mot d'implémentation). Une synergie de 1 se dit
+   `aucune`, pas `+0 %`, et un bonus arrondi à zéro n'affiche pas de parenthèse.
+   Conversion unique dans `duel_engine.pct_text()`.
+2. **La forme du jour est enfin visible.** C'était le SEUL facteur invisible :
+   le joueur lisait « puissance 71 contre 49 », perdait 28-34, et concluait que le
+   bot était cassé. Elle est tirée une fois par équipe avant les 50 possessions,
+   donne le ton du match entier, et un désavantage de forme peut atteindre ×0,54 —
+   de quoi annuler à lui seul un avantage de puissance de ×1,86. Paliers dans
+   `duel_engine.FORM_BANDS`, calés sur la vraie distribution (🔥 Grand jour 10,6 % ·
+   😃 En jambes 23,3 % · 😐 Normale 32,2 % · 😕 Jour moyen 23,3 % · 🥶 Jour sans
+   10,6 %) : un « grand jour » tombe une fois sur dix, donc le mot garde son poids.
+   `simulate_match()` remonte donc `(f1, f2)` en cinquième valeur de retour.
+3. **La ligne « Valeur des cartes » est le total SANS bonus de poste**
+   (`details["raw_total"]`). Partir de `base_total` aurait présenté un premier
+   terme contenant déjà un facteur caché — la chaîne ne se serait pas vérifiée à la
+   main. Au passage, `Postes respectés : 2 sur 7` chiffre enfin ce que coûte un
+   joueur hors de son poste, ce qui était justement la plainte des joueurs.
+
+**Stockage** : `duels.forme1` / `duels.forme2` (REAL, `ALTER TABLE` en try/except
+comme les sept autres colonnes ajoutées après coup). Sans ça, la feuille rejouée
+depuis `/historique_duel` contredirait celle vue en direct. Les duels d'avant
+restent à NULL, et `_team_summary(forme=None)` masque alors la ligne — c'est le
+même chemin que `/ma_defense`, qui n'a pas de match derrière et affiche donc
+`Puissance` (au repos) et non `Puissance sur le terrain`.
+
+Test : `py -3 tools/test_duel_feuille.py` — rendu complet, ordre des lignes,
+absence de multiplicateur, chaîne de calcul vérifiée à la main, cas dégénérés
+(compo vide, 0 poste tenu, forme pile à 1.00) et migration de la base sur un
+schéma ancien.
+
 ### L'équipe du défenseur absent
 C'est **sa compo automatique** (`defense_lineup` → `auto_lineup`) : ses meilleures
 cartes de la saison en cours, une par poste. Ce choix a trois vertus :
@@ -155,6 +206,35 @@ cartes de la saison en cours, une par poste. Ce choix a trois vertus :
   offrir des victoires à ses amis ;
 - **auto-entretenue** — elle se renforce toute seule à chaque pack ouvert, ce qui
   relie directement la collection à la défense (`/ma_defense` rend ce lien visible).
+
+⚠️ **Corrigé le 6 septembre 2026 — la compo auto alignait des joueurs hors poste.**
+`auto_lineup` remplissait les postes un par un en prenant « la meilleure carte
+restante ». Piège : l'écart de rareté (3 → 16) est plus grand que le bonus de poste
+(×1,4), donc un Légendaire ailier pèse **16** dans les buts contre **11,2** pour un
+Rare gardien à SON poste. Le premier slot servi (GB) emportait la meilleure carte
+quel que soit son poste, le titulaire était évincé, et de proche en proche toute la
+compo glissait. Mesuré sur 600 collections tirées de `cards.json` : **3,8 postes sur
+7 mal occupés** et **~13 % de puissance perdue** — d'où les remontées « ma défense
+joue des gens au mauvais poste alors que j'ai le titulaire ».
+
+Le calcul vit maintenant dans le moteur (`duel_engine.best_lineup`) et rend
+l'**optimum exact de `team_power`**, synergie de club comprise. Deux points à ne pas
+re-litiger :
+- **la synergie EST optimisée**, pas seulement la somme des notes. Un optimum de
+  somme pouvait défaire un groupe de club que le glouton avait formé par accident,
+  et rendre une défense *plus faible* qu'avant le correctif (mesuré jusqu'à −6 %).
+  En l'incluant, « jamais pire qu'avant » est vrai par construction ;
+- **à puissance égale on remplit le poste** plutôt que de le laisser vide : une
+  Commune hors poste vaut exactement un slot vide (3), et une feuille de match
+  trouée se lit comme un bug.
+
+Coût : ~10 ms pour une collection de 60 cartes, 70 ms pour les 258 de la saison —
+la DP balaie les 2^7 partages de postes pour chaque club. Effet mesuré :
+**+15,7 % de puissance en moyenne** et **3,8 → 1,8 joueur hors poste**. Les défenses
+de tout le monde montent donc d'un cran : c'est le barème des duels qui se durcit
+légèrement, pas seulement un bug qui disparaît.
+Tests : `py -3 tools/test_duel_lineup.py` (optimum vérifié contre une recherche
+exhaustive, non-régression vs l'ancien glouton, déterminisme, cas limites).
 
 Elle est **figée au lancement du `/defi`**, pas à la résolution : la puissance
 annoncée à l'attaquant est exactement celle qu'il affrontera, même si la cible
@@ -389,9 +469,12 @@ l'idempotence sur deux relances, et les journées de 23 h / 25 h aux changements
 d'heure.
 
 Tests logiques hors-ligne (sans Discord) :
-`py -3 tools/test_duel_balance.py` (équilibrage + Elo + paliers de packs) et
+`py -3 tools/test_duel_balance.py` (équilibrage + Elo + paliers de packs),
 `py -3 tools/test_duel_packs.py` (distribution quotidienne : paliers, bornes de
-journée, idempotence).
+journée, idempotence), `py -3 tools/test_duel_lineup.py` (composition
+automatique : optimum exact, non-régression, déterminisme) et
+`py -3 tools/test_duel_feuille.py` (feuille de match : pourcentages, forme du
+jour, migration `forme1`/`forme2`).
 
 ---
 
