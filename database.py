@@ -14,6 +14,17 @@ DB_NAME = os.path.join(DATA_DIR, 'collection.db')
 # Attente max avant de lever "database is locked" (ms côté SQLite / s côté driver)
 BUSY_TIMEOUT_MS = 10000
 
+# === SAISON DES PRONOSTICS ===
+# Le classement général repart de zéro à chaque saison. Rien n'est effacé : un
+# pronostic appartient à la saison de SON MATCH (`matchs.date_match`), pas à sa date
+# de saisie, donc un résultat rentré en retard tombe du bon côté de la bascule et la
+# Saison 1 reste consultable (`!cg archive`).
+#
+# La date sépare deux saisons de club, pas deux journées : elle doit tomber dans
+# l'intersaison (juillet/août), après le dernier match de la S1 et avant le premier
+# de la S2. Surchargeable sans redéploiement par la variable DEBUT_SAISON_PRONOS.
+DEBUT_SAISON_PRONOS = os.environ.get('DEBUT_SAISON_PRONOS', '2026-09-01')
+
 
 @contextlib.contextmanager
 def _connect():
@@ -1005,15 +1016,19 @@ def get_matches_to_check_results(since_date):
         """, (since_date.isoformat(), now_utc_iso))
         return cur.fetchall()
 
-def get_user_correct_pronostics(user_id):
+def get_user_correct_pronostics(user_id, depuis=DEBUT_SAISON_PRONOS):
     """
-    Récupère tous les pronostics corrects d'un utilisateur avec les détails du match.
+    Récupère les pronostics corrects d'un utilisateur avec les détails du match.
+
+    Borné à la saison en cours par défaut, comme le classement général : les deux
+    doivent afficher le même total, sinon `!userpronos` contredit `!cg`.
+    `depuis=None` rend tout l'historique.
     """
     with _connect() as con:
         con.row_factory = sqlite3.Row
         cur = con.cursor()
         # On retire la colonne points_obtenus qui n'existe pas
-        cur.execute("""
+        query = """
             SELECT
                 m.equipe1,
                 m.equipe2,
@@ -1022,8 +1037,13 @@ def get_user_correct_pronostics(user_id):
             FROM pronostics p
             JOIN matchs m ON p.match_id = m.id
             WHERE p.user_id = ? AND p.pronostic = m.resultat AND m.resultat IS NOT NULL
-            ORDER BY m.date_match DESC
-        """, (user_id,))
+        """
+        params = [user_id]
+        if depuis:
+            query += " AND m.date_match >= ?"
+            params.append(depuis)
+        query += " ORDER BY m.date_match DESC"
+        cur.execute(query, params)
         return cur.fetchall()
 
 def set_advent_pack_opened(user_id, date_str):
@@ -1034,13 +1054,17 @@ def set_advent_pack_opened(user_id, date_str):
         cur.execute("UPDATE users SET last_advent_pack_date = ? WHERE user_id = ?", (date_str, user_id))
         con.commit()
 
-def get_general_leaderboard(points_per_win, limit=10, competition=None):
+def get_general_leaderboard(points_per_win, limit=10, competition=None,
+                            depuis=DEBUT_SAISON_PRONOS):
     """
-    Récupère le classement général des pronostics basé sur tous les matchs terminés.
+    Récupère le classement général des pronostics sur les matchs terminés.
 
     Args:
         points_per_win (int): Le nombre de points pour un pronostic correct.
         limit (int): Le nombre maximum de joueurs à retourner.
+        competition (str|None): Ne compter que cette compétition.
+        depuis (str|None): Date ISO de début de saison. `None` = tout l'historique
+            (l'archive S1 incluse) ; par défaut, la saison en cours seulement.
 
     Returns:
         list: Une liste de dictionnaires contenant user_id, bons_pronos, et total_points.
@@ -1062,7 +1086,13 @@ def get_general_leaderboard(points_per_win, limit=10, competition=None):
         """
         
         params = [points_per_win]
-        
+
+        if depuis:
+            # `date_match` est une chaîne ISO : la comparaison lexicographique suffit,
+            # c'est déjà ce que fait get_matches_in_date_range().
+            query += " AND m.date_match >= ?"
+            params.append(depuis)
+
         if competition:
             # Filtrer par compétition
             # Note: Si des anciens matchs ont NULL, ils ne seront pas comptés ici si on filtre.

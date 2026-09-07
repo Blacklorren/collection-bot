@@ -17,6 +17,19 @@ EMOJI_VICTOIRE_2 = "2️⃣"
 PRONO_EMOJIS = [EMOJI_VICTOIRE_1, EMOJI_NUL, EMOJI_VICTOIRE_2]
 PRONO_MAPPING = { EMOJI_VICTOIRE_1: "1", EMOJI_NUL: "N", EMOJI_VICTOIRE_2: "2" }
 
+# Mots-clés qui, en premier argument de !cg ou !userpronos, demandent tout
+# l'historique au lieu de la seule saison en cours.
+MOTS_CLES_ARCHIVE = ("archive", "tout", "all", "histoire", "total")
+
+
+def _date_lisible(iso):
+    """'2026-09-01' -> '01/09/2026'. Rend la chaîne telle quelle si elle n'est pas
+    une date ISO (la constante est surchargeable par variable d'environnement)."""
+    try:
+        return datetime.fromisoformat(iso).strftime('%d/%m/%Y')
+    except (TypeError, ValueError):
+        return str(iso)
+
 class PronosticsCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -289,10 +302,12 @@ class PronosticsCog(commands.Cog):
                         inline=False
                     )
 
-                # 4. Classement Général de cette Compétition
+                # 4. Classement Général de cette Compétition, SAISON EN COURS
+                # (borne par defaut de get_general_leaderboard : les saisons passees
+                # ne polluent plus le recap hebdomadaire.)
                 general_leaderboard = database.get_general_leaderboard(POINTS_BON_PRONO, limit=10, competition=competition_name)
                 
-                general_text = "Aucun pronostic correct enregistré."
+                general_text = "Aucun pronostic correct enregistré cette saison."
                 if general_leaderboard:
                     general_text = ""
                     for rank, row in enumerate(general_leaderboard, 1):
@@ -302,7 +317,7 @@ class PronosticsCog(commands.Cog):
                         general_text += f"{emoji} **{name}** - {row['total_points']} pts\n"
 
                 embed.add_field(
-                    name="👑 Classement Général",
+                    name="👑 Classement de la Saison",
                     value=general_text,
                     inline=False
                 )
@@ -504,21 +519,29 @@ class PronosticsCog(commands.Cog):
     # --- COMMANDE CORRIGÉE ---
     @commands.command(name='userpronos')
     @commands.has_permissions(manage_guild=True)
-    async def user_pronos_command(self, ctx, membre: discord.Member):
-        """[Admin] Affiche les pronostics corrects d'un utilisateur et les points gagnés."""
+    async def user_pronos_command(self, ctx, membre: discord.Member, *, portee: str = None):
+        """[Admin] Affiche les pronostics corrects d'un utilisateur et les points gagnés.
+
+        Saison en cours par défaut, comme `!cg`.
+        `!userpronos @membre archive` remonte tout l'historique.
+        """
         try:
-            correct_pronos = database.get_user_correct_pronostics(membre.id)
+            archive = (portee or "").strip().lower() in MOTS_CLES_ARCHIVE
+            depuis = None if archive else database.DEBUT_SAISON_PRONOS
+            correct_pronos = database.get_user_correct_pronostics(membre.id, depuis=depuis)
             
             if not correct_pronos:
-                await ctx.send(f"Cet utilisateur n'a aucun pronostic correct enregistré.", ephemeral=True)
+                suffixe = "" if archive else " cette saison (`!userpronos @membre archive` pour tout l'historique)"
+                await ctx.send(f"Cet utilisateur n'a aucun pronostic correct enregistré{suffixe}.", ephemeral=True)
                 return
             
             # On calcule le total des points en se basant sur la constante
             total_points = len(correct_pronos) * POINTS_BON_PRONO
+            cadre = "toutes saisons" if archive else f"depuis le {_date_lisible(database.DEBUT_SAISON_PRONOS)}"
             
             embed = discord.Embed(
                 title=f"✅ Pronostics Corrects pour {membre.display_name}",
-                description=f"**Total :** {len(correct_pronos)} pronostics corrects / **{total_points}** points gagnés.",
+                description=f"**Total :** {len(correct_pronos)} pronostics corrects / **{total_points}** points gagnés ({cadre}).",
                 color=discord.Color.green()
             )
             
@@ -564,13 +587,19 @@ class PronosticsCog(commands.Cog):
     
     @commands.command(name='classementgeneral', aliases=['cg'])
     @commands.has_permissions(manage_guild=True) # Réservé aux admins comme demandé
-    async def classement_general_command(self, ctx, *, competition: str = None):
+    async def classement_general_command(self, ctx, *, argument: str = None):
         """
-        [Admin] Affiche un classement général.
+        [Admin] Affiche un classement général de la SAISON EN COURS.
+
+        Le classement repart de zéro à chaque saison, mais rien n'est effacé :
+        les saisons passées restent lisibles avec le mot-clé `archive`.
+
         Usage :
-        !cg            -> Affiche le classement GLOBAL (toutes compétitions confondues)
-        !cg Starligue  -> Affiche uniquement le classement Starligue
-        !cg Euro       -> Affiche uniquement le classement Euro
+        !cg                    -> classement GLOBAL de la saison (toutes compétitions)
+        !cg Starligue          -> uniquement la Starligue, saison en cours
+        !cg Euro               -> uniquement l'Euro, saison en cours
+        !cg archive            -> tout l'historique, saisons passées comprises
+        !cg archive Starligue  -> tout l'historique, Starligue seulement
         """
         # Suppression du message de l'admin pour garder le chat propre
         try:
@@ -579,6 +608,21 @@ class PronosticsCog(commands.Cog):
             pass
 
         limit = 20 # Nombre de joueurs à afficher
+
+        # `archive` en premier mot bascule sur tout l'historique ; le reste de la
+        # ligne, s'il y en a un, reste le filtre de compétition.
+        mots = (argument or "").strip().split(maxsplit=1)
+        archive = bool(mots) and mots[0].lower() in MOTS_CLES_ARCHIVE
+        if archive:
+            competition = mots[1].strip() if len(mots) > 1 else None
+        else:
+            competition = (argument or "").strip() or None
+
+        depuis = None if archive else database.DEBUT_SAISON_PRONOS
+        if archive:
+            portee = "Toutes saisons confondues (archive)."
+        else:
+            portee = f"Saison en cours, depuis le {_date_lisible(database.DEBUT_SAISON_PRONOS)}."
 
         # Configuration du titre et de la description
         if competition:
@@ -589,15 +633,23 @@ class PronosticsCog(commands.Cog):
             titre = "👑 Classement Général (Global)"
             desc = f"Top {limit} toutes compétitions confondues (Starligue + Euro + ...)."
             couleur = discord.Color.gold()
+        if archive:
+            titre += " — archive"
+        desc = f"{desc}\n*{portee}*"
 
         try:
             # Récupération des données (fonction déjà existante dans votre database.py)
-            leaderboard = database.get_general_leaderboard(POINTS_BON_PRONO, limit=limit, competition=competition)
+            leaderboard = database.get_general_leaderboard(
+                POINTS_BON_PRONO, limit=limit, competition=competition, depuis=depuis
+            )
             
             if not leaderboard:
-                msg = "Aucun pronostic trouvé."
                 if competition:
-                    msg += f" Vérifiez l'orthographe ou lancez `!repair_history` pour récupérer les anciens matchs."
+                    msg = f"Aucun pronostic correct sur **{competition.capitalize()}**. Vérifiez l'orthographe, ou lancez `!repair_history` pour rattacher les anciens matchs à leur compétition."
+                elif archive:
+                    msg = "Aucun pronostic correct enregistré, toutes saisons confondues."
+                else:
+                    msg = "Aucun pronostic correct pour l'instant cette saison. `!cg archive` pour les saisons passées."
                 await ctx.send(f"❌ {msg}", delete_after=10)
                 return
 

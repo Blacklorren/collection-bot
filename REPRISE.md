@@ -182,6 +182,40 @@ Le seul prérequis pour être attaquable est de posséder une carte de la saison
 
 ---
 
+## Rattrapage — le classement des pronostics (7 septembre 2026)
+
+La bascule du 4 septembre n'avait **pas** touché aux pronostics : `tools/migration_s2.py`
+les laisse volontairement de côté, et `!cg` cumulait donc encore les bons pronos de la
+Saison 1. Constaté après la 1re journée.
+
+**Rien n'a été effacé, et il n'y avait rien à effacer.** Un pronostic appartient à la
+saison de **son match** (`matchs.date_match`), pas à sa date de saisie : la séparation
+est un simple filtre, la 1re journée de la S2 reste comptée, et la S1 reste lisible.
+
+- La coupure est `database.DEBUT_SAISON_PRONOS` (par défaut `2026-09-01`, surchargeable
+  par la variable d'environnement du même nom sur Railway — pas de redéploiement).
+- Elle sépare deux **saisons de club**, pas deux journées : elle doit tomber dans
+  l'intersaison, après le dernier match de la S1 et avant le premier de la S2.
+- `!cg` et `!userpronos` sont bornés à la saison en cours ; `!cg archive` et
+  `!userpronos @membre archive` rendent tout l'historique.
+- `!classement` (semaine) et le récap hebdomadaire étaient déjà bornés par dates :
+  ils n'ont pas bougé.
+
+**Contrôle, à lancer sur Railway** (lecture seule, aucune écriture) :
+
+```bash
+python tools/saison_pronos.py
+```
+
+Il affiche les matchs joués mois par mois — l'intersaison apparaît comme un trou, la
+coupure doit y tomber — puis le classement de la saison et celui de tout l'historique
+côte à côte. `--depuis 2026-08-15` permet d'essayer une autre date avant de la figer.
+
+Les **points** des pronos de la S1, eux, avaient déjà été remis à zéro par la bascule
+(`COLONNES_RAZ`) : seule la vitrine du classement traînait.
+
+---
+
 ## Si ça tourne mal
 
 | Symptôme | Cause probable | Geste |
