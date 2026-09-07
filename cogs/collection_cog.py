@@ -265,6 +265,27 @@ def _delai_maturation():
     return f"{m} minutes"
 
 
+def _bloc(*lignes):
+    """Assemble les lignes d'un champ d'embed."""
+    return "\n".join(lignes)
+
+
+def _const(module, nom, defaut):
+    """Lit une constante d'un AUTRE module, tardivement.
+
+    Deux raisons de ne pas l'importer en haut de fichier : duel_cog importe
+    collection_cog (l'import direct ferait un cycle), et un cog peut ne pas être
+    chargé. `/aide` doit rester la source unique et JUSTE des règles du jeu — donc
+    elle lit les vraies constantes plutôt que de recopier des nombres qui périment,
+    mais elle ne doit jamais tomber pour autant : d'où le repli sur `defaut`.
+    """
+    import importlib
+    try:
+        return getattr(importlib.import_module(module), nom, defaut)
+    except Exception:
+        return defaut
+
+
 class CollectionCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -364,10 +385,12 @@ class CollectionCog(commands.Cog):
             try:
                 onboarding_msg = (
                     "🎉 **Bienvenue dans le jeu de collection Handnews !** 🎉\n\n"
-                    "1. Gagnez des points en parlant (1er message = 120pts !).\n"
+                    f"1. Gagnez des points en parlant (1er message du jour = {DAILY_BONUS + POINTS_PER_MESSAGE} pts !).\n"
                     f"2. Achetez des packs (`/pack` - {PACK_COST} pts).\n"
                     "3. Ouvrez-les (`/ouvrir`) et complétez l'album (`/collection`).\n"
-                    "4. Recyclez les doublons (`/recycler`) pour créer les cartes manquantes (`/creer`)."
+                    "4. Recyclez les doublons (`/recycler`) pour créer les cartes manquantes (`/creer`).\n"
+                    "5. Duels, échanges, pronostics… il y a plus que la collection.\n\n"
+                    "👉 **`/aide`** pour la liste complète des commandes et des règles."
                 )
                 await message.author.send(onboarding_msg)
                 database.set_onboarding_received(user_id)
@@ -463,20 +486,74 @@ class CollectionCog(commands.Cog):
 
     # === COMMANDES SLASH ===
 
-    @app_commands.command(name='aide', description="Liste des commandes.")
+    @app_commands.command(name='aide', description="Toutes les commandes du jeu.")
     async def help_command(self, interaction: discord.Interaction):
-        embed = discord.Embed(title="📜 Aide - Collection", color=discord.Color.blue())
-        cmd_list = [
-            ("`/collection`", "Voir tes cartes."),
-            ("`/points`", "Voir ton solde."),
-            ("`/pack`", f"Acheter un pack ({PACK_COST} pts)."),
-            ("`/ouvrir`", "Ouvrir un ou plusieurs packs (`/ouvrir nombre:5`)."),
-            ("`/recycler`", "Vendre les doublons."),
-            ("`/creer`", "Fabriquer une carte spécifique."),
-            ("`/fragments`", "Voir les coûts de fabrication.")
-        ]
-        for name, val in cmd_list:
-            embed.add_field(name=name, value=val, inline=False)
+        from beta import beta_access
+
+        # Les nombres sont LUS aux vraies constantes, jamais recopiés : une aide qui
+        # ment est pire que pas d'aide, et c'est exactement ce qui arrive quand on
+        # écrit « 150 pts » à la main et qu'on change PACK_COST six mois plus tard.
+        pts_prono = _const('cogs.pronostics_cog', 'POINTS_BON_PRONO', 50)
+
+        embed = discord.Embed(
+            title="📜 Aide — Handnews",
+            description=("Collectionne les cartes de la Starligue, affronte les autres "
+                         "joueurs, et pronostique les matchs de la journée."),
+            color=discord.Color.blue()
+        )
+
+        embed.add_field(name="🃏 Collection", value=_bloc(
+            "`/collection` — ton album de la saison, et l'archive des saisons passées.",
+            f"`/pack` — acheter des packs ({PACK_COST} pts). `quantite:tout` dépense tout ton solde.",
+            f"`/ouvrir` — ouvrir tes packs (`nombre:5`, jusqu'à {MAX_BULK_OPEN} d'un coup).",
+            "`/recycler` — transformer tes doublons en fragments.",
+            "`/creer` — fabriquer une carte précise avec des fragments.",
+            "`/fragments` — ton solde de fragments et les coûts de fabrication.",
+            "`/top` — le classement des collections.",
+        ), inline=False)
+
+        # Duels et échanges suivent la même porte que les commandes elles-mêmes
+        # (beta.py) : tant qu'elles ne sont pas ouvertes, les annoncer ne ferait que
+        # promettre des `/` qui répondent « en test privé ».
+        if beta_access(interaction):
+            cap = _const('cogs.duel_cog', 'DAILY_MATCH_CAP', 6)
+            paliers = sorted(_const('duel_engine', 'DAILY_PACK_LADDER', ((5, 2), (3, 1))))
+            recompense = " · ".join(
+                f"**{adv}** adversaires battus → **{packs}** pack" + ("s" if packs > 1 else "")
+                for adv, packs in paliers)
+
+            embed.add_field(name="⚔️ Duels", value=_bloc(
+                f"`/defi` — attaquer un joueur, **même hors ligne** ({cap} attaques classées par jour).",
+                "↳ `amical:true` : match sans Elo, sans pack, et hors quota.",
+                "↳ il faut une équipe complète aux 7 postes, des deux côtés.",
+                "`/ma_defense` — l'équipe qui te défend automatiquement quand on t'attaque.",
+                "`/defenses` — les dernières attaques subies (les tiennes, ou celles d'un autre).",
+                "`/historique_duel` — les derniers duels joués.",
+                "`/classement_duel` — le classement Elo.",
+                f"*Un match ne rapporte que de l'Elo. Les packs tombent en fin de journée, "
+                f"par paliers d'adversaires **distincts** battus : {recompense}.*",
+            ), inline=False)
+
+            embed.add_field(
+                name="🔄 Échanges",
+                value="`/echange` — proposer un échange de cartes à un autre joueur.",
+                inline=False)
+
+        embed.add_field(name="🎯 Pronostics", value=_bloc(
+            "Pas de commande : réagis avec 1️⃣ ❌ 2️⃣ sous les matchs annoncés dans le salon des pronos.",
+            f"Chaque bon pronostic rapporte **{pts_prono} pts**.",
+            "Le classement des pronostiqueurs repart de zéro à chaque saison.",
+        ), inline=False)
+
+        embed.add_field(name="💰 Gagner des points", value=_bloc(
+            f"• **{POINTS_PER_MESSAGE} pts** par message, jusqu'à **{MAX_DAILY_MESSAGE_POINTS} pts** par jour.",
+            f"• **{DAILY_BONUS} pts** de bonus sur ton premier message de la journée.",
+            f"• Les points d'un message mûrissent **{_delai_maturation()}** avant d'être "
+            "dépensables — supprimer le message avant, c'est les perdre.",
+            f"• **{pts_prono} pts** par bon pronostic, et des packs en récompense de tes duels.",
+            "`/points` — ton solde de points, packs et fragments.",
+        ), inline=False)
+
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(name='points', description="Ton solde de points et packs.")
