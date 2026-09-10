@@ -12,7 +12,7 @@ test, ouverture publique automatique le **25 août 2026**). Voir `beta.py`.
 | 1 | Outil postes (xlsx + ré-injection) | `tools/generate_postes_xlsx.py`, `tools/inject_postes.py` | ✅ |
 | 2 | Gating bêta | `beta.py` | ✅ |
 | 3 | Migration DB | `database.py` (elo, `trade_log`, `duels` + fonctions) | ✅ testé |
-| 4 | Échange de cartes | `cogs/trade_cog.py` | ✅ testé |
+| 4 | Échange de cartes (proposition complète) | `cogs/trade_cog.py` | ✅ testé · `tools/test_trade.py` |
 | 4b| Recyclage sélectif (A+B) | `cogs/collection_cog.py`, `database.remove_extra_copies` | ✅ testé |
 | 5 | Moteur de duel | `duel_engine.py` | ✅ testé Monte-Carlo |
 | 5 | DB duels | `database.py` | ✅ testé |
@@ -127,7 +127,9 @@ Les 7 postes / slots : `GB · ALG · ARG · DC · PIV · ARD · ALD`.
 
 ## 3. Duel ASYNCHRONE + composition manuelle — ✅ FAIT
 
-Implémenté dans `cogs/duel_cog.py` (pattern repris de `TradePicker`).
+Implémenté dans `cogs/duel_cog.py`. Le sélecteur de composition et le composeur
+d'échange partagent la même leçon (voir §3ter) : pas d'étape « club », une liste
+unique triée par ce qui sert la décision.
 
 ### Pourquoi asynchrone
 Exiger deux joueurs connectés en même temps rendait le duel quasi injouable sur un
@@ -429,10 +431,135 @@ n'est plus discret, c'est tout. Pour l'empêcher vraiment il faudrait étaler le
 
 ---
 
+## 3ter. Échange : proposition complète — ✅ FAIT
+
+**Refonte ergonomique de `cogs/trade_cog.py`.** L'ancienne fenêtre ouvrait deux
+paniers vides et demandait aux deux joueurs de composer chacun son offre **à
+l'aveugle** : impossible de dire « c'est CETTE carte que je veux », impossible de
+voir la collection d'en face, et la vraie négociation se faisait dans le salon,
+à côté du bot. Le composeur reprenait en plus l'étape « club » abandonnée depuis
+pour le duel (§3, *Le sélecteur de composition*).
+
+### Le nouveau flux
+
+1. `/echange @membre` ouvre un **composeur privé** (rien n'est public, personne
+   n'est encore verrouillé côté destinataire) où l'on écrit **les deux côtés** :
+   ce qu'on donne **et** ce qu'on veut recevoir.
+2. « 📨 Envoyer la proposition » poste l'échange dans le salon, en mentionnant
+   le destinataire.
+3. Celui-ci **accepte en un clic** — ou clique « 🛠️ Modifier », qui rouvre le
+   même composeur **prérempli et vu de son côté** : c'est une contre-proposition,
+   pas un nouvel échange. Un mot en réponse le signale à l'autre (Discord ne
+   notifie jamais une édition de message).
+
+### Le composeur
+
+Plus d'étape « club » imposée : une **liste unique**, triée par ce qui sert la
+décision, et un bouton 🔎 qui filtre par **nom de joueur ou club** (c'est le club
+en tant que recherche, plus en tant que péage). Chaque ligne dit ce qu'on ne
+pouvait pas savoir avant de cliquer :
+
+```
+📤 Ce que tu donnes (2/6)
+   🟩 Yanis LENNE        Peu Commun · tu en as 3 · 🆕 pas dans sa collection
+   🟦 Nedim REMILI       Rare · tu en as 2
+   🟨 Dika MEM           Légendaire · ⚠️ ton seul exemplaire
+
+📥 Ce que tu reçois (1/6)
+   🟪 Elohim PRANDI      Épique · 2 exemplaires · 🆕 tu ne l'as pas
+   🟦 Luka KARABATIC     Rare · 1 exemplaire · tu l'as déjà
+```
+
+Tri : **ses doublons d'abord** quand on donne (ce qu'on peut céder sans rien
+perdre), et parmi eux ce qui manque à l'autre ; **ce qui manque à sa collection
+d'abord** quand on demande, de préférence dans les doublons d'en face. 25 lignes
+par page (plafond Discord), pagination ◀ ▶.
+
+### L'archive S1 ne s'échange pas — 10 septembre 2026
+
+**`trade_cog` n'avait aucun filtre de saison**, ni avant ni après la refonte. On
+pouvait donc échanger ses cartes S1, alors que `tools/migration_s2.py` les a
+réduites à **un exemplaire par carte, en lecture seule**. C'était interdit dans
+les deux sens : céder la sienne est définitif (plus tirable en pack, plus créable
+au craft), et en recevoir une seconde casse l'exemplaire unique sur lequel repose
+l'archive.
+
+`TradeCog.echangeable` applique désormais la même règle que `DuelCog.jouable` —
+saison en cours uniquement — et elle est appliquée à **quatre** endroits, pas un :
+le catalogue du composeur, le comptage qui alimente les marqueurs 🆕, la
+résolution des exemplaires (`resolve_rowids`, filet en cas de bascule de saison
+pendant une proposition ouverte) et le pré-vol de `/echange`. Le composeur
+affiche `🗄️ N carte(s) d'archive non échangeable(s)` : sans ça, une collection
+pleine de S1 s'affiche à moitié vide sans que rien ne dise pourquoi.
+
+Nuance volontaire par rapport au duel : **pas d'exclusion des cartes Noël**. Les
+24 sont S1, donc déjà écartées par la saison ; si une promo revient en saison
+courante, elle sera doublonnable comme le reste et donc échangeable.
+
+### ⚠️ Les `card_id` sont MIXTES
+
+Piège trouvé en écrivant ce filtre : **saison 1 = identifiants entiers** (`1, 2,
+3…`), **saison 2 = slugs** (`banke-gustaf`). La colonne `user_cards.card_id` est
+déclarée `INTEGER` mais SQLite rend ce qu'on y a écrit — donc les deux formes
+cohabitent. Toute clé de carte manipulée dans `trade_cog` passe par
+**`str(card_id)`** (`owned_counts`, `resolve_rowids`, valeurs des menus). Un
+`int(cid)` y plantait sur **toutes** les cartes de la saison en cours.
+
+### Invariants conservés
+
+- **Pas de cadeau** : les deux côtés doivent contenir au moins une carte.
+- **Double validation** : rien ne part sans l'accord des deux sur l'état affiché.
+- **Anti-arnaque** : toute modification validée efface les acceptations et
+  n'engage que son auteur (`Deal.sign`).
+- **Atomicité** : `database.execute_trade` inchangé.
+
+### Ce qui a changé sous le capot
+
+- Les paniers contiennent des **cartes** (`card_id`), plus des exemplaires précis.
+  Les rowids ne sont choisis qu'au clic sur Accepter (`TradeCog.resolve_rowids`) :
+  une proposition peut rester dix minutes à l'écran, et l'exemplaire visé partir
+  ailleurs entre-temps. Un échec est refusé proprement, en nommant le joueur à qui
+  la carte manque.
+- Le composeur travaille sur un **brouillon** : tant qu'on n'a pas validé, l'autre
+  ne voit rien bouger et les acceptations tiennent. Se tromper de menu ne casse
+  plus la négociation en cours.
+- **Verrous** (`ACTIVE_TRADERS`) : le destinataire n'est verrouillé qu'à l'ENVOI,
+  plus dès la commande — composer puis abandonner ne bloque plus personne d'autre
+  que soi. Toute sortie passe par `release()`.
+- `PROPOSAL_TIMEOUT` **900 s** (au lieu de 300) : une proposition attend une vraie
+  personne, pas un joueur déjà devant son écran.
+
+**Vérifié hors-ligne** : `py -3 tools/test_trade.py` — 74 assertions sur le vrai
+code du cog (extrait par `ast`, discord.py n'étant pas installé en dev) : tri des
+menus, marqueurs ⚠️/🆕, filtre nom/club, état de l'accord, résolution des
+exemplaires, échange complet en base (rien créé, rien perdu), échec propre sur
+proposition périmée, **exclusion de l'archive S1 aux quatre points de contrôle**
+et **normalisation des identifiants mixtes** (le jeu de test utilise de vraies
+cartes S2 en slug ET de vraies S1 en entier, pour que la régression ressorte).
+
+---
+
 ## 4. Tester (en bêta, salon `441230079100715008`)
 
 1. Déployer, lancer le bot, `!sync`.
-2. `/echange @autre_compte` — panier des deux côtés, double validation.
+2. `/echange @autre_compte` — composer les deux côtés, envoyer, **accepter en un
+   clic** sur le second compte. Cas à tester :
+   - **contre-proposition** : « Modifier » sur le second compte → le composeur
+     s'ouvre prérempli et inversé ; valider → l'acceptation du premier est effacée
+     et il reçoit le mot de rappel en réponse au message d'échange ;
+   - **brouillon** : ouvrir « Modifier », toucher aux menus, puis « Annuler mes
+     changements » → la proposition affichée n'a pas bougé, les acceptations non plus ;
+   - **recherche** 🔎 par nom puis par club, et « Tout afficher » pour revenir ;
+   - **doublons** : donner ses DEUX exemplaires d'une carte → ligne `×2` + `⚠️` ;
+   - **pas de cadeau** : vider un côté → « Envoyer » reste grisé ;
+   - **proposition périmée** : échanger la carte promise depuis un autre échange,
+     puis accepter → refus propre nommant le joueur, aucune carte déplacée ;
+   - **verrous** : `/echange` pendant qu'on compose → refus ; abandonner la
+     composition → le destinataire n'a jamais été bloqué ;
+   - **archive S1** : aucune carte de saison passée dans les deux menus, ni du
+     côté « donner » ni du côté « demander » ; le pied du composeur annonce
+     `🗄️ N carte(s) d'archive` ; `/echange` sur un compte qui n'a QUE de la S1
+     répond « l'archive ne s'échange pas », pas « ouvre un /pack ».
 3. `/recycler` — version sélective (liste + « Tout recycler »).
 4. `/defi @autre_compte` (classé) et `/defi @autre amical:True`, **le second compte
    déconnecté** : compo préremplie → cliquer **« Attaquer »** (ou ajuster via
