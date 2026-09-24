@@ -638,6 +638,69 @@ class MatchSheetView(discord.ui.View):
         await self.cog.send_match_sheet(interaction)
 
 
+# --- Classement ---
+# Trente places, dix par page : d'un seul bloc, l'embed devenait un mur de texte
+# dès quinze lignes. Découpé en pages, on double le nombre de joueurs affichés sans
+# rien perdre en lisibilité.
+LEADERBOARD_SIZE = 30
+LEADERBOARD_PAGE = 10
+
+
+class LeaderboardView(discord.ui.View):
+    """Les flèches de /classement_duel.
+
+    Seul l'auteur de la commande tourne les pages : le message est public, et le voir
+    changer sous ses yeux parce qu'un autre a cliqué serait déroutant. Les autres
+    relancent la commande, elle ne coûte rien.
+    """
+
+    def __init__(self, author_id, pages):
+        super().__init__(timeout=180)
+        self.author_id = author_id
+        self.pages = pages
+        self.page = 0
+        self.message = None
+        self._sync()
+
+    def _sync(self):
+        self.prev_btn.disabled = self.page == 0
+        self.next_btn.disabled = self.page >= len(self.pages) - 1
+        self.page_btn.label = f"{self.page + 1}/{len(self.pages)}"
+
+    async def interaction_check(self, interaction):
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message(
+                "Lance `/classement_duel` pour parcourir le classement toi-même.", ephemeral=True)
+            return False
+        return True
+
+    async def _show(self, interaction, page):
+        self.page = max(0, min(page, len(self.pages) - 1))
+        self._sync()
+        await interaction.response.edit_message(embed=self.pages[self.page], view=self)
+
+    @discord.ui.button(emoji="◀️", style=discord.ButtonStyle.grey)
+    async def prev_btn(self, interaction, button):
+        await self._show(interaction, self.page - 1)
+
+    # Simple compteur : désactivé, il ne fait qu'afficher la page courante.
+    @discord.ui.button(label="1/1", style=discord.ButtonStyle.grey, disabled=True)
+    async def page_btn(self, interaction, button):
+        pass
+
+    @discord.ui.button(emoji="▶️", style=discord.ButtonStyle.grey)
+    async def next_btn(self, interaction, button):
+        await self._show(interaction, self.page + 1)
+
+    async def on_timeout(self):
+        # La page affichée reste lisible ; seules les flèches, devenues muettes, partent.
+        if self.message:
+            try:
+                await self.message.edit(view=None)
+            except discord.HTTPException:
+                pass
+
+
 class DuelCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -1498,23 +1561,33 @@ class DuelCog(commands.Cog):
     @app_commands.command(name="classement_duel", description="Classement Elo des duels.")
     @beta_guard()
     async def classement_duel(self, interaction: discord.Interaction):
-        data = database.get_duel_leaderboard(limit=15)
+        data = database.get_duel_leaderboard(limit=LEADERBOARD_SIZE)
         if not data:
             return await interaction.response.send_message("Aucun duel classé pour l'instant.", ephemeral=True)
-        desc = ""
+        lines = []
         for i, row in enumerate(data, 1):
             m = interaction.guild.get_member(row["user_id"]) if interaction.guild else None
             name = m.display_name if m else "Inconnu"
             medal = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else f"#{i}"
             defense = (f" · 🛡️ {row['defenses_tenues']}/{row['defenses']}"
                        if row.get("defenses") else "")
-            desc += (f"{medal} **{name}** — {row['elo']} Elo "
-                     f"(⚔️ {row['victoires']}/{row['matchs']} V{defense})\n")
-        e = discord.Embed(title="🏆 Classement des duels", description=desc, color=discord.Color.gold())
-        e.set_footer(text=f"L'Elo et les packs se gagnent à l'attaque · "
-                          f"🛡️ défenses tenues (elles ne rapportent rien, elles protègent) · "
-                          f"{E.ladder_text()}")
-        await interaction.response.send_message(embed=e)
+            lines.append(f"{medal} **{name}** — {row['elo']} Elo "
+                         f"(⚔️ {row['victoires']}/{row['matchs']} V{defense})")
+        footer = (f"L'Elo et les packs se gagnent à l'attaque · "
+                  f"🛡️ défenses tenues (elles ne rapportent rien, elles protègent) · "
+                  f"{E.ladder_text()}")
+        pages = []
+        for start in range(0, len(lines), LEADERBOARD_PAGE):
+            e = discord.Embed(title="🏆 Classement des duels",
+                              description="\n".join(lines[start:start + LEADERBOARD_PAGE]),
+                              color=discord.Color.gold())
+            e.set_footer(text=footer)
+            pages.append(e)
+        if len(pages) == 1:
+            return await interaction.response.send_message(embed=pages[0])
+        view = LeaderboardView(interaction.user.id, pages)
+        await interaction.response.send_message(embed=pages[0], view=view)
+        view.message = await interaction.original_response()
 
 
 async def setup(bot):
