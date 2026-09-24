@@ -649,14 +649,12 @@ LEADERBOARD_PAGE = 10
 class LeaderboardView(discord.ui.View):
     """Les flèches de /classement_duel.
 
-    Seul l'auteur de la commande tourne les pages : le message est public, et le voir
-    changer sous ses yeux parce qu'un autre a cliqué serait déroutant. Les autres
-    relancent la commande, elle ne coûte rien.
+    Tout le monde peut tourner les pages : le classement est public, n'importe quel
+    lecteur doit pouvoir y chercher sa place.
     """
 
-    def __init__(self, author_id, pages):
+    def __init__(self, pages):
         super().__init__(timeout=180)
-        self.author_id = author_id
         self.pages = pages
         self.page = 0
         self.message = None
@@ -666,13 +664,6 @@ class LeaderboardView(discord.ui.View):
         self.prev_btn.disabled = self.page == 0
         self.next_btn.disabled = self.page >= len(self.pages) - 1
         self.page_btn.label = f"{self.page + 1}/{len(self.pages)}"
-
-    async def interaction_check(self, interaction):
-        if interaction.user.id != self.author_id:
-            await interaction.response.send_message(
-                "Lance `/classement_duel` pour parcourir le classement toi-même.", ephemeral=True)
-            return False
-        return True
 
     async def _show(self, interaction, page):
         self.page = max(0, min(page, len(self.pages) - 1))
@@ -1585,7 +1576,7 @@ class DuelCog(commands.Cog):
             pages.append(e)
         if len(pages) == 1:
             return await interaction.response.send_message(embed=pages[0])
-        view = LeaderboardView(interaction.user.id, pages)
+        view = LeaderboardView(pages)
         await interaction.response.send_message(embed=pages[0], view=view)
         view.message = await interaction.original_response()
 
