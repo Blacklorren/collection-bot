@@ -13,7 +13,8 @@ Le principe est désormais celui d'une **proposition complète** :
 - La proposition part ensuite dans un **fil privé** ouvert pour les deux
   joueurs, lisible d'un coup d'œil. Le destinataire n'a plus qu'à cliquer
   **Accepter** — un seul clic pour échanger. Personne d'autre ne voit les
-  boutons (cf `TradeCog._private_thread`, repli sur le salon si le fil échoue).
+  boutons (cf `TradeCog._private_thread`, repli sur le salon si le fil échoue),
+  mais l'échange CONCLU est annoncé dans le salon.
 - S'il n'est pas d'accord, **Modifier** rouvre le même composeur de son point de
   vue, prérempli : c'est une contre-proposition, pas un nouvel échange.
 
@@ -570,6 +571,10 @@ class TradeView(discord.ui.View):
         self.cog = cog
         self.deal = deal
         self.message = None
+        # Salon d'où part le /echange, quand la proposition a filé dans un fil
+        # privé : c'est là que l'échange conclu est annoncé. None si la proposition
+        # est déjà dans le salon (repli), elle y est alors publique d'elle-même.
+        self.public_channel = None
 
     async def interaction_check(self, interaction):
         if interaction.user.id not in (self.deal.a.id, self.deal.b.id):
@@ -727,8 +732,17 @@ class TradeView(discord.ui.View):
                 if manquant else
                 "Une des cartes a changé de propriétaire entre-temps. Rien n'a bougé.")
             e.color = discord.Color.red()
+        e.set_footer(text="⚠️ dernier exemplaire · 🆕 absente de sa collection")
         await interaction.response.edit_message(content=None, embed=e, view=None)
         self.stop()
+        if ok and self.public_channel:
+            # La négociation reste entre les deux joueurs, pas son issue : un
+            # échange conclu s'annonce dans le salon, comme avant le fil privé.
+            try:
+                await self.public_channel.send(
+                    embed=e, allowed_mentions=discord.AllowedMentions.none())
+            except discord.HTTPException:
+                pass    # l'échange est fait et affiché dans le fil : rien de vital
 
     async def on_timeout(self):
         if self.deal.closed:
@@ -824,6 +838,8 @@ class TradeCog(commands.Cog):
         deal.published = True
         view = TradeView(self, deal)
         dest = await self._private_thread(channel, deal) or channel
+        if dest is not channel:
+            view.public_channel = channel
         try:
             view.message = await dest.send(
                 content=f"{deal.b.mention} — **{deal.a.display_name}** te propose un échange !",
