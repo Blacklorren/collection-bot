@@ -10,8 +10,11 @@ Le principe est désormais celui d'une **proposition complète** :
 
 - `/echange @membre` ouvre un composeur **privé** où l'on écrit les DEUX côtés :
   ce qu'on donne, et ce qu'on veut recevoir de l'autre.
-- La proposition part ensuite dans le salon, lisible d'un coup d'œil. Le
-  destinataire n'a plus qu'à cliquer **Accepter** — un seul clic pour échanger.
+- La proposition part ensuite dans un **fil privé** ouvert pour les deux
+  joueurs, lisible d'un coup d'œil. Le destinataire n'a plus qu'à cliquer
+  **Accepter** — un seul clic pour échanger. Personne d'autre ne voit les
+  boutons (cf `TradeCog._private_thread`, repli sur le salon si le fil échoue),
+  mais l'échange CONCLU est annoncé dans le salon.
 - S'il n'est pas d'accord, **Modifier** rouvre le même composeur de son point de
   vue, prérempli : c'est une contre-proposition, pas un nouvel échange.
 
@@ -555,7 +558,8 @@ class TradePicker(discord.ui.View):
 
 
 class TradeView(discord.ui.View):
-    """La proposition, dans le salon : ce que chacun donne, et où en est l'accord.
+    """La proposition, dans le fil privé des deux joueurs : ce que chacun donne,
+    et où en est l'accord.
 
     Un seul clic suffit à conclure. « Modifier » n'ouvre pas un nouvel échange
     mais le même composeur, prérempli et vu de l'autre côté : la contre-proposition
@@ -567,6 +571,10 @@ class TradeView(discord.ui.View):
         self.cog = cog
         self.deal = deal
         self.message = None
+        # Salon d'où part le /echange, quand la proposition a filé dans un fil
+        # privé : c'est là que l'échange conclu est annoncé. None si la proposition
+        # est déjà dans le salon (repli), elle y est alors publique d'elle-même.
+        self.public_channel = None
 
     async def interaction_check(self, interaction):
         if interaction.user.id not in (self.deal.a.id, self.deal.b.id):
@@ -724,8 +732,17 @@ class TradeView(discord.ui.View):
                 if manquant else
                 "Une des cartes a changé de propriétaire entre-temps. Rien n'a bougé.")
             e.color = discord.Color.red()
+        e.set_footer(text="⚠️ dernier exemplaire · 🆕 absente de sa collection")
         await interaction.response.edit_message(content=None, embed=e, view=None)
         self.stop()
+        if ok and self.public_channel:
+            # La négociation reste entre les deux joueurs, pas son issue : un
+            # échange conclu s'annonce dans le salon, comme avant le fil privé.
+            try:
+                await self.public_channel.send(
+                    embed=e, allowed_mentions=discord.AllowedMentions.none())
+            except discord.HTTPException:
+                pass    # l'échange est fait et affiché dans le fil : rien de vital
 
     async def on_timeout(self):
         if self.deal.closed:
@@ -820,18 +837,64 @@ class TradeCog(commands.Cog):
         ACTIVE_TRADERS.add(deal.b.id)
         deal.published = True
         view = TradeView(self, deal)
+        dest = await self._private_thread(channel, deal) or channel
+        if dest is not channel:
+            view.public_channel = channel
         try:
-            view.message = await channel.send(
+            view.message = await dest.send(
                 content=f"{deal.b.mention} — **{deal.a.display_name}** te propose un échange !",
                 embed=view.build_embed(), view=view,
                 allowed_mentions=discord.AllowedMentions(users=[deal.b]))
         except discord.HTTPException:
-            # Salon interdit au bot : sans message public, personne ne peut
-            # répondre — on relâche les deux verrous plutôt que de les figer.
+            # Salon interdit au bot : sans message, personne ne peut répondre —
+            # on relâche les deux verrous plutôt que de les figer.
             view.stop()
             release(deal)
-            await interaction.followup.send(
+            return await interaction.followup.send(
                 "Je n'ai pas pu poster la proposition dans ce salon.", ephemeral=True)
+        if dest is not channel:
+            await interaction.followup.send(
+                f"La proposition t'attend dans le fil privé {dest.mention}.", ephemeral=True)
+
+    async def _private_thread(self, channel, deal):
+        """Un fil PRIVÉ réservé aux deux joueurs, ou None s'il n'a pas pu être ouvert.
+
+        Les boutons d'un message se montrent à tous ceux qui voient le message :
+        postée dans le salon, la proposition affichait « Accepter » et « Annuler »
+        chez chaque lecteur, qui ne pouvait que se faire refuser au clic. Dans un
+        fil privé, seuls les deux joueurs (et la modération) la voient, et ils ont
+        un endroit pour négocier. `invitable=False` : personne d'autre n'y entre.
+
+        Si le fil ne peut pas s'ouvrir (droit manquant, salon qui n'en accepte
+        pas), on retombe sur le salon : un souci de rangement ne doit jamais
+        empêcher d'échanger. Lancé depuis un fil, on ouvre le sien à côté.
+        """
+        parent = channel.parent if isinstance(channel, discord.Thread) else channel
+        if not isinstance(parent, discord.TextChannel):
+            return None
+        try:
+            fil = await parent.create_thread(
+                name=f"🤝 Échange {deal.a.display_name} ↔ {deal.b.display_name}"[:100],
+                type=discord.ChannelType.private_thread, invitable=False,
+                auto_archive_duration=60, reason="Proposition d'échange")
+        except discord.HTTPException as e:
+            print(f"⚠️ (ÉCHANGES) fil privé impossible dans #{parent}: {e} — "
+                  f"la proposition part dans le salon.")
+            return None
+        try:
+            for membre in (deal.a, deal.b):
+                await fil.add_user(membre)
+        except discord.HTTPException as e:
+            # Un fil où l'un des deux manque est pire que le salon : personne
+            # ne pourrait conclure. On le retire et on repart sur le salon.
+            print(f"⚠️ (ÉCHANGES) ajout au fil privé impossible : {e} — "
+                  f"la proposition part dans le salon.")
+            try:
+                await fil.delete()
+            except discord.HTTPException:
+                pass
+            return None
+        return fil
 
     async def cog_app_command_error(self, interaction, error):
         msg = error.user_message if isinstance(error, BetaLocked) else None
