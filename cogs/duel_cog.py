@@ -401,7 +401,8 @@ class LineupPicker(discord.ui.View):
         # Le bonus de poste en POURCENTAGE, comme sur la feuille de match : c'est le
         # même bonus, il doit se dire avec les mêmes mots des deux côtés de l'écran.
         e.set_footer(text=f"{filled}/7 postes · ta puissance {round(pow_)} · "
-                          f"✓ = à son poste ({E.pct_text(E.POSTE_BONUS)})")
+                          f"✓ = à son poste ({E.pct_text(E.POSTE_BONUS)}, "
+                          f"seul à compter pour la synergie de club)")
         return e
 
     async def _apply(self, interaction):
@@ -1272,9 +1273,18 @@ class DuelCog(commands.Cog):
         lines.append(f"Postes respectés : {details.get('poste_ok', 0)} sur {len(E.SLOTS)}"
                      + (f" ({postes})" if postes else ""))
 
+        # Le CLUB est nommé, et « à leur poste » rappelle la règle (17 sept. 2026).
+        # « 3 joueurs (+12 %) » ne disait ni lesquels ni pourquoi : le joueur voyait
+        # un ✗ à un poste et son titulaire sur le banc sans pouvoir relier les deux,
+        # et ça remontait en bug. Nommer le club rend la ligne vérifiable d'un coup
+        # d'œil sur la compo juste en dessous.
         synergie = E.pct_text(details["synergy"])
-        lines.append(f"Synergie club : {details['max_club_group']} joueurs ({synergie})"
-                     if synergie else "Synergie club : aucune")
+        if synergie:
+            club = details.get("club")
+            lines.append(f"Synergie club : {details['max_club_group']} joueurs"
+                         f"{f' de {club}' if club else ''} à leur poste ({synergie})")
+        else:
+            lines.append("Synergie club : aucune")
 
         if forme is None:
             lines.append(f"**Puissance : {round(power)}**")

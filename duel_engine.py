@@ -60,7 +60,22 @@ BASE_NOTE = {
 EMPTY_SLOT_NOTE = BASE_NOTE["Commun"]   # slot vide = niveau Commune, sans club ni bonus
 POSTE_BONUS = 1.4                        # carte alignée à SON poste
 
-# --- SYNERGIE DE CLUB (sur le plus gros groupe de même club aligné) ---
+# --- SYNERGIE DE CLUB (plus gros groupe de même club aligné À SON POSTE) ---
+#
+# ⚠️ « À SON POSTE » est la correction du 17 septembre 2026. Avant, le club
+# comptait ses joueurs où qu'ils soient, et les deux bonus se contredisaient : un
+# palier de synergie vaut +7 à +9 % sur TOUTE l'équipe, le bonus de poste +40 %
+# d'UNE carte, soit +2 à +6 % de l'équipe. Dès qu'une équipe dépassait ~50 de
+# valeur, compléter un groupe de club payait donc mieux que respecter un poste :
+# la compo auto sortait un gardien sur l'aile pendant que l'ailier titulaire, de
+# même rareté, restait sur le banc. Mesuré sur 3 000 collections tirées de packs :
+# 44 % des compos, dont 13 % laissaient dehors un joueur de rareté SUPÉRIEURE —
+# d'où les remontées « la compo auto met des gens n'importe où ».
+#
+# Un joueur hors poste ne rapporte plus rien à la synergie : déplacer quelqu'un
+# pour le club ne peut donc plus faire monter la puissance, et le symptôme
+# disparaît par construction (mesuré : 0 %). Les paliers, eux, ne bougent pas —
+# une équipe de club montée poste par poste vaut toujours ×1.55.
 SYNERGY = {1: 1.00, 2: 1.05, 3: 1.12, 4: 1.20, 5: 1.30, 6: 1.42, 7: 1.55}
 
 # --- SIMULATION DU MATCH ---
@@ -160,15 +175,20 @@ def team_power(lineup):
         raw_total += BASE_NOTE.get(card.get("rarete"), EMPTY_SLOT_NOTE)
         if normalize_poste(card.get("poste")) == slot:
             poste_ok += 1
-        club = card.get("club")
-        if club:
-            club_counts[club] = club_counts.get(club, 0) + 1
-    max_group = max(club_counts.values()) if club_counts else 1
+            # Le club ne compte QUE pour une carte à son poste (cf. SYNERGY).
+            club = card.get("club")
+            if club:
+                club_counts[club] = club_counts.get(club, 0) + 1
+    # `sorted` avant `max` : à égalité de joueurs, deux clubs donnent la même
+    # synergie mais un seul est AFFICHÉ, et il ne doit pas changer d'un match à
+    # l'autre au gré de l'ordre des postes.
+    club, max_group = (max(sorted(club_counts.items()), key=lambda kv: kv[1])
+                       if club_counts else (None, 1))
     synergy = SYNERGY.get(min(max_group, 7), 1.0)
     power = total * synergy
     return power, {"base_total": round(total, 1), "synergy": synergy,
-                   "max_club_group": max_group, "raw_total": round(raw_total, 1),
-                   "poste_ok": poste_ok}
+                   "max_club_group": max_group, "club": club,
+                   "raw_total": round(raw_total, 1), "poste_ok": poste_ok}
 
 
 def _convs(power1, power2, rng):
@@ -350,12 +370,22 @@ def form_text(forme):
 #   - placer au mieux les cartes de C sur ces postes,
 #   - placer au mieux les AUTRES cartes sur les postes restants,
 # les deux moitiés étant indépendantes une fois le partage fixé. On balaie les
-# 2^7 partages pour chaque club, et la synergie se lit sur le nombre de postes
-# tenus par C. Le vrai optimum a forcément un club majoritaire : il est donc
-# atteint par l'un de ces balayages.
+# 2^7 partages pour chaque club, et la synergie se lit sur les cartes de C qui
+# sont À LEUR POSTE (17 sept. 2026 — cf. SYNERGY). Le vrai optimum a forcément un
+# club majoritaire : il est donc atteint par l'un de ces balayages.
+#
+# Ce « à leur poste » est ce qui oblige le côté club à compter (`_assign_dp_club`)
+# au lieu de simplement sommer : deux placements des mêmes cartes peuvent valoir
+# le même total et ne pas donner la même synergie, et c'est justement celui qui
+# respecte les postes qu'on veut garder.
 
 _LINEUP_MASKS = 1 << len(SLOTS)
 _NEG = float("-inf")
+# Deux compos de puissance identique peuvent différer sur le dernier bit du
+# flottant selon le chemin de calcul : on les départage sous cette tolérance.
+# Les vraies puissances, elles, sont des multiples de 0,002 (notes au dixième,
+# synergie au centième), donc aucun écart réel ne passe dessous.
+_TIE = 1e-9
 
 
 def _lineup_order_key(card):
@@ -375,8 +405,7 @@ def _assign_dp(indexes, notes, allow_empty):
     `val[mask]` = meilleur total pour les postes de `mask`, `asg[mask]` = le
     tuple ((slot_index, card_index), …) qui l'atteint.
 
-    allow_empty=False : `mask` est tenu EXACTEMENT par des cartes — indispensable
-    pour que le nombre de postes du masque soit la taille du groupe de club.
+    allow_empty=False : `mask` est tenu EXACTEMENT par des cartes.
     allow_empty=True  : un poste de `mask` peut rester vide (EMPTY_SLOT_NOTE).
 
     L'affectation est stockée en entier plutôt qu'en pointeur vers l'état parent :
@@ -419,6 +448,49 @@ def _assign_dp(indexes, notes, allow_empty):
     return val, asg
 
 
+def _assign_dp_club(indexes, notes, natural):
+    """Le même DP, côté CLUB : `val[mask][k]` = meilleur total pour les postes de
+    `mask`, tenus par des cartes du club dont `k` jouent À LEUR POSTE.
+
+    `k` est la dimension ajoutée le 17 septembre 2026 avec la nouvelle synergie.
+    Sommer ne suffit plus : les mêmes cartes du club placées autrement donnent le
+    même total et pas la même synergie, et un DP qui ne garderait que le meilleur
+    total par masque jetterait justement le placement qui respecte les postes.
+
+    Les états dominés ne sont pas élagués : à sept postes, il y a au plus huit
+    valeurs de `k` par masque, et la comparaison coûterait plus cher que de les
+    garder.
+    """
+    n = len(SLOTS)
+    val = [None] * _LINEUP_MASKS
+    val[0] = {0: (0.0, ())}
+    for ci in indexes:
+        row = notes[ci]
+        nat = natural[ci]
+        # Masques décroissants : même raison que dans `_assign_dp` — on n'écrit que
+        # vers des masques déjà dépassés, donc `ci` ne peut pas servir deux fois.
+        for mask in range(_LINEUP_MASKS - 1, -1, -1):
+            states = val[mask]
+            if not states:
+                continue
+            for si in range(n):
+                bit = 1 << si
+                if mask & bit:
+                    continue
+                dst = val[mask | bit]
+                if dst is None:
+                    dst = val[mask | bit] = {}
+                add = row[si]
+                bump = 1 if nat == si else 0
+                for k, (total, asg) in states.items():
+                    k2 = k + bump
+                    cand = total + add
+                    prev = dst.get(k2)
+                    if prev is None or cand > prev[0]:
+                        dst[k2] = (cand, asg + ((si, ci),))
+    return val
+
+
 def best_lineup(cards):
     """Meilleure feuille de match possible avec `cards` : {slot: card | None}.
 
@@ -432,16 +504,27 @@ def best_lineup(cards):
         return lineup
 
     notes = [[card_note(c, s) for s in SLOTS] for c in cards]
+    natural = []
+    for card in cards:
+        code = normalize_poste(card.get("poste"))
+        natural.append(SLOTS.index(code) if code else -1)
 
-    def prune(indexes):
+    def prune(indexes, keep_natural=False):
         """Les 7 meilleures cartes par poste suffisent à contenir un optimum : au
         plus 7 cartes sont alignées, donc pour n'importe quel poste l'une de ses
         sept meilleures est forcément libre, et vaut au moins autant que celle
         qu'on y aurait mise. Sans cet élagage, une collection complète ferait
-        tourner la DP sur 250 cartes au lieu d'une cinquantaine."""
+        tourner la DP sur 250 cartes au lieu d'une cinquantaine.
+
+        `keep_natural` (côté club) garde EN PLUS les sept meilleures cartes dont
+        c'est le poste : elles seules font monter la synergie, et une carte mieux
+        notée hors poste ne les remplace donc pas à valeur égale."""
         keep = set()
         for si in range(n):
             keep.update(sorted(indexes, key=lambda ci: (-notes[ci][si], ci))[:n])
+            if keep_natural:
+                chez_eux = [ci for ci in indexes if natural[ci] == si]
+                keep.update(sorted(chez_eux, key=lambda ci: (-notes[ci][si], ci))[:n])
         return sorted(keep)
 
     by_club = {}
@@ -451,7 +534,7 @@ def best_lineup(cards):
 
     everyone = list(range(len(cards)))
     full_mask = _LINEUP_MASKS - 1
-    best_power, best = -1.0, None
+    best_power, best_filled, best = -1.0, -1, None
     # `None` en tête = aucune contrainte de club. Ce passage garantit qu'on ne
     # rend jamais pire que l'optimum de somme, y compris pour une collection sans
     # club renseigné, où aucun passage par club n'existerait.
@@ -461,21 +544,32 @@ def best_lineup(cards):
         # a chaque carte (quadratique sur une grosse collection, x16 clubs).
         in_club = set(club_idx)
         other_idx = [ci for ci in everyone if ci not in in_club] if club else everyone
-        a_val, a_asg = _assign_dp(prune(club_idx), notes, allow_empty=False)
+        a_states = _assign_dp_club(prune(club_idx, keep_natural=True), notes, natural)
         b_val, b_asg = _assign_dp(prune(other_idx), notes, allow_empty=True)
         for mask in range(_LINEUP_MASKS):
-            if a_val[mask] == _NEG:
+            states = a_states[mask]
+            if not states:
                 continue
             rest = full_mask ^ mask
             if b_val[rest] == _NEG:
                 continue
-            group = bin(mask).count("1")
-            # SYNERGY[group] minore la vraie synergie quand un AUTRE club est plus
-            # nombreux du côté `b` — ce cas-là est couvert par le passage de ce
-            # club, donc le maximum global reste l'optimum exact.
-            power = (a_val[mask] + b_val[rest]) * SYNERGY.get(min(max(group, 1), 7), 1.0)
-            if power > best_power:
-                best_power, best = power, a_asg[mask] + b_asg[rest]
+            reste, reste_asg = b_val[rest], b_asg[rest]
+            tenus = len(reste_asg)
+            for k, (total, asg) in states.items():
+                # SYNERGY[k] minore la vraie synergie quand un AUTRE club est mieux
+                # représenté du côté `b` — ce cas-là est couvert par le passage de ce
+                # club, donc le maximum global reste l'optimum exact.
+                power = (total + reste) * SYNERGY.get(min(max(k, 1), 7), 1.0)
+                # À puissance ÉGALE, on garde la compo qui tient le plus de postes.
+                # Une Commune hors poste vaut exactement un poste vide (3), et depuis
+                # que le club compte ses joueurs à leur poste, le même optimum se
+                # présente aussi bien avec la carte qu'avec le trou — or une feuille
+                # de match trouée se lit comme un bug.
+                filled = len(asg) + tenus
+                if power > best_power + _TIE or (power > best_power - _TIE
+                                                 and filled > best_filled):
+                    best_power, best_filled = power, filled
+                    best = asg + reste_asg
 
     for si, ci in best:
         lineup[SLOTS[si]] = cards[ci]

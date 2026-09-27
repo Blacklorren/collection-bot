@@ -102,6 +102,12 @@ verifie("ordre : valeur -> postes -> synergie -> forme -> puissance",
                            "Synergie club", "Forme du jour"],
         " / ".join(entetes(col_a)))
 verifie("la forme du jour est nommee ET chiffree", "🔥 Grand jour (+20 %)" in col_d)
+# La ligne de synergie NOMME le club et rappelle la regle (17 sept. 2026) : sans
+# ca, le joueur lisait « 2 joueurs (+5 %) » sans pouvoir relier ce bonus a un ✗
+# sur la compo juste en dessous, et ca remontait en bug.
+verifie("la synergie nomme le club et dit « a leur poste »",
+        "Synergie club : 2 joueurs de Nantes à leur poste (+5 %)" in col_a,
+        [l for l in col_a.split("\n") if "Synergie" in l])
 verifie("les 7 postes sont toujours listes",
         all(("`%s`" % s) in col_a for s in E.SLOTS))
 

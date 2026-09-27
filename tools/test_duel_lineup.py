@@ -162,5 +162,73 @@ for _ in range(60):
             stable = False
 check("meme collection -> meme compo", stable)
 
+print("\n=== 8. La synergie ne compte QUE les joueurs a leur poste (17 sept. 2026) ===")
+bloc_places = {s: card(i, "Rare", E.SLOT_LABELS[s], club="FC") for i, s in enumerate(SLOTS)}
+bloc_deplaces = {s: card(i, "Rare", "Gardien", club="FC") for i, s in enumerate(SLOTS)}
+det_ok = E.team_power(bloc_places)[1]
+det_ko = E.team_power(bloc_deplaces)[1]
+check("7 du meme club A LEUR POSTE : synergie pleine",
+      det_ok["max_club_group"] == 7 and det_ok["synergy"] == E.SYNERGY[7])
+check("les memes, tous hors poste : aucune synergie",
+      det_ko["max_club_group"] == 1 and det_ko["synergy"] == 1.0,
+      "groupe %d, x%.2f" % (det_ko["max_club_group"], det_ko["synergy"]))
+mixte = dict(bloc_places)
+for s in ("ARD", "ALD", "PIV"):
+    mixte[s] = card(90, "Rare", "Gardien", club="FC")   # du club, mais hors poste
+check("seuls les bien places comptent", E.team_power(mixte)[1]["max_club_group"] == 4,
+      "groupe %d" % E.team_power(mixte)[1]["max_club_group"])
+check("le club majoritaire est nomme pour l'affichage", det_ok["club"] == "FC",
+      str(det_ok.get("club")))
+
+print("\n=== 9. Le cas remonte : le titulaire ne va plus sur le banc ===")
+
+
+# L'invariant : jamais un joueur hors poste a un poste dont le titulaire, de
+# rarete EGALE OU SUPERIEURE, est libre. Un ecart de RARETE, lui, reste un
+# arbitrage legitime -- un Epique hors poste (12) vaut mieux qu'un Rare a son
+# poste (11,2), et c'est voulu depuis le debut.
+def titulaire_lese(lu, cards):
+    places = {id(c): s for s, c in lu.items() if c}
+    for s, c in lu.items():
+        if not c or E.normalize_poste(c.get("poste")) == s:
+            continue
+        for d in cards:
+            if E.normalize_poste(d.get("poste")) != s:
+                continue
+            ou = places.get(id(d))
+            if (ou is None or E.normalize_poste(d.get("poste")) != ou) and \
+                    E.BASE_NOTE[d["rarete"]] >= E.BASE_NOTE[c["rarete"]]:
+                return "%s tenu par %s (%s) alors que %s (%s) est libre" % (
+                    s, c["nom"], c["rarete"], d["nom"], d["rarete"])
+    return None
+
+
+# Cesson tient ARD et ALD ; son gardien Rare valait un 3e Cessonnais en le mettant
+# ailier gauche, et l'ailier gauche Rare d'un autre club restait dehors. Depuis que
+# le club ne compte qu'a son poste, le deplacement ne rapporte plus rien : le
+# Cessonnais garde les buts, ou il compte, et l'ailier titulaire joue.
+cas = [card("gb-epique", "Épique", "Gardien", club="Saint-Raphael"),
+       card("gb-cesson", "Rare", "Gardien", club="Cesson"),
+       card("ard-cesson", "Rare", "Arriere Droit", club="Cesson"),
+       card("ald-cesson", "Rare", "Ailier Droit", club="Cesson"),
+       card("alg-tremblay", "Rare", "Ailier Gauche", club="Tremblay"),
+       card("arg-nimes", "Rare", "Arriere Gauche", club="Nimes"),
+       card("dc-paris", "Rare", "Demi Centre", club="Paris"),
+       card("piv-aix", "Rare", "Pivot", club="Aix")]
+lu = E.best_lineup(cas)
+check("l'ailier gauche titulaire joue", lu["ALG"]["id"] == "alg-tremblay", "ALG=%s" % lu["ALG"]["id"])
+check("le Cessonnais reste dans les buts, ou il compte pour son club",
+      lu["GB"]["id"] == "gb-cesson" and E.team_power(lu)[1]["max_club_group"] == 3,
+      "GB=%s groupe %d" % (lu["GB"]["id"], E.team_power(lu)[1]["max_club_group"]))
+check("aucun titulaire lese", titulaire_lese(lu, cas) is None, titulaire_lese(lu, cas) or "")
+
+leses = []
+for _ in range(200):
+    sub = rng.sample(POOL, rng.choice([8, 12, 20, 40, 80]))
+    faute = titulaire_lese(E.best_lineup(sub), sub)
+    if faute:
+        leses.append(faute)
+check("200 collections, aucun titulaire lese", not leses, leses[0] if leses else "")
+
 print("\n" + ("TOUS LES TESTS PASSENT" if not FAILED else "ECHECS : %s" % FAILED))
 sys.exit(1 if FAILED else 0)

@@ -75,6 +75,16 @@ P_ko = lineup_same_rarity("Rare", same_club=False, placed=False)
 wok, wko = show("Rares BIEN places  VS  Rares MAL places (memes cartes)", P_ok, P_ko)
 assert wok > 60, f"Bien placer doit avantager: {wok}"
 
+# 6) La synergie ne compte QUE les joueurs a leur poste (17 sept. 2026) : la meme
+#    equipe du meme club, mal placee, perd le bonus de poste ET le collectif. Avant,
+#    elle gardait x1,55 et la compo auto en profitait pour deplacer des titulaires.
+Q_ok = lineup_same_rarity("Rare", same_club=True, placed=True)
+Q_ko = lineup_same_rarity("Rare", same_club=True, placed=False)
+wq, wqk = show("Rares MEME CLUB bien places  VS  les memes MAL places", Q_ok, Q_ko)
+assert E.team_power(Q_ko)[1]["synergy"] == 1.0, "un club mal place ne donne plus de synergie"
+assert E.team_power(Q_ok)[1]["synergy"] == E.SYNERGY[7], "un club bien place garde la sienne"
+assert wq >= 95, f"le collectif bien place doit ecraser: {wq}"
+
 # --- ELO ---
 print("\n=== ELO ===")
 n1, n2 = E.elo_apply(1000, 1000, 1.0)

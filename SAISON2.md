@@ -41,8 +41,10 @@ pas de bonus de poste pour elles, sans gravité.
 
 - **Bonus de poste** : ×1.4 si la carte est sur son poste naturel.
 - **Slot vide** : note = Commun (3), sans club ni bonus.
-- **Synergie de club** (plus gros groupe de même club aligné) :
+- **Synergie de club** (plus gros groupe de même club aligné **à son poste**) :
   `2→×1.05 · 3→×1.12 · 4→×1.20 · 5→×1.30 · 6→×1.42 · 7→×1.55`.
+  ⚠️ **« à son poste » date du 17 septembre 2026** — un joueur hors poste ne compte
+  plus dans la synergie (voir « La synergie ne compte plus les joueurs déplacés »).
 - **Puissance équipe** = (Σ notes) × synergie.
 - **Simulation** : 50 possessions, conversion ~55 % modulée par la puissance
   relative, variance « forme du jour » (±12 %), mort subite si égalité.
@@ -237,6 +239,57 @@ de tout le monde montent donc d'un cran : c'est le barème des duels qui se durc
 légèrement, pas seulement un bug qui disparaît.
 Tests : `py -3 tools/test_duel_lineup.py` (optimum vérifié contre une recherche
 exhaustive, non-régression vs l'ancien glouton, déterminisme, cas limites).
+
+#### La synergie ne compte plus les joueurs déplacés — 17 septembre 2026
+Les remontées « la compo auto met des gens au mauvais poste » ont continué **après**
+le correctif du 6 septembre. Enquête : l'optimiseur n'avait aucun bug (optimum exact
+revérifié contre une recherche exhaustive indépendante, élagage compris), c'était la
+**synergie de club** qui commandait ces choix, et elle était trop lourde :
+
+- un joueur de plus dans le groupe vaut **+7 à +9 % sur TOUTE l'équipe** ;
+- le bonus de poste vaut **+40 % d'UNE carte**, soit **+2 à +6 %** de l'équipe.
+
+Au-delà d'environ 50 de valeur d'équipe, compléter un groupe payait donc toujours
+plus que respecter un poste. Mesuré sur 3 000 collections tirées de packs :
+**44 % des compos** alignaient un joueur hors poste alors qu'un titulaire de rareté
+**égale ou supérieure** était libre, et **13 %** laissaient sur le banc un joueur de
+rareté strictement supérieure.
+
+Correctif : **un joueur hors de son poste ne compte plus dans la synergie**
+(`team_power`). Déplacer quelqu'un pour le club ne rapporte donc plus jamais rien, et
+le symptôme disparaît **par construction** — mesuré : 0 %, contre 44 %.
+
+Trois points à ne pas re-litiger :
+- **les paliers n'ont pas bougé** (`SYNERGY` reste `×1.05 … ×1.55`). Une équipe de
+  club montée **poste par poste** vaut exactement autant qu'avant : ce qui change,
+  c'est qu'elle doit être montée poste par poste. C'est aussi un objectif de
+  collection plus lisible que « n'importe quels sept Nantais » ;
+- **l'équilibrage validé n'a pas bougé** : les scénarios de `test_duel_balance.py`
+  alignent tous des joueurs à leur poste, donc leurs puissances sont identiques au
+  point près. Effet global sur les compos auto réelles : **−1,5 %** de puissance en
+  moyenne (les deux camps la perdent), **1,27 → 0,98** joueur hors poste, et la
+  synergie moyenne tient (1,215 → 1,185) parce que l'optimiseur reconstruit les
+  groupes **à leur poste** au lieu de les improviser ;
+- **les réglages de constantes ont été mesurés et écartés.** Baisser la synergie de
+  20 % (`×1.04 … ×1.44`) ne réglait que les cas de rareté supérieure (13 % → 1 %) et
+  laissait 36 % de symptôme ; aplatir le début de la courbe réglait les petits
+  groupes mais pas les gros. Aucun réglage ne peut faire les deux : tant que le
+  palier à 7 doit rester ≥ ×1,44 pour que `test_duel_balance.py` passe, les paliers
+  du haut restent au-dessus du bonus de poste.
+
+Coût : la synergie dépendant maintenant du PLACEMENT et plus seulement du groupe, le
+côté club de la DP compte en plus les joueurs à leur poste (`_assign_dp_club`, une
+dimension `k`). Une compo passe de ~20 à ~65 ms, et de 70 à 160 ms pour une
+collection complète de 258 cartes — toujours loin des 3 s d'une interaction Discord.
+
+Sur la feuille de match, la ligne de synergie **nomme le club** et dit « à leur
+poste » (`3 joueurs de Nantes à leur poste (+12 %)`) : avant, « 3 joueurs (+12 %) »
+ne permettait pas de relier un ✗ de la compo au bonus, et c'est ce qui faisait passer
+un choix légitime pour un bug.
+
+Tests : sections 8 et 9 de `tools/test_duel_lineup.py` (synergie comptée au poste,
+le cas remonté par les joueurs, et l'invariant « aucun titulaire lésé » sur 200
+collections), scénario 6 de `tools/test_duel_balance.py`.
 
 Elle est **figée au lancement du `/defi`**, pas à la résolution : la puissance
 annoncée à l'attaquant est exactement celle qu'il affrontera, même si la cible
