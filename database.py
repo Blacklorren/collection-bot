@@ -1061,7 +1061,8 @@ def get_general_leaderboard(points_per_win, limit=10, competition=None,
 
     Args:
         points_per_win (int): Le nombre de points pour un pronostic correct.
-        limit (int): Le nombre maximum de joueurs à retourner.
+        limit (int|None): Le nombre maximum de joueurs à retourner. `None` = tous
+            (le classement paginé de `!cg` découpe lui-même ses pages).
         competition (str|None): Ne compter que cette compétition.
         depuis (str|None): Date ISO de début de saison. `None` = tout l'historique
             (l'archive S1 incluse) ; par défaut, la saison en cours seulement.
@@ -1099,13 +1100,17 @@ def get_general_leaderboard(points_per_win, limit=10, competition=None,
             query += " AND m.competition = ?"
             params.append(competition)
 
-        query += """    
+        # `p.user_id` départage les ex æquo : sans lui leur ordre est laissé à SQLite,
+        # et un classement relu page par page pourrait montrer le même joueur sur deux
+        # pages, ou sur aucune.
+        query += """
             GROUP BY p.user_id
-            ORDER BY total_points DESC, bons_pronos DESC
-            LIMIT ?
+            ORDER BY total_points DESC, bons_pronos DESC, p.user_id ASC
         """
-        params.append(limit)
-        
+        if limit is not None:
+            query += " LIMIT ?"
+            params.append(limit)
+
         cur.execute(query, params)
         
         leaderboard = cur.fetchall()

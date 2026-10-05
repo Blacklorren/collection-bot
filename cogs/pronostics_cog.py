@@ -30,6 +30,58 @@ def _date_lisible(iso):
     except (TypeError, ValueError):
         return str(iso)
 
+
+# --- Classement général paginé (!cg) ---
+# Dix joueurs par page, comme /classement_duel, mais sans plafond : chaque
+# pronostiqueur classé doit pouvoir retrouver sa place.
+CG_PAR_PAGE = 10
+# Préfixe du custom_id des flèches. La suite du custom_id porte TOUT l'état de la
+# page visée (n° de page, portée, compétition) : le bot ne garde rien en mémoire,
+# donc les flèches répondent encore des mois plus tard, après n'importe quel
+# redémarrage. discord.py 2.3 n'a pas `DynamicItem` pour relire un custom_id
+# variable : c'est le listener on_interaction du cog qui s'en charge.
+CG_CUSTOM_ID = "pronos:cg"
+
+
+def _cg_custom_id(page, archive, competition):
+    # La compétition passe en dernier : elle seule peut contenir un « : ».
+    return f"{CG_CUSTOM_ID}:{page}:{int(archive)}:{competition or ''}"
+
+
+def _cg_lire_custom_id(custom_id):
+    """Inverse de _cg_custom_id : (page, archive, competition), ou None si le
+    custom_id n'est pas celui d'une flèche de !cg."""
+    if not custom_id.startswith(CG_CUSTOM_ID + ":"):
+        return None
+    try:
+        page, archive, competition = custom_id[len(CG_CUSTOM_ID) + 1:].split(":", 2)
+        return int(page), archive == "1", competition or None
+    except ValueError:
+        return None
+
+
+def _cg_view(page, nb_pages, archive, competition):
+    """Les flèches de !cg, ou None s'il n'y a qu'une page.
+
+    Tout le monde peut tourner les pages : le classement est public, n'importe quel
+    lecteur doit pouvoir y chercher sa place. Les boutons n'ont volontairement aucun
+    callback : avant comme après un redémarrage, c'est on_interaction qui répond.
+    """
+    if nb_pages <= 1:
+        return None
+    view = discord.ui.View(timeout=None)
+    view.add_item(discord.ui.Button(
+        emoji="◀️", style=discord.ButtonStyle.grey, disabled=page == 0,
+        custom_id=_cg_custom_id(page - 1, archive, competition)))
+    # Simple compteur : désactivé, il ne fait qu'afficher la page courante.
+    view.add_item(discord.ui.Button(
+        label=f"{page + 1}/{nb_pages}", style=discord.ButtonStyle.grey, disabled=True))
+    view.add_item(discord.ui.Button(
+        emoji="▶️", style=discord.ButtonStyle.grey, disabled=page >= nb_pages - 1,
+        custom_id=_cg_custom_id(page + 1, archive, competition)))
+    return view
+
+
 class PronosticsCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -600,14 +652,16 @@ class PronosticsCog(commands.Cog):
         !cg Euro               -> uniquement l'Euro, saison en cours
         !cg archive            -> tout l'historique, saisons passées comprises
         !cg archive Starligue  -> tout l'historique, Starligue seulement
+
+        Tous les joueurs classés sont listés, dix par page. Seul l'admin lance la
+        commande ; les flèches du message, elles, restent cliquables par tout le
+        monde et n'expirent jamais.
         """
         # Suppression du message de l'admin pour garder le chat propre
         try:
             await ctx.message.delete()
         except:
             pass
-
-        limit = 20 # Nombre de joueurs à afficher
 
         # `archive` en premier mot bascule sur tout l'historique ; le reste de la
         # ligne, s'il y en a un, reste le filtre de compétition.
@@ -618,32 +672,10 @@ class PronosticsCog(commands.Cog):
         else:
             competition = (argument or "").strip() or None
 
-        depuis = None if archive else database.DEBUT_SAISON_PRONOS
-        if archive:
-            portee = "Toutes saisons confondues (archive)."
-        else:
-            portee = f"Saison en cours, depuis le {_date_lisible(database.DEBUT_SAISON_PRONOS)}."
-
-        # Configuration du titre et de la description
-        if competition:
-            titre = f"🏆 Classement Général : {competition.capitalize()}"
-            desc = f"Top {limit} des meilleurs pronostiqueurs sur la **{competition.capitalize()}**."
-            couleur = discord.Color.blue()
-        else:
-            titre = "👑 Classement Général (Global)"
-            desc = f"Top {limit} toutes compétitions confondues (Starligue + Euro + ...)."
-            couleur = discord.Color.gold()
-        if archive:
-            titre += " — archive"
-        desc = f"{desc}\n*{portee}*"
-
         try:
-            # Récupération des données (fonction déjà existante dans votre database.py)
-            leaderboard = database.get_general_leaderboard(
-                POINTS_BON_PRONO, limit=limit, competition=competition, depuis=depuis
-            )
-            
-            if not leaderboard:
+            resultat = self._cg_page(ctx.guild, 0, archive, competition)
+
+            if not resultat:
                 if competition:
                     msg = f"Aucun pronostic correct sur **{competition.capitalize()}**. Vérifiez l'orthographe, ou lancez `!repair_history` pour rattacher les anciens matchs à leur compétition."
                 elif archive:
@@ -653,35 +685,100 @@ class PronosticsCog(commands.Cog):
                 await ctx.send(f"❌ {msg}", delete_after=10)
                 return
 
-            embed = discord.Embed(
-                title=titre,
-                description=desc,
-                color=couleur,
-                timestamp=datetime.now(timezone.utc)
-            )
-            
-            classement_text = ""
-            for rank, row in enumerate(leaderboard, 1):
-                user_id, bons_pronos, total_points = row['user_id'], row['bons_pronos'], row['total_points']
-                member = ctx.guild.get_member(user_id)
-                member_name = member.display_name if member else f"Utilisateur ({user_id})"
-                
-                # Médailles
-                if rank == 1: emoji = "🥇"
-                elif rank == 2: emoji = "🥈"
-                elif rank == 3: emoji = "🥉"
-                else: emoji = f"**#{rank}**"
-                
-                classement_text += f"{emoji} **{member_name}** - **{total_points}** pts ({bons_pronos} bons)\n"
-            
-            embed.add_field(name="Top Joueurs", value=classement_text, inline=False)
-            
             # Envoi du classement
-            await ctx.send(embed=embed)
+            embed, view = resultat
+            await ctx.send(embed=embed, view=view)
 
         except Exception as e:
             print(f"Erreur classement: {e}")
             await ctx.send("❌ Une erreur est survenue lors de la génération du classement.", delete_after=5)
+
+    def _cg_page(self, guild, page, archive, competition):
+        """Construit (embed, view) pour une page du classement général, ou None s'il
+        n'y a personne à classer.
+
+        La base est relue à chaque appel : un message posté il y a un mois affiche,
+        dès qu'on tourne une page, le classement du jour et non une photo figée.
+        """
+        depuis = None if archive else database.DEBUT_SAISON_PRONOS
+        leaderboard = database.get_general_leaderboard(
+            POINTS_BON_PRONO, limit=None, competition=competition, depuis=depuis
+        )
+        if not leaderboard:
+            return None
+
+        nb_pages = (len(leaderboard) + CG_PAR_PAGE - 1) // CG_PAR_PAGE
+        # Le classement a pu raccourcir depuis que la flèche cliquée a été posée.
+        page = max(0, min(page, nb_pages - 1))
+        debut = page * CG_PAR_PAGE
+        lignes = leaderboard[debut:debut + CG_PAR_PAGE]
+
+        if archive:
+            portee = "Toutes saisons confondues (archive)."
+        else:
+            portee = f"Saison en cours, depuis le {_date_lisible(database.DEBUT_SAISON_PRONOS)}."
+
+        # Configuration du titre et de la description
+        if competition:
+            titre = f"🏆 Classement Général : {competition.capitalize()}"
+            desc = f"Les meilleurs pronostiqueurs sur la **{competition.capitalize()}**."
+            couleur = discord.Color.blue()
+        else:
+            titre = "👑 Classement Général (Global)"
+            desc = "Toutes compétitions confondues (Starligue + Euro + ...)."
+            couleur = discord.Color.gold()
+        if archive:
+            titre += " — archive"
+
+        embed = discord.Embed(
+            title=titre,
+            description=f"{desc}\n*{portee}*",
+            color=couleur,
+            timestamp=datetime.now(timezone.utc)
+        )
+
+        classement_text = ""
+        for rank, row in enumerate(lignes, debut + 1):
+            user_id, bons_pronos, total_points = row['user_id'], row['bons_pronos'], row['total_points']
+            member = guild.get_member(user_id) if guild else None
+            member_name = member.display_name if member else f"Utilisateur ({user_id})"
+
+            # Médailles
+            if rank == 1: emoji = "🥇"
+            elif rank == 2: emoji = "🥈"
+            elif rank == 3: emoji = "🥉"
+            else: emoji = f"**#{rank}**"
+
+            classement_text += f"{emoji} **{member_name}** - **{total_points}** pts ({bons_pronos} bons)\n"
+
+        if nb_pages == 1:
+            nom_champ = "Top Joueurs"
+        else:
+            nom_champ = f"Places {debut + 1} à {debut + len(lignes)} sur {len(leaderboard)}"
+        embed.add_field(name=nom_champ, value=classement_text, inline=False)
+
+        return embed, _cg_view(page, nb_pages, archive, competition)
+
+    @commands.Cog.listener()
+    async def on_interaction(self, interaction):
+        """Flèches du classement général (!cg) : ouvertes à tous, sans expiration."""
+        if interaction.type != discord.InteractionType.component:
+            return
+        etat = _cg_lire_custom_id((interaction.data or {}).get('custom_id', ''))
+        if etat is None:
+            return
+
+        resultat = self._cg_page(interaction.guild, *etat)
+        if resultat is None:
+            # Un classement « saison en cours » posté la saison passée, relu après
+            # le déplacement de DEBUT_SAISON_PRONOS : il n'y a plus rien à paginer.
+            await interaction.response.send_message(
+                "Aucun pronostic correct pour l'instant cette saison : le classement est reparti de zéro.",
+                ephemeral=True)
+            return
+
+        embed, view = resultat
+        await interaction.response.edit_message(embed=embed, view=view)
 
 async def setup(bot):
     await bot.add_cog(PronosticsCog(bot))

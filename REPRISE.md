@@ -200,6 +200,11 @@ est un simple filtre, la 1re journée de la S2 reste comptée, et la S1 reste li
   `!userpronos @membre archive` rendent tout l'historique.
 - `!classement` (semaine) et le récap hebdomadaire étaient déjà bornés par dates :
   ils n'ont pas bougé.
+- Depuis le 5 octobre 2026, `!cg` liste **tous** les joueurs classés, dix par page
+  (il s'arrêtait au top 20). La commande reste réservée aux admins, mais les flèches
+  du message sont cliquables par tout le monde et n'expirent pas, redémarrages
+  compris : l'état de la page voyage dans le `custom_id` du bouton, et le classement
+  est relu en base à chaque clic. Test : `py -3 tools/test_pronos_classement.py`.
 
 **Contrôle, à lancer sur Railway** (lecture seule, aucune écriture) :
 
