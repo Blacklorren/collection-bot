@@ -550,7 +550,12 @@ class EventsCog(commands.Cog):
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(BROWSERLESS_CONTENT_API_URL, json=payload, timeout=60) as resp:
-                    if resp.status != 200: return None
+                    if resp.status != 200:
+                        # Sans ce log, un token Browserless invalide (401) laisse les
+                        # matchs sans résultat sans aucune trace.
+                        body = (await resp.text())[:200]
+                        print(f"❌ (RESULTATS) Match {event_id} : HTTP {resp.status} : {body}")
+                        return None
                     html = await resp.text()
             soup = BeautifulSoup(html, 'html.parser')
             status = soup.find('span', class_='fixedHeaderDuel__detailStatus')
@@ -560,7 +565,9 @@ class EventsCog(commands.Cog):
             scores = [s.get_text(strip=True) for s in wrapper.find_all('span') if s.get_text(strip=True).isdigit()]
             if len(scores) < 2: return None
             return f"{scores[0]}-{scores[1]}"
-        except Exception: return None
+        except Exception as e:
+            print(f"❌ (RESULTATS) Match {event_id} : {type(e).__name__} : {e}")
+            return None
 
     async def update_discord_event_with_result(self, discord_event_id, team1, team2, score):
         if not discord_event_id: return

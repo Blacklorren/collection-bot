@@ -274,110 +274,143 @@ class PronosticsCog(commands.Cog):
         # On exécute le lundi à 10h du matin
         if now.weekday() == 0 and now.hour == 10:
             print("📅 (PRONOS) Lundi 10h, génération des classements...")
-            
-            today = date.today()
-            last_week_day = today - timedelta(days=7)
-            start, end = database.get_week_dates(last_week_day)
-            
-            # Récupérer tous les matchs de la semaine
-            all_matches = database.get_matches_in_date_range(start, end)
-            
-            if not all_matches:
-                print("ℹ️ (PRONOS) Aucun match la semaine passée.")
-                return
+            await self.send_weekly_summary()
 
-            # Grouper par compétition
-            matches_by_competition = {}
-            for match in all_matches:
-                 # Si 'competition' n'est pas rempli (vieux matchs), on met "Inconnue" ou on essaye de deviner
-                comp = match['competition'] if 'competition' in match.keys() and match['competition'] else "Compétition"
-                if comp not in matches_by_competition:
-                    matches_by_competition[comp] = []
-                matches_by_competition[comp].append(match)
-            
-            channel = self.bot.get_channel(ANNONCE_CHANNEL_ID)
-            if not channel:
-                print(f"❌ (PRONOS) Canal d'annonce {ANNONCE_CHANNEL_ID} introuvable.")
-                return
+    async def send_weekly_summary(self):
+        """Publie le bilan de la semaine passée. Renvoie le nombre de messages envoyés."""
+        today = date.today()
+        last_week_day = today - timedelta(days=7)
+        start, end = database.get_week_dates(last_week_day)
 
-            # POUR CHAQUE COMPÉTITION
-            for competition_name, comp_matches in matches_by_competition.items():
-                print(f"📊 (PRONOS) Traitement de la compétition : {competition_name}")
-                
-                # 1. Vérifier s'il y a eu de l'activité (des pronos)
-                has_activity = False
-                match_ids = [m['id'] for m in comp_matches]
-                
-                # On vérifie s'il y a au moins un prono sur un des matchs
-                for match_id in match_ids:
-                    pronos = database.get_match_pronostics(match_id)
-                    if pronos:
-                        has_activity = True
-                        break
-                
-                if not has_activity:
-                    print(f"ℹ️ (PRONOS) Aucun pronostic pour {competition_name} cette semaine. Pas de message.")
+        # Dernière chance pour les résultats manquants (match du dimanche soir,
+        # ou boucle de résultats en échec) avant de figer le classement.
+        events_cog = self.bot.get_cog('EventsCog')
+        if events_cog:
+            try:
+                await events_cog._internal_check_and_process_results()
+            except Exception as e:
+                print(f"❌ (PRONOS) Récupération des résultats avant bilan : {e}")
+
+        # Récupérer tous les matchs de la semaine
+        all_matches = database.get_matches_in_date_range(start, end)
+
+        if not all_matches:
+            print("ℹ️ (PRONOS) Aucun match la semaine passée.")
+            return 0
+
+        sent = 0
+
+        # Grouper par compétition
+        matches_by_competition = {}
+        for match in all_matches:
+             # Si 'competition' n'est pas rempli (vieux matchs), on met "Inconnue" ou on essaye de deviner
+            comp = match['competition'] if 'competition' in match.keys() and match['competition'] else "Compétition"
+            if comp not in matches_by_competition:
+                matches_by_competition[comp] = []
+            matches_by_competition[comp].append(match)
+        
+        channel = self.bot.get_channel(ANNONCE_CHANNEL_ID)
+        if not channel:
+            print(f"❌ (PRONOS) Canal d'annonce {ANNONCE_CHANNEL_ID} introuvable.")
+            return 0
+
+        # POUR CHAQUE COMPÉTITION
+        for competition_name, comp_matches in matches_by_competition.items():
+            print(f"📊 (PRONOS) Traitement de la compétition : {competition_name}")
+            
+            # 1. Vérifier s'il y a eu de l'activité (des pronos)
+            has_activity = False
+            match_ids = [m['id'] for m in comp_matches]
+            
+            # On vérifie s'il y a au moins un prono sur un des matchs
+            for match_id in match_ids:
+                pronos = database.get_match_pronostics(match_id)
+                if pronos:
+                    has_activity = True
+                    break
+            
+            if not has_activity:
+                print(f"ℹ️ (PRONOS) Aucun pronostic pour {competition_name} cette semaine. Pas de message.")
+                continue
+
+            # 2. Préparer l'embed
+            embed = discord.Embed(
+                title=f"🏆 Bilan {competition_name} 🏆",
+                description=f"Résumé des pronostics pour la semaine du {start.strftime('%d/%m')} au {end.strftime('%d/%m')}.",
+                color=discord.Color.gold(),
+                timestamp=datetime.now(timezone.utc)
+            )
+
+            # 3. Classement Hebdomadaire
+            # On ne garde que les matchs terminés avec un résultat
+            finished_matches_ids = [m['id'] for m in comp_matches if m['resultat']]
+            # Matchs joués mais sans score : la récupération des résultats a échoué
+            now_utc = datetime.now(timezone.utc)
+            missing_results = []
+            for m in comp_matches:
+                if m['resultat']:
                     continue
+                played_at = datetime.fromisoformat(m['date_match'])
+                if played_at.tzinfo is None:
+                    played_at = played_at.replace(tzinfo=timezone.utc)
+                if played_at < now_utc:
+                    missing_results.append(m)
+            if missing_results:
+                print(f"⚠️ (PRONOS) {competition_name} : {len(missing_results)} match(s) joué(s) sans résultat.")
 
-                # 2. Préparer l'embed
-                embed = discord.Embed(
-                    title=f"🏆 Bilan {competition_name} 🏆",
-                    description=f"Résumé des pronostics pour la semaine du {start.strftime('%d/%m')} au {end.strftime('%d/%m')}.",
-                    color=discord.Color.gold(),
-                    timestamp=datetime.now(timezone.utc)
-                )
-
-                # 3. Classement Hebdomadaire
-                # On ne garde que les matchs terminés avec un résultat
-                finished_matches_ids = [m['id'] for m in comp_matches if m['resultat']]
-                
-                if not finished_matches_ids:
-                     embed.add_field(
-                        name="Classement de la Semaine",
-                        value="Aucun match terminé avec résultat cette semaine.",
-                        inline=False
-                    )
-                else:
-                    weekly_leaderboard = database.get_leaderboard_for_matches(finished_matches_ids)
-                    weekly_text = "Aucun pronostic correct."
-                    if weekly_leaderboard:
-                        weekly_text = ""
-                        for rank, row in enumerate(weekly_leaderboard[:10], 1):
-                            user = self.bot.get_user(row['user_id'])
-                            name = user.display_name if user else f"Utilisateur {row['user_id']}"
-                            emoji = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"**#{rank}**"
-                            weekly_text += f"{emoji} **{name}** - {row['bons_pronos']}/{len(finished_matches_ids)} ({row['total_points']} pts)\n"
-                    
-                    embed.add_field(
-                        name="🏆 Top 10 Semaine",
-                        value=weekly_text,
-                        inline=False
-                    )
-
-                # 4. Classement Général de cette Compétition, SAISON EN COURS
-                # (borne par defaut de get_general_leaderboard : les saisons passees
-                # ne polluent plus le recap hebdomadaire.)
-                general_leaderboard = database.get_general_leaderboard(POINTS_BON_PRONO, limit=10, competition=competition_name)
-                
-                general_text = "Aucun pronostic correct enregistré cette saison."
-                if general_leaderboard:
-                    general_text = ""
-                    for rank, row in enumerate(general_leaderboard, 1):
-                        user = self.bot.get_user(row['user_id'])
-                        name = user.display_name if user else f"Utilisateur {row['user_id']}"
-                        emoji = "👑" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"**#{rank}**"
-                        general_text += f"{emoji} **{name}** - {row['total_points']} pts\n"
-
+            if not finished_matches_ids:
+                value = "Aucun match terminé avec résultat cette semaine."
+                if missing_results:
+                    value = f"⏳ Résultats indisponibles pour {len(missing_results)} match(s), classement reporté."
                 embed.add_field(
-                    name="👑 Classement de la Saison",
-                    value=general_text,
+                    name="Classement de la Semaine",
+                    value=value,
                     inline=False
                 )
+            else:
+                weekly_leaderboard = database.get_leaderboard_for_matches(finished_matches_ids)
+                weekly_text = "Aucun pronostic correct."
+                if weekly_leaderboard:
+                    weekly_text = ""
+                    for rank, row in enumerate(weekly_leaderboard[:10], 1):
+                        user = self.bot.get_user(row['user_id'])
+                        name = user.display_name if user else f"Utilisateur {row['user_id']}"
+                        emoji = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"**#{rank}**"
+                        weekly_text += f"{emoji} **{name}** - {row['bons_pronos']}/{len(finished_matches_ids)} ({row['total_points']} pts)\n"
                 
-                embed.set_footer(text=f"Pronostics {competition_name}")
-                await channel.send(embed=embed)
-                print(f"✅ (PRONOS) Message envoyé pour {competition_name}.")
-                await asyncio.sleep(2)
+                embed.add_field(
+                    name="🏆 Top 10 Semaine",
+                    value=weekly_text,
+                    inline=False
+                )
+
+            # 4. Classement Général de cette Compétition, SAISON EN COURS
+            # (borne par defaut de get_general_leaderboard : les saisons passees
+            # ne polluent plus le recap hebdomadaire.)
+            general_leaderboard = database.get_general_leaderboard(POINTS_BON_PRONO, limit=10, competition=competition_name)
+            
+            general_text = "Aucun pronostic correct enregistré cette saison."
+            if general_leaderboard:
+                general_text = ""
+                for rank, row in enumerate(general_leaderboard, 1):
+                    user = self.bot.get_user(row['user_id'])
+                    name = user.display_name if user else f"Utilisateur {row['user_id']}"
+                    emoji = "👑" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"**#{rank}**"
+                    general_text += f"{emoji} **{name}** - {row['total_points']} pts\n"
+
+            embed.add_field(
+                name="👑 Classement de la Saison",
+                value=general_text,
+                inline=False
+            )
+            
+            embed.set_footer(text=f"Pronostics {competition_name}")
+            await channel.send(embed=embed)
+            print(f"✅ (PRONOS) Message envoyé pour {competition_name}.")
+            sent += 1
+            await asyncio.sleep(2)
+
+        return sent
 
     @check_pronos_closure.before_loop
     @publish_weekly_summary.before_loop
@@ -468,6 +501,17 @@ class PronosticsCog(commands.Cog):
             )
         
         await ctx.send(embed=embed, ephemeral=True)
+
+    @commands.command(name='bilan')
+    @commands.has_permissions(manage_guild=True)
+    async def bilan_command(self, ctx):
+        """[Admin] Republie le bilan de la semaine passée (après récupération des résultats manquants)."""
+        await ctx.send("🔄 Récupération des résultats et génération du bilan...", ephemeral=True)
+        sent = await self.send_weekly_summary()
+        if sent:
+            await ctx.send(f"✅ Bilan publié ({sent} message(s)).", ephemeral=True)
+        else:
+            await ctx.send("ℹ️ Aucun bilan à publier pour la semaine passée.", ephemeral=True)
 
     @commands.command(name='classement')
     @commands.has_permissions(manage_guild=True)
